@@ -17,7 +17,13 @@ made during feature work.
 - Default seeded punches (first launch): standard orthodox 1-6 — 1 Jab,
   2 Cross, 3 Left Hook, 4 Right Hook, 5 Left Uppercut, 6 Right Uppercut.
 - Default Settings: 10 rounds, 180s work / 60s rest, 0s warmup, 1.5-3s
-  combo gap, 1.0x speech rate, full app volume, no active preset.
+  combo gap, 2-4 punch combo length, no punch-pool restriction (draws
+  from all current punches), 1.0x speech rate, full app volume, no
+  active preset.
+- Combo length (how many punches per Random-mode combo) and which
+  punches are eligible to be drawn are both user-customizable settings
+  (`comboLengthMin`/`Max`, `randomPunchPool`) — confirmed explicitly,
+  not left as a fixed engine constant.
 - **Native modules with no JS-only fallback silently no-op under
   `jest-expo`, they don't throw.** `expo-crypto`'s `randomUUID()`
   returned `undefined` in tests with no error — traced only because a

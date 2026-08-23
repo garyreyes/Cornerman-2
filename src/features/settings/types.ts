@@ -9,6 +9,11 @@ export interface Settings {
   activePresetId: string | null;
   comboGapMinSec: number;
   comboGapMaxSec: number;
+  /** How many punches make up one randomly-generated combo (Random mode) */
+  comboLengthMin: number;
+  comboLengthMax: number;
+  /** Punch.num values eligible for Random mode's draw; null = every current punch */
+  randomPunchPool: number[] | null;
   /** 0.25-5.0 */
   speechRate: number;
   /** 0-1, this app's own output only, independent of device media volume */
