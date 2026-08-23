@@ -17,11 +17,10 @@ as each sub-phase completes — it should never drift out of sync with
 
 - [x] **1a. Harness setup** — `done` — scaffold, lint/typecheck/test
   gates, CI, branch protection. Shipped 2026-08-23 (`e3da0c6`, `b589640`).
-- [ ] **1b. MMKV storage layer + Settings/Punch/Preset data model** —
-  `not started` — types, CRUD service, zero-migration defaulting
-  (`Object.assign(defaults, parsed)` pattern). Correctness-adjacent per
-  `CLAUDE.md`'s testing standard (settings persistence) — write tests
-  first.
+- [x] **1b. MMKV storage layer + Settings/Punch/Preset data model** —
+  `done` — types, CRUD service, zero-migration defaulting
+  (`Object.assign(defaults, parsed)` pattern). Test-first per
+  `CLAUDE.md`'s testing standard; 8 tests passing.
 
 ## Phase 2 — Timer Engine
 
@@ -114,6 +113,6 @@ decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-First sub-phase to build is **1b** (MMKV storage layer + data model) —
+Next sub-phase to build is **2a** (phase state machine + tick loop) —
 run `/feature-planner` for it when ready. As each sub-phase completes,
 mark it `done` here and log the matching entry in `CHANGES.md`.
