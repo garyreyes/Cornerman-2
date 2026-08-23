@@ -18,6 +18,8 @@ function beginWork(
     tenWarned: false,
     lastRestCountdown: null,
     firstComboAt: transitionAt + FIRST_COMBO_MIN_MS + random() * FIRST_COMBO_WINDOW_MS,
+    isPaused: false,
+    pausedAt: null,
   };
 }
 
@@ -29,6 +31,8 @@ function beginRest(round: number, transitionAt: number, config: TimerConfig): Ti
     tenWarned: false,
     lastRestCountdown: null,
     firstComboAt: null,
+    isPaused: false,
+    pausedAt: null,
   };
 }
 
@@ -45,6 +49,8 @@ export function startTimer(
       tenWarned: false,
       lastRestCountdown: null,
       firstComboAt: null,
+      isPaused: false,
+      pausedAt: null,
     };
   }
   return beginWork(1, now, config, random);
@@ -58,6 +64,10 @@ export function tick(
   now: number,
   random: RandomFn = Math.random,
 ): { state: TimerState; events: TimerEvent[] } {
+  if (state.isPaused) {
+    return { state, events: [] };
+  }
+
   const events: TimerEvent[] = [];
   let s = state;
 
@@ -101,4 +111,36 @@ export function tick(
   }
 
   return { state: s, events };
+}
+
+/**
+ * Freezes a running session exactly where it is. Detecting *why* to pause
+ * (a phone call, losing audio focus) is native/platform wiring built
+ * later (Phase 7) -- this is just the mechanism itself.
+ */
+export function pause(state: TimerState, now: number): TimerState {
+  if (state.isPaused || !TICKING_PHASES.has(state.phase)) {
+    return state;
+  }
+  return { ...state, isPaused: true, pausedAt: now };
+}
+
+/**
+ * Resumes at exactly the remaining time captured at pause() -- every
+ * forward-looking timestamp shifts by the paused duration rather than
+ * being recomputed from wall-clock phase boundaries, which is what
+ * avoids drift (extraction doc §1.3).
+ */
+export function resume(state: TimerState, now: number): TimerState {
+  if (!state.isPaused || state.pausedAt === null) {
+    return state;
+  }
+  const pausedDurationMs = now - state.pausedAt;
+  return {
+    ...state,
+    isPaused: false,
+    pausedAt: null,
+    phaseEndAt: state.phaseEndAt + pausedDurationMs,
+    firstComboAt: state.firstComboAt !== null ? state.firstComboAt + pausedDurationMs : null,
+  };
 }

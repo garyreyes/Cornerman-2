@@ -18,6 +18,9 @@ export interface TimerState {
   lastRestCountdown: 3 | 2 | 1 | null;
   /** Absolute timestamp the first combo of the current Work phase should fire; null outside Work */
   firstComboAt: number | null;
+  isPaused: boolean;
+  /** Timestamp pause() was called; null while running */
+  pausedAt: number | null;
 }
 
 export type TimerEvent =

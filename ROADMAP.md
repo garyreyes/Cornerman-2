@@ -29,9 +29,10 @@ as each sub-phase completes — it should never drift out of sync with
 - [x] **2a. Phase state machine + tick loop** — `done` —
   once-per-second latches for the 10s work warning and rest countdown;
   Ready/Warmup/Work/Rest/Finished transitions. 12 tests passing.
-- [ ] **2b. True pause/resume + interruption handling** — `not started`
-  — exact remaining-time preservation on pause; auto-pause/resume on a
-  call or audio-focus loss (`docs/user-flows.md` Flow 2).
+- [x] **2b. True pause/resume + interruption handling** — `done` —
+  exact remaining-time preservation on pause (mechanism only; actually
+  detecting a call/audio-focus interruption is Phase 7's native wiring,
+  per `docs/user-flows.md` Flow 2). 9 tests passing.
 
 ## Phase 3 — Combo Engine
 
@@ -162,8 +163,8 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-Next sub-phase to build is **2b** (true pause/resume + interruption
-handling). Phase 10+ is planned and written down, but confirmed to
-build *after* Phase 9 ships. Run `/feature-planner` for 2b when ready.
-As each sub-phase completes, mark it `done` here and log the matching
-entry in `CHANGES.md`.
+Phase 2 (Timer Engine) is complete. Next sub-phase to build is **3a**
+(random + preset combo generation). Phase 10+ is planned and written
+down, but confirmed to build *after* Phase 9 ships. Run
+`/feature-planner` for 3a when ready. As each sub-phase completes, mark
+it `done` here and log the matching entry in `CHANGES.md`.

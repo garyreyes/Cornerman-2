@@ -27,3 +27,16 @@ Dated log of shipped changes, appended to as features complete.
   large-`now`-jump case (app resumed after suspension) resolving to
   the correct phase without retroactively firing stale countdowns.
   12 tests, all passing. Pause/resume is 2b, not this sub-phase.
+- 2026-08-23: Sub-phase 2b — True pause/resume (`pause`/`resume` added
+  to `src/features/timer/service.ts`). `resume()` shifts every
+  forward-looking timestamp (`phaseEndAt`, and `firstComboAt` if still
+  pending) forward by the exact paused duration rather than recomputing
+  from wall-clock phase boundaries — the no-drift fix from extraction
+  doc §1.3, generalized beyond just `endTime`. Latch state (`tenWarned`,
+  `lastRestCountdown`) is untouched by pause, so an already-fired
+  warning doesn't refire on resume and a pending one still fires at the
+  correct *remaining* time regardless of how long the pause lasted.
+  `tick()` is a true no-op while paused. Detecting a real interruption
+  (call, audio-focus loss) is native wiring for Phase 7 — this sub-phase
+  only builds the mechanism those hooks will call. 9 new tests, all
+  passing (30/30 total).
