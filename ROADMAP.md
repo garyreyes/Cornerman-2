@@ -65,11 +65,27 @@ as each sub-phase completes — it should never drift out of sync with
 
 *(highest technical risk — new mechanism, no prior art in the old app)*
 
-- [ ] **5a. VoiceClip data model + bundled playback** — `not started`.
+- [x] **5a. VoiceClip data model + bundled playback** — `done` — scope
+  expanded 2026-08-24 (`docs/PRD.md` §10): default punches renamed to
+  lead/rear + Body Hook added (`num: 7`); `src/features/speech/`
+  resolves any text to a bundled clip by normalized key
+  (`normalizeToKey`/`resolveBundledClip`, pure + tested) covering a
+  33-word bank (numbers, 9 punches, 12 kicks, 6 defense words) generated
+  by `scripts/generate_voice_bank.py` (Kokoro TTS, dev-machine only —
+  not run on-device). Committed WAVs are silent placeholders pending
+  that script actually being run (no Python in this environment, same
+  gap as Phase 4a's sound assets). 10 new tests (66/66 total).
 - [ ] **5b. Pitch-preserving time-stretch, 0.25x–5x** — `not started`.
 - [ ] **5c. On-device TTS fallback + caching for custom punches** —
   `not started` — loading/error states per `docs/user-flows.md` Flow 4;
-  last-punch delete guard belongs here too.
+  last-punch delete guard belongs here too; also the fallback path for
+  any word (including a number) outside 5a's bundled bank.
+- [ ] **5d. Number announce-style + defensive/movement cue layer** —
+  `not started`, added 2026-08-24 (`docs/PRD.md` §10 use cases 11-12) —
+  `announceStyle: "name" | "number"` setting; defense/movement cues as
+  an independent random-gap-timed layer during Work phase, deliberately
+  not mixed into `Combo`/`comboEngine`. Depends on 5b/5c existing since
+  it reuses the full speech pipeline, not just bundled lookup.
 
 ## Phase 6 — Main Timer Screen
 
@@ -173,10 +189,11 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-Phase 2 (Timer Engine), Phase 3 (Combo Engine), and Phase 4 (Audio
-Engine) are complete. Next sub-phase to build is **5a** (VoiceClip data
-model + bundled playback), starting Phase 5 (Speech Pipeline — the
-highest-technical-risk phase, no prior art in the old app). Phase 10+ is
-planned and written down, but confirmed to build *after* Phase 9 ships.
-Run `/feature-planner` for 5a when ready. As each sub-phase completes,
-mark it `done` here and log the matching entry in `CHANGES.md`.
+Phase 2 (Timer Engine), Phase 3 (Combo Engine), Phase 4 (Audio Engine),
+and 5a (bundled voice-bank lookup + playback) are complete. Next
+sub-phase to build is **5b** (pitch-preserving time-stretch, 0.25x–5x).
+5d (number announce-style + defensive/movement cue layer) was added
+2026-08-24 and comes after 5b/5c. Phase 10+ is planned and written down,
+but confirmed to build *after* Phase 9 ships. Run `/feature-planner` for
+5b when ready. As each sub-phase completes, mark it `done` here and log
+the matching entry in `CHANGES.md`.

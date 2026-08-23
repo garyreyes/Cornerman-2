@@ -67,15 +67,16 @@ describe("settings persistence", () => {
 });
 
 describe("punches", () => {
-  test("seeds the standard orthodox 1-6 punches on first read", () => {
+  test("seeds the standard orthodox 1-7 punches (lead/rear naming) on first read", () => {
     const punches = getPunches();
     expect(punches.map((p) => [p.num, p.name])).toEqual([
       [1, "Jab"],
       [2, "Cross"],
-      [3, "Left Hook"],
-      [4, "Right Hook"],
-      [5, "Left Uppercut"],
-      [6, "Right Uppercut"],
+      [3, "Lead Hook"],
+      [4, "Rear Hook"],
+      [5, "Lead Uppercut"],
+      [6, "Rear Uppercut"],
+      [7, "Body Hook"],
     ]);
   });
 

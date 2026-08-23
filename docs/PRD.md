@@ -264,6 +264,63 @@ explicitly deferred, not designed away (see `ARCHITECTURE.md`).
 
 ---
 
+## 10. Addendum: Voice bank vocabulary, kicks, and call-out style
+
+Added 2026-08-24, surfaced while planning Phase 5 (Speech Pipeline). This
+expands the product from boxing-only to **boxing/kickboxing** — worth
+naming plainly rather than letting the scope drift silently, since §1-§9
+above were written and confirmed describing a boxing app specifically.
+
+**Default punches renamed to lead/rear, not left/right** — `num`s 1-6
+keep their traditional boxing meaning (1 Jab, 2 Cross, 3 Lead Hook, 4
+Rear Hook, 5 Lead Uppercut, 6 Rear Uppercut), with **Body Hook** added as
+`num: 7`. Left/Right broke the moment a user switches stance mid-session
+(orthodox one round, southpaw the next) — "Rear Hook" always means the
+same physical punch regardless of stance, "Right Hook" doesn't.
+
+**Use case 10 — Bundled, pre-generated voice bank via Kokoro TTS.**
+Kokoro (open-source, offline, Apache 2.0) batch-generates a fixed 33-word
+vocabulary once, on a dev machine (`scripts/generate_voice_bank.py`),
+bundled into the app exactly like the old proposal for pre-recorded
+`VoiceClip`s — this is still a "generated ahead of time, not synthesized
+live at variable rate" source, so it doesn't reintroduce the
+pitch-distortion problem §1 and the extraction doc's §5.4/§1.10 already
+solved by moving off live TTS. The vocabulary: numbers one-six (feeds
+number-style call-outs, see below), the 9 default/library punches
+(including 2 more body-target variants — Body Jab, Body Cross — beyond
+the default-seeded Body Hook), 12 kicks (lead/rear × high/body/low/calf/
+inside/push), and 6 defense/movement words (roll, slip, duck, pivot,
+check, clinch). Kicks and the extra body-punch variants are **not**
+auto-seeded into a fresh install's active punch pool — they're available
+in the bundled bank for a user to add via the existing Punches screen,
+at which point the name matches a bundled clip by normalized key instead
+of falling through to on-device TTS. On-device TTS as the fallback for
+anything NOT in this fixed bank (an arbitrary custom punch/kick name)
+is unchanged from the original plan — Kokoro is a dev-machine batch tool
+only, it never runs on the phone.
+
+**Use case 11 — Number-style call-outs.** A new `announceStyle` setting
+(`"name" | "number"`) lets combos be announced by `Punch.num` instead of
+`Punch.name`, matching how real corners actually call combos ("1-2!").
+Reuses the identical bundled/TTS-fallback resolution as names — a number
+outside the pre-generated 1-6 just falls through to on-device TTS like
+any unrecognized word.
+
+**Use case 12 — Defensive/movement call-outs.** A separate, independent
+layer (own occasional random-gap timer during Work phase, same shape as
+the proven combo-gap timer) — deliberately **not** mixed into the
+`Combo`/`comboEngine` type, so the already-shipped, tested combo
+generation is untouched. Fixed built-in 6-word set, not user-editable in
+v1 (same pattern as the bell/clapper `SoundAsset`s) — a stated
+assumption, revisit if customizable defense cues turn out to matter.
+
+**Sequencing:** the bundled voice bank + renamed punches + kicks are
+Phase 5a (expanded scope). Number call-outs and the defensive-cue layer
+are a new **Phase 5d**, sequenced after 5b/5c since both reuse the full
+speech pipeline once it exists — see `ROADMAP.md`.
+
+---
+
 ## Handoff
 
 `docs/PRD.md` is written and confirmed. Per the project's planning

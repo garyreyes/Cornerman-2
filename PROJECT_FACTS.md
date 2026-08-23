@@ -73,3 +73,42 @@ made during feature work.
   binding) — reused directly via `__mocks__/react-native-audio-api.ts`
   rather than hand-rolled, unlike the `react-native-mmkv`/`expo-crypto`
   mocks which needed a from-scratch fake.
+- **Default punches are lead/rear-named, not left/right, as of 5a
+  (2026-08-24)**: Jab, Cross, Lead Hook, Rear Hook, Lead Uppercut, Rear
+  Uppercut, Body Hook (`num: 7`, deliberately not interleaved into 1-6
+  so the traditional boxing numbering stays intact for the number
+  announce-style). Reason: a user switching stance mid-session
+  (orthodox/southpaw) makes "Right Hook" ambiguous — it's a different
+  physical punch depending on stance — while "Rear Hook" is always
+  correct. `num` still isn't required to be unique (extraction doc
+  §1.6), so a user can already remap/duplicate numbers however they
+  want; renamed defaults are just a better starting point, not a new
+  constraint.
+- **The app expanded from boxing-only to boxing/kickboxing scope as of
+  5a** (`docs/PRD.md` §10) — 12 kicks and 2 extra body-punch variants
+  (Body Jab, Body Cross) are in the bundled voice bank, but **not**
+  auto-seeded into a fresh install's active punch pool; a user adds them
+  via the existing Punches screen if wanted, at which point the name
+  resolves to a bundled clip instead of on-device TTS. Confirmed
+  decision, not scope creep left unstated.
+- **This environment has no Python installed at all** (no `python`,
+  `python3`, or `pip` — only the Windows Store alias stub) — confirmed
+  while building 5a. `scripts/generate_voice_bank.py` (Kokoro TTS) is
+  written but never executed here; it needs to be run on a machine with
+  a real Python install, same shape as Phase 4a's audio-asset-sourcing
+  gap. Its Kokoro API calls (`KPipeline`, `am_fenrir` voice) are written
+  from training-data knowledge, not verified against a live run or
+  current docs — check them if generation fails.
+- **`VoiceClip` is keyed by normalized text, not `Punch.id`** (revised
+  from the original design in `ARCHITECTURE.md` during 5a) — numbers and
+  defense/movement words need clips with no owning `Punch`, so
+  `src/features/speech/service.ts`'s `normalizeToKey` is the actual
+  lookup key everywhere (e.g. "Lead Hook" → `lead_hook`). Only
+  `"tts-generated"` clips need real MMKV persistence (Phase 5c, not yet
+  built) — `"bundled"` clips are a static compile-time asset map, same
+  non-persisted pattern as `SoundAsset`.
+- **Defensive/movement call-outs (Phase 5d, not yet built) are a fixed
+  6-word set, not user-editable in v1** — same pattern as the bell/
+  clapper `SoundAsset`s, not a new CRUD feature parallel to Punches.
+  Stated assumption during 5a's planning, not explicitly confirmed by
+  the user — revisit if customizable defense cues turn out to matter.
