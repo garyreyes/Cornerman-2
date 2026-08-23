@@ -27,14 +27,22 @@ export function createDefaultSettings(): Settings {
   };
 }
 
+/**
+ * Lead/rear naming (not left/right) so a punch name stays correct if the
+ * user switches stance mid-session -- "Right Hook" means a different
+ * physical punch in orthodox vs southpaw, "Rear Hook" never does.
+ * Body Hook is num 7, not interleaved into 1-6, so the traditional
+ * boxing 1-6 numbering (used by the number announce-style) stays intact.
+ */
 export function createDefaultPunches(): Punch[] {
   return [
     { id: Crypto.randomUUID(), num: 1, name: "Jab" },
     { id: Crypto.randomUUID(), num: 2, name: "Cross" },
-    { id: Crypto.randomUUID(), num: 3, name: "Left Hook" },
-    { id: Crypto.randomUUID(), num: 4, name: "Right Hook" },
-    { id: Crypto.randomUUID(), num: 5, name: "Left Uppercut" },
-    { id: Crypto.randomUUID(), num: 6, name: "Right Uppercut" },
+    { id: Crypto.randomUUID(), num: 3, name: "Lead Hook" },
+    { id: Crypto.randomUUID(), num: 4, name: "Rear Hook" },
+    { id: Crypto.randomUUID(), num: 5, name: "Lead Uppercut" },
+    { id: Crypto.randomUUID(), num: 6, name: "Rear Uppercut" },
+    { id: Crypto.randomUUID(), num: 7, name: "Body Hook" },
   ];
 }
 

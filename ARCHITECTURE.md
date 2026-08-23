@@ -20,8 +20,9 @@ screen-locked, so training continues while the phone is put away.
 | Framework | React Native | Single codebase for iOS + Android, matches existing JS background |
 | Build/tooling | EAS Build with a dev client (NOT Expo Go) | Background/locked-screen audio requires custom native config (iOS `UIBackgroundModes: audio`, Android foreground service) that Expo Go cannot run |
 | Audio engine | `react-native-audio-api` (Web Audio API port for RN) | Matches the extraction doc §1.11 shared-bus approach in spirit, but this library has no `DynamicsCompressorNode` (confirmed 2026-08-24, Phase 4a — it's on the library's own roadmap, not shipped); the built bus is `appVolume gain → makeup gain → WaveShaper soft-clip limiter → destination` instead. See `PROJECT_FACTS.md`. |
-| Combo speech | Pre-recorded `VoiceClip` per punch, spliced per combo, played back with pitch-preserving time-stretching (WSOLA/phase-vocoder) for a continuous 0.25x–5x rate | Live TTS distorts pitch at extreme rates by nature (the "chipmunk" artifact, extraction doc §1.10/§5.4) — time-stretching real recorded audio is the only mechanism that hits a wide rate range without it |
-| Custom-punch speech fallback | One-time on-device TTS synthesis, cached locally as a `VoiceClip` (`source: "tts-generated"`), then played through the same time-stretch pipeline | Preserves free punch renaming (extraction doc §1.6) without needing a recording for every possible custom name |
+| Combo speech | Pre-generated `VoiceClip` per word, spliced per combo, played back with pitch-preserving time-stretching (WSOLA/phase-vocoder) for a continuous 0.25x–5x rate | Live TTS distorts pitch at extreme rates by nature (the "chipmunk" artifact, extraction doc §1.10/§5.4) — time-stretching real recorded/generated audio is the only mechanism that hits a wide rate range without it |
+| Bundled voice bank source | Kokoro TTS (open-source, offline, Apache 2.0), batch-generated once on a dev machine via `scripts/generate_voice_bank.py`, not run on-device | Confirmed 2026-08-24, Phase 5a — still "generated ahead of time," same category as a real recording for the pitch-distortion argument above; see `docs/PRD.md` §10 for the 33-word vocabulary |
+| Custom-punch speech fallback | One-time on-device TTS synthesis, cached locally as a `VoiceClip` (`source: "tts-generated"`), then played through the same time-stretch pipeline | Preserves free punch renaming (extraction doc §1.6) without needing a recording for every possible custom name; also the fallback for any word (including a number) outside the bundled bank |
 | Audio assets (bell/clapper/warning) | Real recorded/licensed samples — Freesound.org (CC0) first, AudioJungle (one-time purchase) fallback | User-confirmed requirement: authentic, not synthesized or AI-generated (PRD §6) |
 | Local persistence (Settings/Punch/Preset metadata) | MMKV | Fast, synchronous key-value storage; directly mirrors the old app's zero-migration `Object.assign(defaults, parsed)` pattern (extraction doc §1.13) |
 | Audio file storage | App document directory (filesystem) — MMKV holds only metadata/file paths | Binary audio doesn't belong in a JSON-blob key-value store |
@@ -39,28 +40,43 @@ Preset   *---* Punch       (logical reference only — Preset.sequence: number[]
                              resolved at read time, falls back to a generic
                              "Punch " + num label if the number no longer
                              exists — extraction doc §1.5)
-Punch    1---1 VoiceClip   (Punch.id → VoiceClip.punchId; generated on first
-                             use if missing)
+Punch    *---1 VoiceClip   (resolved by normalized text key, e.g. "Lead
+                             Hook" -> "lead_hook" -- NOT Punch.id. Numbers
+                             and defense/movement words resolve the same
+                             way with no owning Punch at all. Generated
+                             on first use if missing -- see PRD §10)
 ```
 
 - **`Settings`** — singleton record (one per device, no accounts). Fields:
   `rounds`, `workDuration`, `restDuration`, `warmupDuration`, `mode`
   (`"random" | "preset"`), `activePresetId`, `comboGapMin`, `comboGapMax`,
-  `speechRate` (0.25–5.0), `appVolume`. Persisted via MMKV, defaults applied
-  via `Object.assign(createDefaultSettings(), parsed)` — same zero-migration
-  pattern as the old app.
+  `speechRate` (0.25–5.0), `appVolume`, `announceStyle`
+  (`"name" | "number"`, PRD §10 — Phase 5d). Persisted via MMKV, defaults
+  applied via `Object.assign(createDefaultSettings(), parsed)` — same
+  zero-migration pattern as the old app.
 - **`Punch`** — `{ id: string (uuid), num: number, name: string }`.
   **`id` is the primary key, not `num`** — `num` is explicitly allowed to be
   non-unique and non-sequential (extraction doc §1.6), so nothing may treat
-  it as a stable identifier.
+  it as a stable identifier. Default-seeded set uses lead/rear (not
+  left/right) naming so a name stays correct across a stance switch — see
+  `PROJECT_FACTS.md`.
 - **`Preset`** — `{ id: string (uuid), name: string, sequence: number[] }`
   (sequence values are `Punch.num`, resolved to live names at call time).
-- **`VoiceClip`** — `{ id: string (uuid), punchId: string, filePath: string,
-  source: "bundled" | "tts-generated" }`. Audio data lives on the
-  filesystem; this record is just the pointer + provenance.
+- **`VoiceClip`** — keyed by **normalized text**, not `Punch.id` (revised
+  2026-08-24, Phase 5a — the original punch-keyed design didn't account
+  for numbers or defense/movement words needing clips with no owning
+  Punch). `{ id: string (uuid), key: string, filePath: string, source:
+  "bundled" | "tts-generated" }`. `"bundled"` clips are a static
+  compile-time asset map (`src/features/speech/service.ts`'s
+  `BUNDLED_CLIPS`), not persisted — only `"tts-generated"` clips need an
+  actual MMKV record + filesystem file (Phase 5c, not yet built). Audio
+  data lives on the filesystem; a persisted record is just the pointer +
+  provenance.
 - **`SoundAsset`** (bell, clapper, warning) — bundled app resources, not
   user-editable data. Referenced by filename from `Settings`, not modeled
-  as its own persisted entity.
+  as its own persisted entity. Defense/movement cues (PRD §10, Phase 5d)
+  follow this same non-persisted, fixed-set pattern rather than `Punch`'s
+  user-editable CRUD.
 - **Timer/session state** (current phase, round number, remaining time,
   paused flag) — runtime-only, lives in app state (Zustand/Context), never
   persisted. This is the direct RN equivalent of the old app's DOM-free
