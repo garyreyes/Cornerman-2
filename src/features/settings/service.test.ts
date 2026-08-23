@@ -35,6 +35,30 @@ describe("settings persistence", () => {
     expect(settings.rounds).toBe(createDefaultSettings().rounds);
   });
 
+  test("combo-length and pool fields default correctly when entirely absent from saved data", () => {
+    // Simulates data saved before these fields existed at all (not just
+    // one field overridden, per the previous test -- the keys are
+    // literally missing, matching a real pre-3a saved settings blob).
+    const preExistingShape = {
+      rounds: 10,
+      workDurationSec: 180,
+      restDurationSec: 60,
+      warmupDurationSec: 0,
+      mode: "random",
+      activePresetId: null,
+      comboGapMinSec: 1.5,
+      comboGapMaxSec: 3,
+      speechRate: 1.0,
+      appVolume: 1.0,
+    };
+    saveSettings(preExistingShape as ReturnType<typeof createDefaultSettings>);
+
+    const settings = getSettings();
+    expect(settings.comboLengthMin).toBe(2);
+    expect(settings.comboLengthMax).toBe(4);
+    expect(settings.randomPunchPool).toBeNull();
+  });
+
   test("saved settings round-trip exactly", () => {
     const custom = { ...createDefaultSettings(), rounds: 5, appVolume: 0.5 };
     saveSettings(custom);

@@ -40,3 +40,17 @@ Dated log of shipped changes, appended to as features complete.
   (call, audio-focus loss) is native wiring for Phase 7 — this sub-phase
   only builds the mechanism those hooks will call. 9 new tests, all
   passing (30/30 total).
+- 2026-08-23: Sub-phases 3a+3b — Combo engine
+  (`src/features/comboEngine/service.ts`): `generateRandomCombo`,
+  `generatePresetCombo`, and `generateCombo` sharing the identical
+  `Array<{num,name}>` shape regardless of mode (extraction doc §1.4),
+  with `resolvePunchName`'s graceful fallback for deleted punch numbers
+  (§1.5). Settings gained `comboLengthMin`/`comboLengthMax` and
+  `randomPunchPool` — combo length and which punches are eligible for
+  Random mode are now user-customizable per explicit request, not
+  hardcoded. Preset mode with no valid active preset degrades to a
+  random combo rather than producing nothing. 3b needed no separate
+  implementation: punch resolution turned out to be a hard dependency
+  of 3a's output shape, and first-combo timing already shipped in 2a.
+  13 new tests, test-first per the correctness-critical rule (43/43
+  total passing).

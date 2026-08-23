@@ -38,11 +38,16 @@ as each sub-phase completes — it should never drift out of sync with
 
 *(correctness-critical — test-first per `CLAUDE.md`)*
 
-- [ ] **3a. Random + preset combo generation** — `not started` — shared
-  `Array<{num, name}>` shape contract regardless of mode.
-- [ ] **3b. Punch resolution + first-combo timing** — `not started` —
-  punch-number → live-name resolution with graceful fallback; first
-  combo of a round uses its own clamped gap window, not the general range.
+- [x] **3a. Random + preset combo generation** — `done` — shared
+  `Array<{num, name}>` shape contract regardless of mode. Settings
+  gained `comboLengthMin/Max` and `randomPunchPool` (user-customizable
+  combo length and punch pool, per explicit request). 13 tests passing.
+- [x] **3b. Punch resolution + first-combo timing** — `done`, absorbed
+  elsewhere rather than built separately: punch-number → live-name
+  resolution (`resolvePunchName`) turned out to be a hard dependency of
+  3a's shared output shape, so it shipped there instead of separately;
+  first-combo timing's clamped gap window was already built in 2a as
+  timer-adjacent state (`firstComboAt`). Nothing left to build here.
 
 ## Phase 4 — Audio Engine
 
@@ -163,8 +168,9 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-Phase 2 (Timer Engine) is complete. Next sub-phase to build is **3a**
-(random + preset combo generation). Phase 10+ is planned and written
-down, but confirmed to build *after* Phase 9 ships. Run
-`/feature-planner` for 3a when ready. As each sub-phase completes, mark
-it `done` here and log the matching entry in `CHANGES.md`.
+Phase 2 (Timer Engine) and Phase 3 (Combo Engine) are complete. Next
+sub-phase to build is **4a** (audio bus + sourced sound assets). Phase
+10+ is planned and written down, but confirmed to build *after* Phase 9
+ships. Run `/feature-planner` for 4a when ready. As each sub-phase
+completes, mark it `done` here and log the matching entry in
+`CHANGES.md`.

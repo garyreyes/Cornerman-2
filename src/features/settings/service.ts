@@ -19,6 +19,9 @@ export function createDefaultSettings(): Settings {
     activePresetId: null,
     comboGapMinSec: 1.5,
     comboGapMaxSec: 3,
+    comboLengthMin: 2,
+    comboLengthMax: 4,
+    randomPunchPool: null,
     speechRate: 1.0,
     appVolume: 1.0,
   };
