@@ -104,15 +104,66 @@ from the real, shipped result)*
 
 ---
 
+# Phase 10+ — Workout Templates & Assault-Bike Cognitive Protocol
+
+Added 2026-08-23 (`docs/PRD.md` §9, `ARCHITECTURE.md`'s Phase 10+
+entities). **Sequenced after Phase 9 ships**, per explicit confirmation
+— this is a real scope expansion, not a revision of the v1 plan above,
+and doesn't delay it. Inherits the `DESIGN.md` locked in Phase 6; no new
+visual-world decisions here (see risk check below).
+
+## Phase 10 — Workout Templates (boxing round-by-round programming)
+
+- [ ] **10a. `WorkoutTemplate`/`RoundConfig` data model + storage** —
+  `not started` — extends the Phase 1b settings feature; per-round
+  comboSource resolution (fixed-punch/fixed-sequence/preset/random)
+  follows the same resolve-at-call-time pattern as `Preset`.
+  Correctness-adjacent (extends already-tested combo
+  generation/resolution) — test-first.
+- [ ] **10b. Templates Picker screen** — `not started` — built-ins +
+  custom, start-directly-on-tap, edit as a separate action.
+- [ ] **10c. Round Builder / Template Editor screen** — `not started` —
+  inline expandable round cards (add/reorder/edit), not a per-round
+  sub-screen.
+- [ ] **10d. Wire timer/combo engines to a `roundPlan`** — `not started`
+  — Main Timer consumes per-round duration/gap/comboSource overrides
+  when a template-driven session is active; existing Settings-driven
+  quick-start (Phases 1–9) keeps working unchanged.
+  - [ ] `/impeccable audit` (Templates Picker + Round Builder)
+
+## Phase 11 — Assault-Bike Cognitive Protocol
+
+- [ ] **11a. `AssaultBikeConfig` data model + built-in template** —
+  `not started`.
+- [ ] **11b. Assault-Bike Session screen** — `not started` — work phase
+  + rest's three sub-phases (Settle → Drill → Reset); visually distinct
+  from the boxing Main Timer.
+- [ ] **11c. Visual drill: Odd-One-Out** — `not started` — grid, tap
+  detection, live (unlogged) reaction-time display.
+- [ ] **11d. Auditory drill: Corner Commands** — `not started` — reuses
+  the Phase 5 speech pipeline with real corner-cue vocabulary.
+  - [ ] `/impeccable audit`
+
+## Phase 12 — Templates Phase Close
+
+- [ ] **Phase close: `/impeccable critique` + `/impeccable polish`** —
+  `not started` — Templates Picker, Round Builder, and Assault-Bike
+  Session judged together for visual consistency with each other and
+  with the rest of the app.
+
+---
+
 ## Design-system risk check (per this skill's own process)
 
 No later phase redefines core visual tokens/theme after Phase 6 —
 Phase 6 is where `DESIGN.md` gets written from the real build, and
-Phases 8–9 inherit it rather than introducing new visual-system
-decisions. No re-polish-earlier-phases item is needed.
+Phases 8–9 **and 10–12** inherit it rather than introducing new
+visual-system decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-Next sub-phase to build is **2a** (phase state machine + tick loop) —
-run `/feature-planner` for it when ready. As each sub-phase completes,
+Next sub-phase to build is still **2a** (phase state machine + tick
+loop) — Phase 10+ is planned and written down, but confirmed to build
+*after* Phase 9 ships, not instead of continuing the current sequence.
+Run `/feature-planner` for 2a when ready. As each sub-phase completes,
 mark it `done` here and log the matching entry in `CHANGES.md`.

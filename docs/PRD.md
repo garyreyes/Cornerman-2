@@ -215,11 +215,52 @@ old app:
 - Coach/trainer mode
 - Wearable integration
 - Accounts / multi-user support (architecture should allow, not built)
+- **Workout templates + assault-bike cognitive protocol — now actually
+  planned, see §9.** Unlike the other items on this list, this one has a
+  real architecture (`ARCHITECTURE.md`'s Phase 10+ entities) and a
+  roadmap slot (`ROADMAP.md` Phase 10+) — deferred in sequence (after
+  v1 ships), not deferred in the sense of "someday, unplanned."
 
 **Won't have (v1):**
 - Any data migration from the old app
 - Automatic ducking of other apps' audio
 - App Store / Play Store submission as part of this build phase
+
+---
+
+## 9. Addendum: Workout templates + assault-bike cognitive protocol
+
+Added 2026-08-23. A real scope expansion surfaced after v1 planning was
+already confirmed, not a revision of it — v1 (§1–§8 above) is unchanged
+and still ships first (`ROADMAP.md` Phases 1–9); this is Phase 10+.
+
+**Use case 8 — Run a structured, round-by-round programmed workout.**
+Instead of one uniform combo behavior for a whole session, a
+`WorkoutTemplate` can specify a different focus per round (e.g. round 1
+jab-only at technical pace, round 2 a fixed 1-2, round 3 the user's real
+saved combos, round 4 a manually-picked body-work punch pool, round 9 a
+longer "championship round"), with an optional on-screen coaching note
+per round. Four built-ins ship (Relax/Zone-2, Moderate, Intense, Assault
+Bike Cognitive); users can also create and edit their own — see
+`ARCHITECTURE.md`'s Phase 10+ entities for the full data model.
+
+**Use case 9 — Run an assault-bike cognitive-motor HIIT session.** A
+different workout modality entirely (10s all-out bike intervals, 50s
+rest split into settle/cognitive-drill/reset sub-phases), pairing
+physical fatigue with a reaction/decision task (visual grid or spoken
+corner-command drills) — Brain Endurance Training, not combo timing.
+Scoped for the first build to one visual drill (Odd-One-Out) and one
+auditory drill (Corner Commands), fixed difficulty rather than
+per-round auto-scaling, and explicitly **no bike hardware integration**
+(app handles timing + drill only) and **no stats/history logging**
+(reaction time/accuracy is live-display-only) — both confirmed
+decisions, not oversights, consistent with §4's existing history/stats
+deferral.
+
+**Out of scope for this addendum specifically:** the other 12 drill
+variants from the reference protocol, `mixed` drill mode, per-round
+difficulty auto-scaling, and any bike sensor connectivity — all
+explicitly deferred, not designed away (see `ARCHITECTURE.md`).
 
 ---
 

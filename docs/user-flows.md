@@ -12,7 +12,7 @@ OS-level permission gate covered in the onboarding flow below.
 
 ---
 
-## Screen inventory (7 screens total)
+## Screen inventory (10 screens total)
 
 1. **Onboarding** (first launch only, never shown again after)
 2. **Main Timer** (home — the screen you land on every subsequent launch)
@@ -20,7 +20,10 @@ OS-level permission gate covered in the onboarding flow below.
 4. **Punches** (editor/list — reachable in both Random and Preset mode, see §3 below)
 5. **Presets — List**
 6. **Presets — Editor** (create/edit one preset's sequence)
-7. *(Implicit)* system permission dialogs (OS-native, not app screens, but part of the onboarding flow)
+7. **Templates — Picker** *(Phase 10+, added 2026-08-23)*
+8. **Templates — Editor / Round Builder** *(Phase 10+)*
+9. **Assault-Bike Session** *(Phase 11+ — a second "Main Timer"-equivalent, distinct screen since the boxing round-lights/combo-card don't fit this workout type)*
+10. *(Implicit)* system permission dialogs (OS-native, not app screens, but part of the onboarding flow)
 
 ## Navigation convention
 
@@ -37,11 +40,29 @@ Onboarding (first launch only)
     │
     ▼
 Main Timer ──(gear icon)──▶ Settings ──▶ Punches
-    ▲                           │
-    │                           ▼
-    └───────────────────  Presets List ──▶ Preset Editor
-        (back navigation only, no other paths)
+    │  ▲                        │
+    │  │                        ▼
+    │  └────────────────  Presets List ──▶ Preset Editor
+    │       (back navigation only, no other paths)
+    │
+    └──(Templates action)──▶ Templates Picker ──▶ Round Builder
+                                    │  (edit)
+                                    │ (select a boxing template → start)
+                                    ▼
+                              Main Timer (running, roundPlan-driven)
+
+                              Templates Picker
+                                    │ (select an assault-bike template → start)
+                                    ▼
+                              Assault-Bike Session (running)
 ```
+
+*(Phase 10+, added 2026-08-23)* Templates is a second entry point off
+Main Timer, alongside the existing gear icon — purely additive, the
+existing Settings-driven quick-start flow is untouched. Selecting a
+template starts the matching session type directly (no forced
+preview-before-start step, per the one-obvious-primary-action rule);
+editing is a separate explicit action per template row.
 
 ---
 
@@ -186,18 +207,100 @@ Settings → Presets List → (tap existing, or "+ New") → Preset Editor
 
 ---
 
+## Flow 6 — Workout templates *(Phase 10+, added 2026-08-23)*
+
+```
+Main Timer → (Templates action) → Templates Picker
+```
+
+```mermaid
+flowchart TD
+    A[Templates Picker: built-in +\ncustom templates listed] --> B{Action}
+    B -->|Tap a template| C{workoutType?}
+    C -->|boxing| D[Main Timer starts,\nroundPlan-driven]
+    C -->|assault-bike-cognitive| E[Assault-Bike Session\nstarts]
+    B -->|Edit icon on a row| F[Round Builder /\nTemplate Editor]
+    B -->|"+ New Template"| G[Pick workout type,\nthen Round Builder]
+    F --> H[Name, base work/rest/gap,\nadd/reorder/edit rounds]
+    H --> I{Per round}
+    I --> J[Optional label + note]
+    I --> K[Optional duration override]
+    I --> L["comboSource: fixed punch /\nfixed sequence / preset /\nrandom (full or a picked pool)"]
+    H --> M[Save] --> A
+```
+
+- **Templates Picker empty-ish state:** the 4 built-ins (Relax,
+  Moderate, Intense, Assault Bike Cognitive) always exist — there's no
+  true empty state, but a first-time user sees only built-ins until they
+  create a custom one.
+- **Round Builder is inline, not a per-round sub-screen:** each round is
+  an expandable card in one scrollable list (add/reorder/remove/edit
+  in place) — matches the "low chrome, progressive disclosure" rule
+  rather than forcing a drill-down per round, which would turn a
+  10-round program into 10 extra screen transitions.
+- **Selecting a template starts it directly** (no forced preview step,
+  per the one-obvious-primary-action rule) — editing is a distinct,
+  explicit action on the row, not something you pass through on the way
+  to starting.
+- **Error state:** local save failure on the Round Builder — same
+  generic "Couldn't save, try again" as Preset Editor, same reasoning
+  (on-device storage, not a remote call).
+- **A round's `comboSource: preset` referencing a since-deleted preset**
+  falls back the same way a deleted punch number does — generic label,
+  never an error (consistent with the existing resolve-at-call-time
+  pattern, extraction doc §1.5).
+
+---
+
+## Flow 7 — Assault-Bike Cognitive session *(Phase 11+)*
+
+```
+Templates Picker → (assault-bike template) → Assault-Bike Session
+```
+
+```mermaid
+flowchart TD
+    A[Work phase: 10s\nall-out countdown] --> B[Rest: Settle\n0-8s, just breathe]
+    B --> C[Rest: Cognitive Drill\n~30s]
+    C --> D{drillMode}
+    D -->|visual| E[Odd-One-Out grid:\ntap the different tile,\nreaction time shown live]
+    D -->|auditory| F[Corner Commands:\nspoken cue, quick\nshadow-response window\n— reuses the Phase 5\nspeech pipeline]
+    E --> G[Rest: Reset\n~12s, \"get ready\"]
+    F --> G
+    G --> A
+    A -.all rounds complete.-> H[Finished]
+```
+
+- **This screen is visually distinct from the boxing Main Timer** —
+  round-progress lights and the combo card don't apply here; the work
+  phase is a stark countdown, the drill phase is the one moment this
+  mode asks for eyes-on-screen attention (unlike the boxing flow's
+  audio-first, mostly-eyes-off pattern).
+- **No data is logged.** Reaction time/accuracy shown during the drill
+  is live-only and disappears once the round ends — matches the
+  confirmed "no bike integration, no stats tracking" scope.
+- **Empty/error state:** none beyond what Phase 6/7's audio-engine error
+  banner already covers (sound-unavailable degrades the same way here
+  as on the boxing timer).
+
+---
+
 ## UX floor check (Step 2b)
 
 - **One obvious primary action per screen:** Onboarding (grant/continue),
   Main Timer Ready (Start), Main Timer Finished (Reset), Punches empty
-  guard (can't reach empty), Presets List empty (+ New Preset) — all pass.
+  guard (can't reach empty), Presets List empty (+ New Preset), Templates
+  Picker (tap a template to start) — all pass.
 - **Nothing requires remembering a prior screen:** preset sequences show
   live punch names, not raw numbers; Settings summary rows show current
-  values (e.g. "3 presets") rather than requiring recall — pass.
+  values (e.g. "3 presets") rather than requiring recall; a running
+  round-plan session shows the current round's label/note on screen
+  rather than expecting the user to remember what they programmed — pass.
 - **Step count honesty:** starting a session with existing settings is
-  still one tap (Start) from Main Timer — the added screens (Onboarding,
-  Punches, Presets List/Editor) are all *configuration* paths, not on the
-  critical path to starting a workout — pass.
+  still one tap (Start) from Main Timer, and starting a template is one
+  tap from Templates Picker — the added screens (Onboarding, Punches,
+  Presets List/Editor, Round Builder) are all *configuration* paths, not
+  on the critical path to starting a workout — pass.
 - **Progressive disclosure:** Punches/Presets pulled into their own
   sub-screens specifically so Settings itself stays scannable — this was
   the point of making that call above.

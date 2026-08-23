@@ -70,6 +70,65 @@ No indexes: at the scale of a few dozen records total (punches, presets),
 array lookups are sufficient — formal indexing would solve a problem this
 app doesn't have.
 
+## Phase 10+ entities: Workout Templates
+
+Added 2026-08-23, planned for build *after* the v1 boxing-timer roadmap
+(Phases 1–9) ships — see `ROADMAP.md` Phase 10+. Purely additive:
+`Settings`/`Punch`/`Preset` above are untouched, and the existing
+quick-start (Settings-driven) session flow keeps working exactly as
+already built.
+
+- **`WorkoutTemplate`** — a saved, user-editable, whole-session config
+  bundle. Same relationship to a session that `Preset` has to a combo
+  sequence, one level up. `{ id, name, isBuiltIn, workoutType: "boxing" |
+  "assault-bike-cognitive", config }` — `config` is one of the two shapes
+  below, discriminated by `workoutType`. Built-ins (`isBuiltIn: true`)
+  are ordinary editable rows, not specially locked — there's no stated
+  need to protect them from edits.
+
+- **`BoxingConfig`** — `{ baseWorkDurationSec, baseRestDurationSec,
+  warmupDurationSec, baseComboGapMinSec, baseComboGapMaxSec, roundPlan:
+  RoundConfig[] }`. A "uniform" template (e.g. the Relax/Moderate/Intense
+  built-ins) is simply a `roundPlan` where every round has the same
+  `{ type: "random" }` comboSource and no overrides — the round-by-round
+  case and the uniform case are the same data shape, not two systems.
+
+- **`RoundConfig`** — one entry per round, in order:
+  `{ label?, note?, workDurationSec?, restDurationSec?, comboGapMinSec?,
+  comboGapMaxSec?, comboSource }`. Per-round fields override the
+  template's base values when set (e.g. a "championship round" running
+  longer than the rest). `note` is a coaching-reminder string displayed
+  on screen during that round — **visual only, not spoken aloud** (an
+  assumption, not explicitly confirmed — flag if wrong). `comboSource` is
+  one of:
+  - `{ type: "fixed-punch", punchNum }` — one punch repeated (e.g. jab-only)
+  - `{ type: "fixed-sequence", sequence: number[] }` — a fixed combo repeated
+  - `{ type: "preset", presetId }` — draws from a saved `Preset`
+  - `{ type: "random", punchPool?: number[] }` — random draw from a
+    manually chosen subset, or the full punch list when `punchPool` is
+    omitted
+
+  All punch references use `Punch.num` (not `id`), matching `Preset`'s
+  existing resolve-at-call-time-with-graceful-fallback pattern — one
+  resolution mechanism for the whole app, not two.
+
+- **`AssaultBikeConfig`** — `{ roundsTarget, workSec, restSec, restPhases:
+  { settleSec, drillSec, resetSec }, drillMode: "visual" | "auditory" |
+  "mixed", drillType, difficulty: "easy" | "medium" | "hard" }`. Scoped
+  down for the first build: one fixed difficulty rather than the
+  reference protocol's per-round auto-scaling, and only two drill types
+  shipped initially — visual **Odd-One-Out** and auditory **Corner
+  Commands** (the latter reuses the Phase 5 speech pipeline directly,
+  since it's just spoken cue words like the existing combo call-outs).
+  `mixed` mode and the other twelve drill variants from the reference
+  protocol are explicitly deferred, not designed away.
+
+  **No bike hardware integration** (confirmed) — the app only runs
+  timing and the cognitive drill; watts/RPM stay on the bike's own
+  console. **No stats/history persisted** (confirmed) — matches the
+  PRD's existing v1 decision; reaction-time/accuracy display during a
+  drill is live-only, never logged.
+
 ## Deferred decisions (written down on purpose, not forgotten)
 
 - **Accounts/multi-user/sync backend.** Not built in v1 (PRD §2, §4). The
