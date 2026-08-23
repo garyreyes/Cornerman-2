@@ -54,3 +54,25 @@ Dated log of shipped changes, appended to as features complete.
   of 3a's output shape, and first-combo timing already shipped in 2a.
   13 new tests, test-first per the correctness-critical rule (43/43
   total passing).
+- 2026-08-24: Sub-phase 4a — Audio engine (`src/features/audio/`):
+  `react-native-audio-api` bus (`GainNode` for the independent
+  `settings.appVolume` fader → fixed makeup-gain `GainNode` →
+  `WaveShaperNode` soft-clip limiter → destination) wired to the
+  timer's `TimerEvent`s via `mapEventToCue` (phase-changed to
+  work/rest → bell, work-warning → clapper, rest-countdown → tick,
+  session-finished → final bell; every other event plays nothing).
+  This library has no `DynamicsCompressorNode` yet (confirmed against
+  its own README roadmap), so the old app's proven
+  masterGain→compressor bus (extraction doc §1.11) couldn't carry over
+  as literally planned in `ARCHITECTURE.md` — substituted a
+  WaveShaper soft-clip curve as the overlap-clipping guard instead; see
+  `PROJECT_FACTS.md`. Bell/clapper/countdown-tick assets are silent
+  placeholder WAVs, not final — real sourcing is a manual, by-ear task
+  outside what I can do from here, tracked in
+  `assets/audio/SOURCING.md`. `mapEventToCue`/`gainForVolume` (pure)
+  and the bus-wiring/playback dispatch (native-module-backed, tested
+  against the library's own official Jest mock,
+  `react-native-audio-api/mock`) are both test-first per the
+  correctness-critical rule — one wrong event-to-cue mapping is an
+  immediately-noticeable bug mid-workout. 13 new tests, all passing
+  (56/56 total).
