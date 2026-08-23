@@ -51,10 +51,15 @@ as each sub-phase completes — it should never drift out of sync with
 
 ## Phase 4 — Audio Engine
 
-- [ ] **4a. Audio bus + sourced sound assets** — `not started` —
-  `react-native-audio-api` gain → compressor → destination chain;
-  bell/clapper/warning sourced from Freesound/AudioJungle, wired to
-  timer phase events.
+- [x] **4a. Audio bus + sourced sound assets** — `done` —
+  `react-native-audio-api` gain → WaveShaper limiter → destination
+  chain (this library has no `DynamicsCompressorNode` yet — see
+  `PROJECT_FACTS.md`), wired to timer phase events via
+  `mapEventToCue`. Bell/clapper/countdown-tick assets are silent
+  placeholders pending manual sourcing — see
+  `assets/audio/SOURCING.md`; the actual gain/limiter tuning also
+  awaits a real by-ear pass once real assets + a device are in hand.
+  13 tests passing (56/56 total).
 
 ## Phase 5 — Speech Pipeline
 
@@ -168,9 +173,10 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-Phase 2 (Timer Engine) and Phase 3 (Combo Engine) are complete. Next
-sub-phase to build is **4a** (audio bus + sourced sound assets). Phase
-10+ is planned and written down, but confirmed to build *after* Phase 9
-ships. Run `/feature-planner` for 4a when ready. As each sub-phase
-completes, mark it `done` here and log the matching entry in
-`CHANGES.md`.
+Phase 2 (Timer Engine), Phase 3 (Combo Engine), and Phase 4 (Audio
+Engine) are complete. Next sub-phase to build is **5a** (VoiceClip data
+model + bundled playback), starting Phase 5 (Speech Pipeline — the
+highest-technical-risk phase, no prior art in the old app). Phase 10+ is
+planned and written down, but confirmed to build *after* Phase 9 ships.
+Run `/feature-planner` for 5a when ready. As each sub-phase completes,
+mark it `done` here and log the matching entry in `CHANGES.md`.
