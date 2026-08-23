@@ -26,9 +26,9 @@ as each sub-phase completes — it should never drift out of sync with
 
 *(correctness-critical — test-first per `CLAUDE.md`)*
 
-- [ ] **2a. Phase state machine + tick loop** — `not started` —
+- [x] **2a. Phase state machine + tick loop** — `done` —
   once-per-second latches for the 10s work warning and rest countdown;
-  Ready/Work/Rest/Finished transitions.
+  Ready/Warmup/Work/Rest/Finished transitions. 12 tests passing.
 - [ ] **2b. True pause/resume + interruption handling** — `not started`
   — exact remaining-time preservation on pause; auto-pause/resume on a
   call or audio-focus loss (`docs/user-flows.md` Flow 2).
@@ -162,8 +162,8 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-Next sub-phase to build is still **2a** (phase state machine + tick
-loop) — Phase 10+ is planned and written down, but confirmed to build
-*after* Phase 9 ships, not instead of continuing the current sequence.
-Run `/feature-planner` for 2a when ready. As each sub-phase completes,
-mark it `done` here and log the matching entry in `CHANGES.md`.
+Next sub-phase to build is **2b** (true pause/resume + interruption
+handling). Phase 10+ is planned and written down, but confirmed to
+build *after* Phase 9 ships. Run `/feature-planner` for 2b when ready.
+As each sub-phase completes, mark it `done` here and log the matching
+entry in `CHANGES.md`.

@@ -1,0 +1,104 @@
+import type { Phase, RandomFn, TimerConfig, TimerEvent, TimerState } from "./types";
+
+const FIRST_COMBO_MIN_MS = 500;
+const FIRST_COMBO_WINDOW_MS = 1000; // clamps to [500ms, 1500ms]
+const REST_COUNTDOWN_START_SEC = 3;
+const WORK_WARNING_THRESHOLD_MS = 10_000;
+
+function beginWork(
+  round: number,
+  transitionAt: number,
+  config: TimerConfig,
+  random: RandomFn,
+): TimerState {
+  return {
+    phase: "work",
+    round,
+    phaseEndAt: transitionAt + config.workDurationMs,
+    tenWarned: false,
+    lastRestCountdown: null,
+    firstComboAt: transitionAt + FIRST_COMBO_MIN_MS + random() * FIRST_COMBO_WINDOW_MS,
+  };
+}
+
+function beginRest(round: number, transitionAt: number, config: TimerConfig): TimerState {
+  return {
+    phase: "rest",
+    round,
+    phaseEndAt: transitionAt + config.restDurationMs,
+    tenWarned: false,
+    lastRestCountdown: null,
+    firstComboAt: null,
+  };
+}
+
+export function startTimer(
+  config: TimerConfig,
+  now: number,
+  random: RandomFn = Math.random,
+): TimerState {
+  if (config.warmupDurationMs > 0) {
+    return {
+      phase: "warmup",
+      round: 0,
+      phaseEndAt: now + config.warmupDurationMs,
+      tenWarned: false,
+      lastRestCountdown: null,
+      firstComboAt: null,
+    };
+  }
+  return beginWork(1, now, config, random);
+}
+
+const TICKING_PHASES: ReadonlySet<Phase> = new Set(["warmup", "work", "rest"]);
+
+export function tick(
+  state: TimerState,
+  config: TimerConfig,
+  now: number,
+  random: RandomFn = Math.random,
+): { state: TimerState; events: TimerEvent[] } {
+  const events: TimerEvent[] = [];
+  let s = state;
+
+  while (TICKING_PHASES.has(s.phase) && now >= s.phaseEndAt) {
+    if (s.phase === "warmup") {
+      s = beginWork(1, s.phaseEndAt, config, random);
+      events.push({ type: "phase-changed", phase: "work", round: s.round });
+    } else if (s.phase === "work") {
+      if (s.round >= config.totalRounds) {
+        s = { ...s, phase: "finished", firstComboAt: null };
+        events.push({ type: "phase-changed", phase: "finished", round: s.round });
+        events.push({ type: "session-finished" });
+      } else {
+        s = beginRest(s.round, s.phaseEndAt, config);
+        events.push({ type: "phase-changed", phase: "rest", round: s.round });
+      }
+    } else {
+      // rest
+      s = beginWork(s.round + 1, s.phaseEndAt, config, random);
+      events.push({ type: "phase-changed", phase: "work", round: s.round });
+    }
+  }
+
+  if (s.phase === "work" && !s.tenWarned) {
+    const remainingMs = s.phaseEndAt - now;
+    if (remainingMs <= WORK_WARNING_THRESHOLD_MS) {
+      s = { ...s, tenWarned: true };
+      events.push({ type: "work-warning" });
+    }
+  } else if (s.phase === "rest") {
+    const remainingSec = Math.ceil((s.phaseEndAt - now) / 1000);
+    if (
+      remainingSec >= 1 &&
+      remainingSec <= REST_COUNTDOWN_START_SEC &&
+      (s.lastRestCountdown === null || remainingSec < s.lastRestCountdown)
+    ) {
+      const secondsRemaining = remainingSec as 3 | 2 | 1;
+      s = { ...s, lastRestCountdown: secondsRemaining };
+      events.push({ type: "rest-countdown", secondsRemaining });
+    }
+  }
+
+  return { state: s, events };
+}
