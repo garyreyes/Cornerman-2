@@ -133,3 +133,28 @@ made during feature work.
   clamps to `[0.25, 4.0]` — if this project ever needs the full 5x
   later, that clamp (and the workaround this fact describes) is where
   to revisit it, not by assuming the native library changed.
+- **Custom-punch/fallback speech is live TTS, never cached (confirmed
+  2026-08-24, Phase 5c).** Checked before assuming: neither
+  `expo-speech` nor `react-native-tts` (the two obvious library
+  choices) can synthesize TTS to a file — both are live-playback-only
+  wrappers, even though the underlying native platform APIs genuinely
+  support it (iOS `AVSpeechSynthesizer.write(toBufferCallback:)`,
+  Android `TextToSpeech.synthesizeToFile()`). Reaching that would need a
+  real custom native module (Swift + Kotlin, Expo config plugin) —
+  explicitly not built: real engineering, unverifiable in this
+  sandboxed environment (no device, no native build tooling), for a
+  fallback path that only triggers on words outside the 33-word bundled
+  bank. User explicitly chose live `expo-speech` playback instead, with
+  these accepted, named tradeoffs: a different voice than the bundled
+  Kokoro clips (device's system voice, not `am_fenrir`), per-play
+  synthesis latency (~100-500ms, re-synthesized every call, no caching),
+  and `expo-speech`'s own `rate` param instead of true WSOLA
+  pitch-preserving stretch (its docs give no min/max range — "1.0 is
+  normal rate" — and behavior above roughly 2-3x is unverified,
+  platform/voice-dependent). If audio quality/latency here ever becomes
+  a real problem in practice, the native-module route is the fix, not a
+  different library — none exists with this capability.
+- `expo-speech`'s `Speech.speak` is directly spy-able under Jest with no
+  manual mock needed (verified before writing tests, per this project's
+  established "don't assume a native module works under Jest" lesson —
+  unlike `react-native-mmkv`/`expo-crypto`, which needed one).

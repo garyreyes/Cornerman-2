@@ -1,3 +1,4 @@
+import * as Speech from "expo-speech";
 import { AudioBufferSourceNode, AudioContext } from "react-native-audio-api";
 
 import { createSpeechEngine, normalizeToKey, rateForSpeechRate, resolveBundledClip } from "./service";
@@ -115,6 +116,62 @@ describe("createSpeechEngine", () => {
   });
 });
 
+describe("createSpeechEngine -- on-device TTS fallback (5c)", () => {
+  test("an unrecognized word falls through to live on-device TTS and returns true", () => {
+    const speakSpy = jest.spyOn(Speech, "speak").mockImplementation(() => {});
+
+    const engine = createSpeechEngine();
+    const played = engine.playWord("Crescent Kick");
+
+    expect(played).toBe(true);
+    expect(speakSpy).toHaveBeenCalledWith("Crescent Kick", expect.any(Object));
+
+    speakSpy.mockRestore();
+  });
+
+  test("a bundled word never falls through to TTS", async () => {
+    const speakSpy = jest.spyOn(Speech, "speak").mockImplementation(() => {});
+    const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
+
+    const engine = createSpeechEngine();
+    engine.playWord("Jab");
+    await Promise.resolve();
+
+    expect(speakSpy).not.toHaveBeenCalled();
+    expect(startSpy).toHaveBeenCalledTimes(1);
+
+    speakSpy.mockRestore();
+    startSpy.mockRestore();
+  });
+
+  test("blank text is a no-op -- returns false and calls neither playback path", () => {
+    const speakSpy = jest.spyOn(Speech, "speak").mockImplementation(() => {});
+
+    const engine = createSpeechEngine();
+    expect(engine.playWord("   ")).toBe(false);
+    expect(engine.playWord("")).toBe(false);
+    expect(speakSpy).not.toHaveBeenCalled();
+
+    speakSpy.mockRestore();
+  });
+
+  test("setRate and setVolume carry into the TTS fallback call, clamped the same as bundled playback", () => {
+    const speakSpy = jest.spyOn(Speech, "speak").mockImplementation(() => {});
+
+    const engine = createSpeechEngine();
+    engine.setRate(5.0); // must clamp to 4.0, same ceiling as the WSOLA path
+    engine.setVolume(0.4);
+    engine.playWord("Crescent Kick");
+
+    expect(speakSpy).toHaveBeenCalledWith(
+      "Crescent Kick",
+      expect.objectContaining({ rate: 4.0, volume: 0.4 }),
+    );
+
+    speakSpy.mockRestore();
+  });
+});
+
 describe("createSpeechEngine (5a coverage)", () => {
   test("playWord returns true and starts playback for a bundled word", async () => {
     const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
@@ -125,19 +182,6 @@ describe("createSpeechEngine (5a coverage)", () => {
 
     expect(played).toBe(true);
     expect(startSpy).toHaveBeenCalledTimes(1);
-
-    startSpy.mockRestore();
-  });
-
-  test("playWord returns false and plays nothing for an unrecognized word", async () => {
-    const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
-
-    const engine = createSpeechEngine();
-    const played = engine.playWord("Crescent Kick");
-    await Promise.resolve();
-
-    expect(played).toBe(false);
-    expect(startSpy).not.toHaveBeenCalled();
 
     startSpy.mockRestore();
   });

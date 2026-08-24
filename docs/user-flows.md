@@ -158,22 +158,32 @@ happens on the Punches screen where TTS generation occurs).
 
 ---
 
-## Flow 4 — Manage punches (with the new TTS-fallback requirement)
+## Flow 4 — Manage punches (with the TTS-fallback requirement, revised
+2026-08-24 per Phase 5c)
 
 ```
 Settings → Punches
 ```
 
+Originally specified as a blocking "generate + cache" step at save time
+(`Loading: "Generating voice clip..." → Cached as VoiceClip`). Revised
+once Phase 5c confirmed no library can synthesize TTS to a cacheable
+file (`PROJECT_FACTS.md`) — an unrecognized name is instead spoken live,
+every time, at actual playback (see `src/features/speech/service.ts`).
+There is nothing to generate-and-cache at save time anymore, so saving a
+punch is instant regardless of whether its name is bundled or not; a
+non-blocking **Preview** action lets the user hear how a name will sound
+before committing to it, which is optional rather than a save-blocking
+gate.
+
 ```mermaid
 flowchart TD
     A[Punches screen: list of\nexisting punches] --> B{Action}
     B -->|Add new / rename| C[Enter punch name]
-    C --> D{VoiceClip exists\nfor this name?}
-    D -->|Yes, bundled| E[Saved immediately]
-    D -->|No| F[Loading state:\n\"Generating voice clip...\"\n— one-time on-device TTS synthesis]
-    F --> G{Synthesis succeeded?}
-    G -->|Yes| H[Cached as VoiceClip,\nsaved]
-    G -->|No| I[Error state: \"Couldn't\ngenerate audio for this\nname — try again\" + retry]
+    C --> D[Saved immediately —\nno generation step]
+    D -.->|optional| P["Preview" button:\nlive TTS playback\nof the name]
+    P -.-> Q{Preview failed?}
+    Q -->|Yes| R[Error toast: \"Couldn't\npreview this name\" —\nnon-blocking, save already succeeded]
     B -->|Delete| J{Is this the last\nremaining punch?}
     J -->|Yes| K[Blocked: \"At least one\npunch is required\" —\nRandom mode has nothing\nto draw from otherwise]
     J -->|No| L[Deleted]
@@ -182,7 +192,9 @@ flowchart TD
 **Empty state:** cannot actually occur post-install since defaults are
 seeded (PRD §4 — fresh defaults, not empty), but the delete-guard above
 prevents a user from reaching a true zero-punch state, which would
-silently break Random-mode combo generation.
+silently break Random-mode combo generation. (Already built —
+`LastPunchError` in `src/features/settings/service.ts`'s `deletePunch`,
+Phase 1b — not new work for 5c.)
 
 ---
 

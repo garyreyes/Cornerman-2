@@ -85,10 +85,16 @@ as each sub-phase completes — it should never drift out of sync with
   around that fixed ceiling. `rateForSpeechRate` clamps to [0.25, 4.0];
   `SpeechEngine.setRate`/`playWord` wire it into playback. 4 new tests
   (71/71 total).
-- [ ] **5c. On-device TTS fallback + caching for custom punches** —
-  `not started` — loading/error states per `docs/user-flows.md` Flow 4;
-  last-punch delete guard belongs here too; also the fallback path for
-  any word (including a number) outside 5a's bundled bank.
+- [x] **5c. On-device TTS fallback for custom punches** — `done` —
+  "+ caching" dropped from the title: confirmed 2026-08-24 that no
+  library (`expo-speech`, `react-native-tts`) can synthesize TTS to a
+  file, so there's nothing to cache — a word outside 5a's bundled bank
+  falls through to live `expo-speech` playback every call instead, per
+  explicit choice over building a custom native module. `docs/user-flows.md`
+  Flow 4 revised to match (no blocking generate/cache step, non-blocking
+  Preview instead). Last-punch delete guard was already built in Phase
+  1b (`LastPunchError`) — nothing new needed there. 4 new tests
+  (74/74 total).
 - [ ] **5d. Number announce-style + defensive/movement cue layer** —
   `not started`, added 2026-08-24 (`docs/PRD.md` §10 use cases 11-12) —
   `announceStyle: "name" | "number"` setting; defense/movement cues as
@@ -199,11 +205,11 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 ## Handoff
 
 Phase 2 (Timer Engine), Phase 3 (Combo Engine), Phase 4 (Audio Engine),
-5a (bundled voice-bank lookup + playback), and 5b (pitch-preserving
-time-stretch, revised to 0.25x–4x) are complete. Next sub-phase to build
-is **5c** (on-device TTS fallback + caching for custom punches). 5d
-(number announce-style + defensive/movement cue layer) was added
-2026-08-24 and comes after 5c. Phase 10+ is planned and written down,
+5a (bundled voice-bank lookup + playback), 5b (pitch-preserving
+time-stretch, revised to 0.25x–4x), and 5c (on-device TTS fallback,
+revised to live/uncached) are complete. Next sub-phase to build is
+**5d** (number announce-style + defensive/movement cue layer), the last
+sub-phase in Phase 5. Phase 10+ is planned and written down,
 but confirmed to build *after* Phase 9 ships. Run `/feature-planner` for
-5c when ready. As each sub-phase completes, mark it `done` here and log
+5d when ready. As each sub-phase completes, mark it `done` here and log
 the matching entry in `CHANGES.md`.

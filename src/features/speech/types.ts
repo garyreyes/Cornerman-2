@@ -8,10 +8,12 @@ export interface SpeechEngine {
    */
   setRate(rate: number): void;
   /**
-   * Plays the bundled clip matching `text`, if one exists. Returns whether
-   * a clip was found -- an unrecognized word (e.g. an un-generated custom
-   * punch name) is a silent no-op here; on-device TTS synthesis for that
-   * case is Phase 5c, not yet built.
+   * Plays the bundled clip matching `text` if one exists (pitch-preserving,
+   * via react-native-audio-api); otherwise falls through to live on-device
+   * TTS (expo-speech -- no library can synthesize to a cacheable file, so
+   * this re-synthesizes every call, through the OS's own audio output, not
+   * this engine's AudioContext bus -- see PROJECT_FACTS.md). Returns false
+   * only for blank/empty text.
    */
   playWord(text: string): boolean;
 }
