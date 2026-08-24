@@ -26,6 +26,8 @@ export interface Settings {
   defenseCuesEnabled: boolean;
   defenseCueGapMinSec: number;
   defenseCueGapMaxSec: number;
+  /** Whether the first-launch onboarding screen (docs/user-flows.md Flow 1) has ever been completed */
+  hasCompletedOnboarding: boolean;
 }
 
 export interface Punch {

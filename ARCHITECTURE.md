@@ -31,7 +31,7 @@ screen-locked, so training continues while the phone is put away.
 | Hosting/distribution | Google Play Console (existing `com.gary.cornerman` listing, carried forward) + Apple App Store (deferred — no Developer account yet, PRD §6) | Both platforms are in scope for the build; actual submission is explicitly out of scope for this phase |
 | Screen animation | `react-native-reanimated` v4 (+ `react-native-worklets`) + `react-native-svg` | Confirmed 2026-08-24, Phase 6a — the design contract's continuous sweep-ring countdown and mechanical bell-strike motion need real native-thread animation and precise arc drawing; the plain RN `Animated` API can't do either well |
 | Screen typography | `@expo-google-fonts/barlow-condensed` + `@expo-google-fonts/inter` via `expo-font` | The direction contract's exact type choices (Barlow Condensed for dial numerals, Inter for body text) — not a substitutable system-font default |
-| Navigation | None yet — deliberately deferred (Phase 6a) | Only one real screen exists (Main Timer). Adding `expo-router` before there's a second screen to route to would be premature architecture; revisit at Phase 7/8. Settings gear icon is present but a no-op stub until then. |
+| Navigation | Still no router (Phase 7b) — `App.tsx` conditionally renders `OnboardingScreen` vs. `MainTimerScreen` off a persisted boolean, same plain pattern already used there for the fonts-loading gate | Confirmed 2026-08-24: Onboarding is a one-way, show-once-ever gate (`docs/user-flows.md` Flow 1) with no back-navigation need, not a push/pop stack — `expo-router` remains deliberately deferred to Phase 8, when Settings/Punches/Presets genuinely need real stack navigation with back arrows |
 | Background audio session | `react-native-audio-api`'s own `AudioManager` (iOS `playback` session category + interruption event observation) + `PlaybackNotificationManager` for a minimal lock-screen indicator | Confirmed 2026-08-24, Phase 7a — the declarative background-mode config (iOS `UIBackgroundModes`, Android foreground service) is already free via this same library's Expo config plugin (defaulted on, already listed in `app.json`); this is the runtime activation + interruption-detection half, closing the gap Phase 2b's `pause`/`resume` deliberately left open |
 
 ## Entities
@@ -58,7 +58,8 @@ Punch    *---1 VoiceClip   (resolved by normalized text key, e.g. "Lead
   (`"name" | "number"`, PRD §10), `defenseCuesEnabled`,
   `defenseCueGapMinSec`/`defenseCueGapMaxSec` (independent of
   `comboGapMin`/`Max` — a deliberately separate timing knob, PRD §10 use
-  case 12). Persisted via MMKV, defaults
+  case 12), `hasCompletedOnboarding` (Phase 7b — gates `App.tsx`'s
+  Onboarding vs. Main Timer render, never re-shown once true). Persisted via MMKV, defaults
   applied via `Object.assign(createDefaultSettings(), parsed)` — same
   zero-migration pattern as the old app.
 - **`Punch`** — `{ id: string (uuid), num: number, name: string }`.
@@ -253,12 +254,19 @@ src/
                        # config (UIBackgroundModes, Android foreground
                        # service) is separately covered by
                        # react-native-audio-api's own Expo config plugin
-                       # (app.json), not this file.
+                       # (app.json), not this file. Also exports
+                       # requestNotificationPermission (Phase 7b's
+                       # Android 13+ runtime prompt).
   app/                 # navigation entry, thin screens that assemble
                        # features - no business logic
     MainTimerScreen.tsx # Phase 6a -- the flagship first screen; holds
                        # the design-direction.md contract as its opening
                        # comment per Impeccable's Step 5 format
+    OnboardingScreen.tsx # Phase 7b -- first-launch-only gate (docs/
+                       # user-flows.md Flow 1), same locked visual world
+                       # as MainTimerScreen. App.tsx conditionally
+                       # renders this vs. MainTimerScreen off
+                       # Settings.hasCompletedOnboarding.
 
 ```
 

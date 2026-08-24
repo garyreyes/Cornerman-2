@@ -306,3 +306,31 @@ made during feature work.
   survival (locked screen, real phone call) instead of visuals. Treat
   as unverified until tested on a real device; don't assume it works
   just because the JS-level wiring is tested and typechecks.
+- **Onboarding (7b) stayed on a plain conditional render in `App.tsx`,
+  not `expo-router`, confirmed 2026-08-24** — even though ARCHITECTURE.md
+  had flagged "second screen exists" as the trigger point for adding
+  real navigation. On inspection, Onboarding is a one-way, show-once-
+  ever gate (`docs/user-flows.md` Flow 1) with no back button and no
+  revisit path, architecturally nothing like the push/pop stack
+  Settings→Punches→Presets will need in Phase 8 (header back arrows,
+  drilling in and backing out, per `docs/user-flows.md`'s navigation
+  convention). User confirmed keeping it simple. **Phase 8 is still the
+  real trigger for installing `expo-router`** — don't skip past it a
+  second time.
+- **`react-native-audio-api`'s `AudioManager.requestNotificationPermissions()`
+  is the exact API Flow 1's "Android 13+ system notification permission
+  dialog" step needed** — no separate `expo-notifications` package
+  required. iOS has no equivalent runtime prompt for this (background
+  audio mode there is a declared capability, not a user permission), so
+  `src/lib/backgroundAudio.ts`'s `requestNotificationPermission()`
+  resolves `true` immediately on every non-Android platform.
+- **A denied notification permission does not persist any "denied" flag
+  anywhere** — deliberate simplification during 7b's planning. Phase 8's
+  Settings screen (not yet built) is expected to show a persistent note
+  about degraded background-audio reliability per Flow 1's proposed
+  default, but it should call `AudioManager.checkNotificationPermissions()`
+  live when it renders rather than trust a stale onboarding-time
+  snapshot — permission state can change later via OS settings outside
+  the app, and a live check reflects that correctly where a persisted
+  boolean would not. Don't add a persisted flag for this later without
+  re-reading this reasoning first.

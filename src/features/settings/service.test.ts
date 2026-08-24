@@ -9,6 +9,7 @@ import {
   getPunches,
   getSettings,
   LastPunchError,
+  markOnboardingComplete,
   saveSettings,
 } from "./service";
 
@@ -90,6 +91,41 @@ describe("settings persistence", () => {
     const custom = { ...createDefaultSettings(), rounds: 5, appVolume: 0.5 };
     saveSettings(custom);
     expect(getSettings()).toEqual(custom);
+  });
+
+  test("hasCompletedOnboarding defaults to false when entirely absent from saved data", () => {
+    // Simulates data saved before Phase 7b's field existed.
+    const preExistingShape = {
+      rounds: 10,
+      workDurationSec: 180,
+      restDurationSec: 60,
+      warmupDurationSec: 0,
+      mode: "random",
+      activePresetId: null,
+      comboGapMinSec: 1.5,
+      comboGapMaxSec: 3,
+      comboLengthMin: 2,
+      comboLengthMax: 4,
+      randomPunchPool: null,
+      speechRate: 1.0,
+      appVolume: 1.0,
+      announceStyle: "name",
+      defenseCuesEnabled: true,
+      defenseCueGapMinSec: 15,
+      defenseCueGapMaxSec: 30,
+    };
+    saveSettings(preExistingShape as ReturnType<typeof createDefaultSettings>);
+
+    expect(getSettings().hasCompletedOnboarding).toBe(false);
+  });
+
+  test("markOnboardingComplete persists true and leaves every other field untouched", () => {
+    const custom = { ...createDefaultSettings(), rounds: 5 };
+    saveSettings(custom);
+
+    markOnboardingComplete();
+
+    expect(getSettings()).toEqual({ ...custom, hasCompletedOnboarding: true });
   });
 });
 
