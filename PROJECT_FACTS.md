@@ -223,3 +223,24 @@ made during feature work.
   than throwing immediately. If a component test hangs instead of
   failing fast, check for a missing `await` on `render()` before
   suspecting the component/native-module code.
+- **The recurring `@emnapi/*` lockfile-drift issue (hit 4 times across
+  this project) is now permanently fixed, not just re-rolled again
+  (2026-08-24, Phase 6a).** Root cause, finally traced: `eslint-config-expo`
+  → `eslint-import-resolver-typescript` → `unrs-resolver` →
+  `@unrs/resolver-binding-wasm32-wasi` (a WASM fallback for ESLint's
+  import resolver, nothing to do with the app itself) requires
+  `@emnapi/core`/`@emnapi/runtime` via a wide, ambiguous range
+  (`^1.7.1 || ^2.0.0-alpha.4`). These are optional, platform-conditional
+  packages that don't install on Windows at all (`npm ls` shows nothing
+  locally), so **local `npm ci` verification on this Windows machine
+  cannot actually catch a Linux-side resolution mismatch** — confirmed
+  when a lockfile that passed local `npm ci` twice still failed CI
+  twice in a row with the identical error. Fixed for real via a
+  `package.json` `overrides` block pinning
+  `@emnapi/core`/`@emnapi/runtime`/`@emnapi/wasi-threads` to one exact
+  version each, eliminating the ambiguous range (and therefore the
+  cross-platform resolution non-determinism) entirely, rather than
+  hoping a regenerate happens to land on a matching version again. If
+  this recurs, check whether the pinned override versions have gone
+  stale against a newer `unrs-resolver`, not whether to regenerate the
+  lockfile again.
