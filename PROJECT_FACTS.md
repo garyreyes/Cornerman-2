@@ -377,6 +377,76 @@ made during feature work.
   since Phase 5b (`react-native-audio-api`'s WSOLA hard limit); the
   roadmap text just never got updated when that revision happened.
   `docs/PRD.md` was already correct (never hardcoded a number).
+- **Settings form widget choices, confirmed 2026-08-24 (Phase 8a):**
+  `react-native-wheely` (pure JS, no native module) for the Round/Work/
+  Rest/Warmup duration wheels — user explicitly chose "add a library"
+  over hand-building a scroll-wheel, and this one avoids a native
+  rebuild dependency a heavier wheel-picker library would need.
+  `@react-native-community/slider` — a real native view, needs a
+  dev-client rebuild like every other native dependency already in this
+  project — used for every slider-shaped control (volume, speech rate,
+  and all min/max ranges), rather than a separate dual-thumb range-slider
+  library: two of these stacked, with each slider's opposite bound
+  clamped live to the other's current value (min's `maximumValue` =
+  current max, and vice versa), stand in for a min/max range so the user
+  structurally can't drag one past the other — no separate clamp-on-save
+  validation needed. Both choices were explicit user picks among named
+  alternatives, not defaults.
+- **"Combinations" is now a mode-aware section, not Preset-only
+  (confirmed 2026-08-24, Phase 8a).** The newer `comboLengthMin`/`Max` +
+  `randomPunchPool` fields (Phase 3a, postdating Flow 3's original
+  section list) needed a home; rather than add a 7th top-level section,
+  Random mode now shows combo length + a punch-pool chip picker in the
+  same "Combinations" slot Preset mode uses for the Presets List row —
+  same confirmed extraction-doc §1.14 order, mode-dependent content.
+  `docs/user-flows.md` Flow 3 itself hasn't been edited to reflect this;
+  read this fact as the current source of truth over that doc's original
+  wording.
+- **"Defense Cues" is a new Settings section, appended after Combo
+  Timing and before Punches (confirmed 2026-08-24, Phase 8a)** — it
+  postdates Flow 3's originally-confirmed section order (Phase 5d),
+  so rather than force it into an existing section it got its own,
+  placed low in the order as the newest/most tangential feature.
+- **There is no bell/clapper "choice" of multiple sound variants, despite
+  Flow 3's wording (confirmed 2026-08-24, Phase 8a).** `audio/service.ts`'s
+  `CUE_ASSETS` is exactly one fixed bell asset and one fixed clapper
+  asset — the Settings "Sounds" section is just the `appVolume` slider,
+  nothing else. If per-cue sound variants ever become a real feature
+  (PRD §8 lists "wider variety in sound cues" as a Should-have, not v1),
+  that's new `SoundAsset` plumbing, not something this pass silently
+  half-built.
+- **Settings' punches/presets now refresh on focus, not just on mount
+  (fixed 2026-08-24, Phase 8b -- resolves the gap flagged in Phase 8a's
+  review).** `src/app/settings/index.tsx` now wraps `getPunches()`/
+  `getPresets()` in `useFocusEffect` (imported directly from
+  `expo-router`, which re-exports it -- no need for a direct
+  `@react-navigation/native` dependency). Became reachable the moment 8b
+  shipped real add/rename/delete: Settings stays mounted underneath
+  Punches in the stack, so a mount-only load showed stale "N defined"
+  summary rows and a stale Random-mode punch-pool chip list after
+  navigating back. If 8c's Preset Editor needs the same treatment for
+  its own mutations, this is the established pattern to follow.
+- **`SpeechEngine` now has a `close()` method (added 2026-08-24, Phase
+  8b review).** `react-native-audio-api`'s `AudioContext` always had
+  `close()`/`suspend()` -- this codebase's own `SpeechEngine` wrapper
+  (`speech/types.ts`/`service.ts`) just never surfaced it, which a
+  review caught after `previewEngine.ts` (Punches' Preview action)
+  copied `useSession.ts`'s "never close" pattern for an inaccurate
+  reason (claiming no release mechanism existed). `useSession.ts`'s own
+  engine still deliberately never calls `close()` -- Main Timer is the
+  app's one long-lived screen, so there's nothing to release it for --
+  but any future short-lived-screen engine (like `previewEngine.ts`,
+  now scoped to Punches' own mount/unmount) should call it rather than
+  leaking a native AudioContext for the rest of the process lifetime.
+- **`Alert.alert` (Punches' last-punch delete guard, Phase 8b) is this
+  app's first use of a native OS alert dialog** -- every other error
+  state so far (`AudioErrorBanner`) is a custom themed inline banner.
+  Functionally correct per Flow 4's "Blocked" framing, but visually
+  inconsistent with the rest of the app's fully custom-themed surfaces.
+  Deliberately not replaced with a themed modal now -- `ROADMAP.md`'s
+  Phase 8 close already has a dedicated `/impeccable critique` step for
+  reconciling exactly this kind of cross-screen consistency question
+  once 8a/8b/8c all exist; revisit there, not piecemeal.
 - **`expo-router@57.0.15` pulls in a real `react-dom@19.2.8` conflict via
   a transitive web-only chain** (`expo-router` → `@expo/ui` → `vaul` →
   `@radix-ui/*`, unrelated to this mobile-only app), which needs
@@ -393,3 +463,202 @@ made during feature work.
   `rm -rf node_modules package-lock.json && npm install` + `npm ci`. If
   a future `expo-router`/Expo SDK bump changes the pinned `react`
   version, this override needs to move in lockstep with it.
+- **How the active preset gets chosen was a real, undocumented gap in
+  `docs/user-flows.md` Flow 5, resolved by explicit user decision
+  (2026-08-24, Phase 8c).** Flow 5 describes creating/editing/deleting
+  a preset but never says how `Settings.activePresetId` actually gets
+  set. Confirmed choice: a separate radio-style control per row on the
+  Presets List (`src/features/settings/components/PresetRow.tsx`), kept
+  distinct from tapping the row body (which opens the Editor, per Flow
+  5's literal "tap existing -> Preset Editor" wording) -- not
+  overloading the same tap with two meanings, and not moving activation
+  onto the Settings screen itself. `docs/user-flows.md` itself hasn't
+  been edited to reflect this; treat this fact as current over that
+  doc's original silence on the question.
+- **The Preset Editor uses an explicit Save button, not autosave
+  (confirmed 2026-08-24, Phase 8c)** -- deliberately different from
+  Settings' and Punches' autosave-on-change pattern. Reason: Flow 5
+  itself lists "save" as its own distinct step (unlike Flow 3/Flow 4),
+  and autosaving a brand-new preset's draft on every keystroke would
+  persist an abandoned/partial preset if the user backs out mid-edit,
+  unlike a punch rename where every intermediate typed value is already
+  a valid, harmless name.
+- **`Alert.alert` (Punches' last-punch delete guard, Phase 8b) is still
+  the only native OS dialog in this app as of Phase 8's close** --
+  flagged for the Phase 8 close `/impeccable critique` pass to
+  reconcile against the rest of the app's fully custom-themed inline
+  banners, not fixed piecemeal mid-phase.
+- **A local `android/` native folder already exists in this project
+  (confirmed 2026-08-24, Phase 9a) -- gitignored, not from this
+  session's work.** Untracked (`/android` and `/ios` are both in
+  `.gitignore`, standard Expo Continuous Native Generation pattern --
+  regenerated on demand via `expo prebuild`/`expo run:android`, never
+  committed), dated from an earlier local-build attempt outside this
+  conversation. Don't be surprised it's there; don't assume it needs
+  regenerating either -- `npm run android` (`expo run:android`) can use
+  it as-is. EAS Build itself doesn't use this local folder at all --
+  it runs its own fresh `expo prebuild` in the cloud from `app.json`'s
+  config plugins, so nothing here needs reconciling with `eas.json`.
+- **`eas.json` exists as of Phase 9a, but no EAS project is linked
+  yet.** `app.json` has no `extra.eas.projectId` -- that only gets
+  written by the user running `eas login` + `eas build:configure`
+  themselves (needs their real Expo account; not something to run on
+  their behalf). Don't assume EAS builds are actually runnable yet just
+  because the config file exists.
+- **The project now lives at `C:\dev\cornerman`, not the old OneDrive
+  path (moved 2026-08-24, first real device build session).** The old
+  path (`OneDrive - De La Salle University - Manila\Desktop\Claude
+  Projects\Cornerman\Cornerman-2`, ~89 characters before any project
+  file names even start) broke native Android builds: CMake's
+  `CMAKE_OBJECT_PATH_MAX` check flagged object-file paths for
+  `react-native-worklets`/`react-native-nitro-modules`/
+  `react-native-screens` as unsafely long, and Ninja looped forever
+  ("manifest 'build.ninja' still dirty after 100 tries") trying to
+  regenerate a build graph it could never actually write. Enabling
+  Windows' `LongPathsEnabled` registry key (plus a reboot) did **not**
+  fix this -- this specific CMake/Ninja toolchain doesn't respect it.
+  Moving to a short path was the only fix that worked. The old
+  directory was deleted after verifying git history and a clean
+  working tree matched exactly. If this repo is ever cloned fresh,
+  clone it somewhere short (e.g. `C:\dev\...`), not deep inside
+  OneDrive or another long, space-containing path.
+- **Test files cannot live inside `src/app/`, confirmed 2026-08-24.**
+  `expo-router`'s `_ctx.*.js` builds its route `require.context` with a
+  hardcoded regex (`/^(?:\.\/)(?!...+api|...+html|...+middleware)...\.
+  [tj]sx?$/`) that matches *every* `.tsx`/`.ts`/`.js` file recursively
+  under `EXPO_ROUTER_APP_ROOT` (`src/app`, per `app.json`) -- there is
+  no built-in exception for `.test.tsx` files, and no documented config
+  option to add one (checked live SDK 57 docs and the installed
+  package's source; `getRoutesCore.js`'s own `ignoreList` only runs
+  *after* Metro has already tried to bundle the file, too late to
+  matter). Three router-integration tests
+  (`main-timer-ready`/`onboarding-redirect`/`settings-navigation`) lived
+  directly in `src/app/` since Phase 8a's nav-infra pass and were never
+  caught, because this was the first time the app was ever actually
+  bundled and run -- `npm test` alone never exercises Metro's route
+  scanning. Moved to `src/appTests/` (a sibling to `app/`, so `../app/`
+  imports work) -- this is the correct home for any future test that
+  needs to import real route files via `expo-router/testing-library`.
+  Regular unit tests colocated with their source elsewhere in the repo
+  (`service.test.ts` next to `service.ts`) are unaffected -- they were
+  never inside `src/app/` to begin with.
+- **Android Studio's bundled JBR JDK was 25 -- far too new for this
+  AGP/CMake toolchain (confirmed 2026-08-24).** A separate JDK 17
+  (Eclipse Temurin, installed via `winget install
+  EclipseAdoptium.Temurin.17.JDK`) is required. Three things had to
+  each be fixed, in order, because each one masked the next:
+  1. `JAVA_HOME` (env var) must point at the JDK 17 install, not
+     Android Studio's `jbr` folder.
+  2. **`android/gradle/gradle-daemon-jvm.properties`, if present, wins
+     over everything else** -- Gradle's newer "Daemon JVM criteria"
+     file, auto-generated at some point with `toolchainVersion=25`
+     baked in, silently overrides `JAVA_HOME`/`org.gradle.java.home`
+     entirely and tries to auto-provision JDK 25 for the daemon itself.
+     Delete this file if it reappears (e.g. after `expo prebuild`
+     regenerates `android/`); don't just re-set env vars and assume
+     that's sufficient.
+  3. `android/gradle.properties` also has
+     `org.gradle.java.home=C:\Program Files\Eclipse
+     Adoptium\jdk-17.0.20.8-hotspot` and
+     `org.gradle.java.installations.auto-download=false` /
+     `auto-detect=false` pinned explicitly, as defense in depth against
+     Gradle's toolchain resolver silently fetching yet another stray
+     JDK for a worker task. All of this is machine-local (`android/` is
+     gitignored) -- redo it if `android/` is ever regenerated on this or
+     another machine.
+- **The app has now been visually verified for the first time
+  (2026-08-24)** -- Onboarding and Main Timer's Ready state both render
+  and match `docs/design-direction.md`'s "Corner's Stopwatch & Bell"
+  contract closely (gunmetal-dark ground, brass-amber sweep-ring
+  countdown, engraved-plate phase badge, lap-dial round counter, large
+  brass-amber Start button). This was a real screenshot from a running
+  emulator, not reasoning-through-the-contract. Still unverified:
+  Settings/Punches/Presets' actual rendered appearance, the Work/Rest/
+  Finished states, and 7a's background-audio survival. A full
+  `/impeccable audit` has still not been run -- this was ad hoc
+  verification during a build-troubleshooting session, not that
+  deliberate process.
+- **The gunmetal/brass palette above was redesigned the same day it was
+  first seen on-device (2026-08-24) -- the user didn't like it once it
+  was actually rendered, not a hypothetical revisit.** New direction,
+  pinned by explicit user request rather than a `concept-seed.mjs` roll
+  (`docs/design-direction.md`'s "beats the roll, always" rule): dark
+  background + orange accent in the register of Claude/VS Code's own
+  dark themes, plus genuine light/dark mode support (a `Settings.themeMode`
+  field: `"system" | "light" | "dark"`, defaulting to `"system"`) rather
+  than one locked dark world. Two structural questions were asked and
+  answered before touching code, not assumed: (1) the analog-dial motifs
+  (sweep-ring countdown, engraved-style phase badge, lap-dial round
+  counter, bell-strike animation) are **kept, just recolored** -- the
+  user chose this over flattening to a chrome-less Claude/VSCode-style
+  layout; (2) Barlow Condensed is **retired** in favor of Inter for
+  display/label text, with JetBrains Mono reserved specifically for
+  numeral readouts (countdown, wheel-picker values, slider values, num
+  badges) -- not a blanket monospace swap, since most "display" usages
+  (section titles, phase badge text, button labels, punch names) are
+  words, not digits.
+- **`src/shared/theme/` (`tokens.ts` + `ThemeContext.tsx`) replaces the
+  old static `src/features/session/theme.ts` (deleted).** Old token names
+  renamed for clarity now that they're genuinely dynamic:
+  `brassAmber`→`accent`, `brassAmberDim`→`accentDim`,
+  `enamelWhite`→`textPrimary`, `enamelMuted`→`textMuted`
+  (`background`/`panel`/`panelLine`/`danger` kept). Every button's label
+  color is `colors.background` (not a separate "on-accent" token) --
+  this generalizes correctly to both modes for free, since `background`
+  is near-black in dark mode and white in light mode, giving the right
+  contrast either way without special-casing.
+- **Three real, distinct palettes -- not "2 palettes + an OS-linked auto
+  option" -- confirmed 2026-08-24 after three corrections the same day.**
+  Pass 1: `accent` tuned to a different orange per mode. Pass 2: unified
+  to one shared orange. Pass 3 (still wrong): stripped orange from
+  Light/Dark entirely and made "System" alias to whichever of them the
+  device's `useColorScheme()` reported -- which meant the Claude/VS Code
+  look never actually appeared anywhere. **The actual model**: `system`
+  IS the Claude/VS Code-style look (dark ground + `#EA580C` orange
+  accent) -- always, not OS-dependent, and what a fresh install shows by
+  default. `light`/`dark` are explicit overrides to a genuinely
+  monochrome look (`accent` there equals `textPrimary` -- no orange).
+  `useColorScheme()` is no longer read at all -- `ThemeMode` is now
+  `"system" | "light" | "dark"` directly, the exact same type as
+  `Settings.themeMode`, with no separate OS-resolved value in between.
+  `danger` stays a real red in all three. `src/shared/theme/tokens.ts`'s
+  `isDarkGround(mode)` (true for `system`/`dark`) drives the status bar
+  icon color, replacing the old direct `mode === "dark"` check.
+- **`ThemeProvider` owns `themeMode` state at the root
+  (`src/app/_layout.tsx`) and calls `settings/service.ts`'s
+  `getSettings`/`saveSettings` directly** -- a deliberate exception to
+  every other Settings field's flow (screen-local state + `onChange`
+  prop), because the theme has to be visible to every screen the instant
+  it changes, including screens that aren't descendants of the one that
+  changed it. `AppearanceSection` (new, Settings screen, section order:
+  Appearance → Round → ...) reads/writes through `useTheme()` directly
+  rather than the generic `settings`/`handleChange` prop pattern the rest
+  of the form uses, for the same reason. This is still a `service.ts`
+  call from a component, not a raw MMKV/native call -- consistent with
+  `CLAUDE.md`'s layer boundaries, the same pattern `SettingsScreen`'s own
+  autosave already used.
+- **All ~29 files that consumed the old static `theme` import were
+  converted to a `useTheme()` hook + memoized `createStyles(colors,
+  fonts)` pattern** (module-scope `StyleSheet.create` can't react to a
+  runtime mode change, so every one of them moved from a top-level
+  `const styles = StyleSheet.create(...)` to a function called inside the
+  component body via `useMemo(() => createStyles(colors, fonts), [colors,
+  fonts])`). Mechanical but real -- if a future component still imports
+  from a `theme` module directly instead of `useTheme()`, it will not
+  respond to a theme-mode change; there is no compatibility shim, the old
+  module is deleted.
+- **`react-native-wheely`'s `WheelPickerItem` is wrapped in
+  `React.memo(..., () => true)` -- a comparator that always returns
+  `true`, meaning it deliberately never re-renders after its first mount
+  (confirmed 2026-08-24 reading `node_modules/react-native-wheely/lib/
+  WheelPickerItem.js`).** A `textStyle`/`selectedIndicatorStyle` color
+  change (e.g. switching Appearance mode) is silently ignored by
+  already-mounted wheel items -- the numerals stay whatever color they
+  first rendered with, which is how Dark mode shipped with invisible
+  wheel-picker numbers (stuck on their original color, now indistinguishable
+  from the new background). Fixed by keying the `<Wheely>` element itself
+  on `mode` (`src/shared/components/WheelPicker.tsx`) so an Appearance
+  change forces a full remount instead of relying on the library to
+  notice new props -- the only way to get it to actually pick up new
+  colors. Any future themed prop passed into this library needs the same
+  treatment, not just `itemTextStyle`/`selectedIndicatorStyle`.

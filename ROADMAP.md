@@ -147,6 +147,14 @@ from the real, shipped result)*
     simulator; treat the screen as unverified until then, the same
     honesty standard already applied to bell/clapper sound quality
     (4a) and TTS voice quality (5a/5c).
+  - **2026-08-24 redesign**: the gunmetal/brass palette this sub-phase
+    shipped was recolored after the user saw it on-device and asked for
+    a dark-background/orange-accent world (Claude/VS Code register)
+    with real light/dark mode support — see `docs/design-direction.md`'s
+    redesign record and `PROJECT_FACTS.md`. The dial motifs (sweep-ring,
+    phase badge, lap-dial counter) are unchanged, only palette/type. The
+    `/impeccable audit` above still needs to happen against this new
+    palette, not the retired one.
 
 ## Phase 7 — Background Audio + Onboarding
 
@@ -193,7 +201,7 @@ from the real, shipped result)*
 
 *(inherits the now-locked `DESIGN.md` — no new visual-world decisions)*
 
-- [ ] **8a. Settings screen** — `in progress` — split into two passes
+- [x] **8a. Settings screen** — `done` — split into two passes
   (confirmed, matches how Phase 5 was sequenced):
   - [x] **Navigation infrastructure** — `done` — installed and wired
     `expo-router` (the confirmed real trigger point, not 7b's one-way
@@ -211,31 +219,74 @@ from the real, shipped result)*
     `expo-router/testing-library`'s `renderRouter`, one per file (see
     `PROJECT_FACTS.md` for why one file per test was needed). 109/109
     tests passing, all gates green.
-  - [ ] **Settings form content** — `not started` — the real form:
-    Round → Mode → Sounds (bell/clapper + independent volume slider) →
-    Combinations (Presets List, Mode = Preset only) → Combo Timing (gap
-    range + **0.25x–4x** speech rate dial — corrected from this
-    roadmap's earlier stale "5x", see `PROJECT_FACTS.md`) → Punches
-    (`docs/user-flows.md` Flow 3). Still needs a decision on where the
-    Phase 3a/5d fields (`comboLengthMin`/`Max`, `randomPunchPool`,
-    `announceStyle`, `defenseCuesEnabled`, `defenseCueGapMinSec`/`MaxSec`
-    — all added after Flow 3 was originally written) actually go in the
-    layout.
-- [ ] **8b. Punches screen** — `not started` — add/rename/delete, plus
-  the non-blocking **Preview** action (live TTS playback) per
-  `docs/user-flows.md` Flow 4 — revised 2026-08-24 (Phase 5c) from the
-  original blocking "TTS-generation" step; there's nothing to
-  generate-and-cache anymore, saving is instant.
-- [ ] **8c. Presets List + Preset Editor** — `not started`.
+  - [x] **Settings form content** — `done` — the real form: Round
+    (rounds + Work/Rest/Warmup via a new `react-native-wheely`-based
+    wheel picker) → Mode → Sounds (just the volume slider — confirmed
+    there's no bell/clapper "choice" of variants to pick between) →
+    Combinations, made mode-aware (Random: combo length + punch pool;
+    Preset: the existing Presets List row) so `comboLengthMin`/`Max` +
+    `randomPunchPool` didn't need a 7th section → Combo Timing (gap
+    range, **0.25x–4x** speech rate dial, announce style) → Defense
+    Cues (new section, not in Flow 3's original order) → Punches.
+    New `src/shared/components/` primitives (first real use of that
+    folder); placeholder `/settings/punches` and `/settings/presets`
+    routes shipped so the new summary rows navigate ahead of 8b/8c.
+    Judgment/presentation, no new tests. 109/109 tests passing, all
+    gates green; visual correctness unverified, same standing gap as
+    every other screen.
+- [x] **8b. Punches screen** — `done` — add/rename/delete, plus the
+  non-blocking **Preview** action (live playback through the real
+  `SpeechEngine`) per `docs/user-flows.md` Flow 4. New punches get the
+  next unused `num` automatically — no `num` picker, matching how the
+  old app's rename flow only ever wrote the name field (extraction doc
+  §1.6). New `previewEngine.ts` (scoped to the screen's own mount/
+  unmount, not the app's process lifetime — see `PROJECT_FACTS.md`).
+  Judgment/presentation + untested native wiring, no new tests.
+  109/109 tests passing, all gates green.
+- [x] **8c. Presets List + Preset Editor** — `done` — two screens,
+  replacing the flat placeholder (`src/app/settings/presets.tsx`
+  restructured into a `presets/` folder: `index.tsx` for the List,
+  `[id].tsx` for the Editor, `id === "new"` the create-mode sentinel).
+  List: "+ New Preset", empty state, and a per-row separate radio
+  control for `Settings.activePresetId` — a real gap in
+  `docs/user-flows.md` Flow 5 (which never actually says how the active
+  preset gets chosen) resolved by explicit user confirmation rather
+  than a silent decision, see `PROJECT_FACTS.md`. Editor: name + ordered
+  sequence builder (tap-to-append, up/down reorder, remove — not
+  drag-and-drop, no new gesture dependency), with an **explicit Save
+  button** unlike Settings/Punches' autosave, since Flow 5 itself lists
+  "save" as its own step and autosaving a new preset's draft would
+  persist abandoned entries. Judgment/presentation, no new tests.
+  109/109 tests passing, all gates green.
 - [ ] **Phase close: `/impeccable critique` + `/impeccable polish`** —
   `not started` — all three screens judged together for visual
-  consistency, not one at a time.
+  consistency, not one at a time. One known, deliberately-deferred item
+  for this pass: Punches' last-punch-delete guard uses a native
+  `Alert.alert` (the app's only native dialog so far, everywhere else is
+  a themed inline banner) — flagged in `PROJECT_FACTS.md` as a candidate
+  for reconciling here rather than fixed piecemeal. **Also now covers**
+  the new Appearance section (System/Light/Dark toggle, added
+  2026-08-24) and the dark/orange redesign applied across all three
+  screens — this pass should judge the new palette, not the retired
+  gunmetal/brass one.
 
 ## Phase 9 — Platform Builds & Ship Readiness
 
-- [ ] **9a. EAS build config, both platforms** — `not started` —
-  confirm `com.gary.cornerman` continuity; real-device/simulator
-  verification on iOS and Android.
+- [ ] **9a. EAS build config, both platforms** — `in progress` — `eas.json`
+  written (development/preview/production profiles; `developmentClient:
+  true` + `distribution: "internal"` + `android.buildType: "apk"` on
+  development/preview for direct-install dev-client testing;
+  `appVersionSource: "remote"` so EAS owns version/build-number bumping
+  rather than hand-maintained native files). `com.gary.cornerman`
+  continuity already confirmed (`PROJECT_FACTS.md`, predates this
+  sub-phase) and unchanged in `app.json`. **What's left, all requiring
+  the user's own action, not something buildable from here:** `eas
+  login` + `eas build:configure` to actually link an EAS project (writes
+  a `projectId` into `app.json` — needs the user's real Expo account,
+  can't be done on their behalf), then a real build +
+  real-device/simulator verification on iOS and Android. iOS
+  specifically also needs an Apple Developer account, which doesn't
+  exist yet (`PROJECT_FACTS.md`).
 - [ ] **Phase close: full-app `/impeccable polish`** — `not started` —
   whole-app pass, not per-section, before considering this
   production-ready.
@@ -300,29 +351,63 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-Phases 2-5 (Timer Engine, Combo Engine, Audio Engine, Speech Pipeline),
-6a (Main Timer screen + the `session` orchestration layer), and all of
-Phase 7 (7a native background-audio session + interruption pause/resume;
-7b Onboarding screen) are done — 108/108 tests passing, all gates
-green. **What's genuinely outstanding, all requiring a real
-device/simulator this environment doesn't have:** `/impeccable audit`
-for both real screens (never actually seen rendered, only built against
-`docs/design-direction.md`'s written contract) and real-device
-verification for 7a's background-audio survival (does audio genuinely
-keep playing through a locked screen or a phone call — reasoned through
-against the library's source, never observed). Run the app yourself
-(`npx expo start`, real device or simulator — this project needs a
-dev-client build, not Expo Go, per the native modules already
-installed), check both, then run `/impeccable audit`. `DESIGN.md` still
-doesn't exist — per Impeccable's process it gets written *from* the
-real, inspected result, so it waits on that audit, not on this handoff.
-Once that's done: Phase 8 is now in progress. `expo-router` is
-installed and wired (8a's navigation-infrastructure pass) — the gear
-icon reaches a real, back-navigable Settings route, but that screen is
-still a placeholder. **8a's Settings form content is the next actual
-build step** (see the Phase 8 section above for the exact field list
-and the still-open question of where the newer Phase 3a/5d fields go),
-followed by 8b (Punches) and 8c (Presets). Phase 10+ is planned and
-written down, but confirmed to build *after* Phase 9 ships. As each
-sub-phase completes, mark it `done` here and log the matching entry in
-`CHANGES.md`.
+Phases 1–8 are all done — 109/109 tests passing, all gates green. Each
+Phase 8 sub-phase went through an independent `reviewer` pass before
+being marked done; real issues that pass caught are already fixed (see
+`CHANGES.md`'s dated entries and `PROJECT_FACTS.md` for the durable
+ones).
+
+**A real device is now available and the app has actually been run**
+(2026-08-24) — this changes the standing "no device/simulator in this
+environment" caveat that applied to every phase before this. The
+project also moved to `C:\dev\cornerman` (a Windows path-length issue
+broke native builds at the old OneDrive location — see
+`PROJECT_FACTS.md`), and a real bug was found and fixed in the process:
+three router-integration tests were living inside `src/app/` and Expo
+Router's route scanner was sweeping them into the real app bundle
+(moved to `src/appTests/`). Onboarding and Main Timer's Ready state
+were visually confirmed from a real screenshot and match
+`docs/design-direction.md`'s contract closely. **Still not done, even
+though a device now exists:** the actual deliberate `/impeccable audit`
+process (this was ad hoc verification during build troubleshooting, not
+that process), visual confirmation of Settings/Punches/Presets and the
+Work/Rest/Finished timer states, and 7a's background-audio survival
+(does audio genuinely keep playing through a locked screen or a phone
+call). `DESIGN.md` still doesn't exist — per Impeccable's process it
+gets written *from* the real, inspected result of a proper audit, not
+from incidental screenshots taken mid-troubleshooting.
+
+**2026-08-24, later the same day: the visual world was redesigned.**
+Once the gunmetal/brass palette was actually seen running (the
+confirmation above), the user didn't like it and asked for a different
+direction — dark background + orange accent (Claude/VS Code dark-theme
+register) plus real light/dark mode support, not one locked dark world.
+This was a pinned user direction, not a `concept-seed` re-roll. The
+analog-dial motifs (sweep-ring countdown, engraved-style phase badge,
+lap-dial round counter, bell-strike animation) were kept and just
+recolored — confirmed explicitly over flattening to a chrome-less
+Claude/VSCode-style layout. Barlow Condensed was retired for Inter
+(display/label text); JetBrains Mono was added specifically for numeral
+readouts (countdown, wheel-picker values, slider values, num badges).
+New `src/shared/theme/` (`tokens.ts` + `ThemeContext.tsx`) replaces the
+old static `src/features/session/theme.ts`, driven by a new
+`Settings.themeMode` field (System/Light/Dark, new Appearance section in
+Settings) plus the device's own color scheme. All ~29 files that
+consumed the old static theme were converted to a `useTheme()` hook.
+109/109 tests still pass, lint/typecheck clean. See
+`docs/design-direction.md`'s redesign record and `PROJECT_FACTS.md` for
+the full token map and reasoning. **This redesign has not yet been seen
+on a real device either** — same standing verification gap as
+everything else in this environment.
+
+**What's next:** run `/impeccable audit` now that a device is
+genuinely available, covering 6a/7b's outstanding audit **against the
+new dark/orange palette** and the Phase 8 close step (`/impeccable
+critique` + `/impeccable polish` across all three Settings-stack
+screens, including the new Appearance section, judged together). **9a's
+`eas.json` is written** (build profiles for a dev-client build), but
+actually linking an EAS project (`eas login`, `eas build:configure`)
+and triggering a real build is still the user's own action. Phase 10+
+is planned and written down, but confirmed to build *after* Phase 9
+ships. As each sub-phase completes, mark it `done` here and log the
+matching entry in `CHANGES.md`.

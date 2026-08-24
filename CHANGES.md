@@ -248,3 +248,226 @@ Dated log of shipped changes, appended to as features complete.
   shared one file — see `PROJECT_FACTS.md`). Also corrected this
   roadmap's stale "0.25x–5x" rate-dial reference to the actual confirmed
   0.25x–4x cap. 109/109 tests passing, all gates green.
+- 2026-08-24: Sub-phase 8a (Settings form content pass, closing out 8a) —
+  the real form replacing the nav-infra pass's placeholder, in the
+  confirmed extraction-doc §1.14 order: Round (rounds + Work/Rest/Warmup
+  duration, via a new themed `WheelPicker` wrapping `react-native-wheely`
+  — pure-JS, no native module, per PRD §3.1/§8's "iOS-style continuous
+  scroll picker" requirement) → Mode (Random/Preset segmented control) →
+  Sounds (app volume slider — confirmed there's no bell/clapper "choice"
+  of multiple variants, `audio/service.ts`'s `CUE_ASSETS` is one fixed
+  asset per cue, so this section is just the volume slider) →
+  Combinations, made mode-aware to give the newer `comboLengthMin/Max` +
+  `randomPunchPool` fields a home without adding a 7th section: Random
+  mode shows a combo-length range + a punch-pool chip multi-select
+  (with a "restrict pool" toggle and a last-chip guard), Preset mode
+  keeps the existing Presets List summary row → Combo Timing (gap range
+  respecting the 0.5s "Blitz" floor per extraction doc §1.7, the
+  0.25x–4x speech-rate dial, Name/Number announce-style toggle) →
+  Defense Cues (new section, not in the original Flow 3 order since it
+  postdates Phase 5d — enabled toggle + gap range, shown only when
+  enabled) → Punches (summary row). New dependencies:
+  `react-native-wheely` (pure JS) and `@react-native-community/slider`
+  (real native view, needs a dev-client rebuild to actually run, same as
+  every other native dependency added so far — no `app.json` plugin
+  entry needed, it autolinks). New `src/shared/components/` primitives
+  (`SectionCard`, `SegmentedControl`, `LabeledSlider`, `RangeSliderPair`,
+  `WheelPicker`, `SummaryRow`, `ChipMultiSelect`) — the first real use of
+  the `shared/` folder `ARCHITECTURE.md` reserved for this. Also shipped
+  minimal placeholder routes for `/settings/punches` and
+  `/settings/presets` (same "proves reachable" pattern the nav-infra pass
+  used for `/settings` itself), so the new summary rows actually navigate
+  instead of dead-ending ahead of 8b/8c. Judgment/presentation work, no
+  new tests — updated the one existing navigation test
+  (`settings-navigation.test.tsx`) to assert on real form content instead
+  of the retired placeholder's body text, and registered the two new
+  placeholder routes in its `renderRouter` call so the nested layout's
+  screen list matches. 109/109 tests passing, all gates green; visual
+  correctness is unverified for the same reason as every screen so far
+  (no device/simulator in this environment). Phase 8a is now fully done —
+  8b (Punches) is next.
+- 2026-08-24: `reviewer` pass on 8a's Settings form content caught three
+  real issues, all fixed: `WheelPicker`'s out-of-range fallback silently
+  showed index 0 (e.g. "Rounds: 1") instead of the nearest valid value
+  when a persisted setting isn't on the wheel's discretized grid — now
+  snaps to nearest, matching the codebase's existing graceful-fallback
+  pattern (`resolvePunchName`/`effectivePool`); the punch-pool chip
+  multi-select's "can't deselect the last one" guard undercounted when
+  two punches share a `num` (explicitly allowed, extraction doc §1.6) —
+  `randomPunchPool` is now deduped on every write in
+  `CombinationsSection.tsx`; `settings/index.tsx`'s `handleChange` read
+  `settings` from a stale render closure instead of a functional updater
+  like `useSession.ts`'s established pattern — fixed. Also normalized a
+  `SafeAreaView` `edges` inconsistency between the new placeholder routes
+  and the new real screen. One more finding (Settings' punches/presets
+  loaded once on mount, not refreshed on focus) is correctly harmless
+  today — 8b/8c have no mutation yet — logged in `PROJECT_FACTS.md` as
+  required follow-up when they ship. 109/109 tests passing, all gates
+  green after fixes.
+- 2026-08-24: Sub-phase 8b — Punches screen, replacing its placeholder.
+  `src/app/settings/punches.tsx`: each punch is an inline-editable name
+  field (commits on blur) + num badge + non-blocking Preview + Delete
+  (`docs/user-flows.md` Flow 4). Preview plays through the real
+  `SpeechEngine` (bundled clip or on-device TTS fallback, at the
+  current speech rate/volume) via a new `previewEngine.ts`, not a
+  simplified stand-in — so it actually sounds like what the user will
+  hear mid-session. Adding a punch assigns the next unused `num`
+  automatically; there's no `num` picker anywhere in this UI, matching
+  how the old app's rename flow only ever wrote the name field
+  (extraction doc §1.6). Delete keeps the existing Phase 1b last-punch
+  guard (`LastPunchError`), surfaced via `Alert.alert` (blocking, per
+  Flow 4's own "Blocked" framing — the app's first use of a native
+  alert dialog rather than a themed inline banner; flagged in
+  `PROJECT_FACTS.md` for the Phase 8 close critique pass, not fixed
+  now). Judgment/presentation + untested native wiring (matches
+  `useSession.ts`/`speech/service.ts`'s existing precedent), no new
+  tests. 109/109 tests passing, all gates green.
+- 2026-08-24: `reviewer` pass on 8b caught one High-severity issue and
+  two Medium, all fixed: the Settings screen (`settings/index.tsx`)
+  loaded punches/presets once on mount and never refreshed — a gap this
+  project's own `PROJECT_FACTS.md` had explicitly flagged as "fix when
+  8b/8c ship," now actually reachable since 8b lets a user mutate
+  punches and navigate back to Settings underneath. Fixed with a
+  `useFocusEffect`-driven refetch (re-exported directly from
+  `expo-router`). `previewEngine.ts`'s original "no way to release the
+  AudioContext" justification for never closing its engine was
+  factually wrong — the library's `AudioContext.close()` exists,
+  `SpeechEngine` (this codebase's own wrapper) just never surfaced it;
+  added `close()` to the `SpeechEngine` interface and scoped
+  `previewEngine.ts` to the Punches screen's own mount/unmount instead
+  of the app's process lifetime, so visiting Punches no longer leaves a
+  second native AudioContext open forever. Also caught and fixed a real
+  unhandled-promise-rejection risk in the pre-existing (Phase 5a)
+  `speech/service.ts`'s fire-and-forget bundled-clip playback — added a
+  `.catch()`; left `playWord`'s synchronous boolean contract alone
+  (changing it would have broken its own well-covered Phase 5 test
+  suite for a currently-unobservable edge case, since the committed
+  voice-bank WAVs are silent placeholders, not corrupt ones). 109/109
+  tests passing, all gates green after fixes.
+- 2026-08-24: Sub-phase 8c — Presets List + Preset Editor, closing out
+  Phase 8. Restructured the flat `src/app/settings/presets.tsx`
+  placeholder into a `presets/` folder (`index.tsx` List, `[id].tsx`
+  Editor, `id === "new"` the create-mode sentinel) since
+  `docs/user-flows.md` Flow 5 needs two distinct screens, not one.
+  Presets List: "+ New Preset", an empty state, and -- a real gap in
+  Flow 5 resolved by an explicit user decision rather than a silent
+  one, since Flow 5 describes create/edit/delete but never actually
+  says how the active preset gets chosen -- a separate radio-style
+  control per row sets `Settings.activePresetId`, distinct from tapping
+  the row body (which opens the Editor, per Flow 5's literal wording).
+  Deleting the active preset clears the selection. Preset Editor: name
+  field + an ordered sequence builder (tap-to-append from the current
+  Punches list -- deliberately not a toggle/multi-select like
+  `ChipMultiSelect`, since a punch can legitimately repeat in a combo --
+  plus up/down reorder and remove per entry, no drag-and-drop, no new
+  gesture dependency), with an explicit Save button unlike Settings/
+  Punches' autosave -- Flow 5 itself lists "save" as its own step, and
+  autosaving a new preset's draft on every keystroke would persist
+  abandoned entries. `settings/index.tsx`'s focus-refresh now also
+  refetches `settings` itself (not just punches/presets), since the new
+  List screen's activation control mutates `Settings.activePresetId`
+  from a sibling screen. Judgment/presentation, no new tests. 109/109
+  tests passing, all gates green. Phase 8 (Settings, Punches, Presets)
+  is now done -- next is the Phase close `/impeccable critique` +
+  `/impeccable polish` pass, then Phase 9.
+- 2026-08-24: `reviewer` pass on 8c caught one real Medium-severity
+  issue, fixed: `PresetsListScreen`'s `handleDelete` compared against
+  `settings.activePresetId` from a stale render closure instead of a
+  functional update, so two rows' controls firing in the same batch
+  (e.g. simultaneous multi-touch -- activating one preset while
+  deleting another) could let the delete's stale check clobber the
+  just-made activation. Fixed by switching `handleActivate`/
+  `handleDelete` to functional `setSettings` updaters throughout,
+  matching the pattern `settings/index.tsx`'s `handleChange` already
+  established. Every other scrutinized area (mode detection on
+  remount, the defensive redirect-if-preset-not-found effect, reorder/
+  remove logic with duplicate `Punch.num` values, keying, layer
+  boundaries, Save gating) checked out correct. 109/109 tests passing,
+  all gates green after the fix.
+- 2026-08-24: Sub-phase 9a (partial) -- wrote `eas.json`: `development`
+  (dev-client, internal distribution, Android APK -- installs directly
+  on a device without Play Store, matching this project's dev-client-
+  not-Expo-Go requirement) and `preview` profiles for direct-install
+  testing builds, plus a minimal `production` profile
+  (`autoIncrement: true`) and empty `submit.production` stub for when
+  actual store submission is eventually in scope (still explicitly not
+  now, per `docs/PRD.md`). `appVersionSource: "remote"` so EAS owns
+  version/build-number bumping rather than hand-maintained native
+  files -- consistent with this project's gitignored, regenerate-on-
+  demand `android`/`ios` folders (confirmed via `git log`/`.gitignore`:
+  an `android/` folder already exists locally from an earlier local-
+  build attempt, untracked, not touched by this change). No `eas.json`
+  or CI/EAS integration existed before this. Config-only, no gates
+  apply. **Not done**: linking an actual EAS project (`eas login` + `eas
+  build:configure`, which needs the user's own Expo account and writes
+  a `projectId` into `app.json`) and the real-device/simulator
+  verification 9a also calls for -- both are the user's own action, not
+  buildable from here.
+- 2026-08-24: First successful real-device (emulator) build and run --
+  a genuine milestone, not a code change, but worth logging since it
+  took real troubleshooting to get here and produced one actual bug
+  fix. Along the way: installed JDK 17 (Android Studio's bundled JBR
+  turned out to be JDK 25, incompatible with this AGP/CMake toolchain);
+  found and deleted a stray `gradle-daemon-jvm.properties` that
+  silently pinned the Gradle daemon to JDK 25 regardless of `JAVA_HOME`;
+  hit a genuine Windows path-length limit breaking native CMake builds
+  under the old, deeply-nested OneDrive project path, which enabling
+  Windows long-paths support did not fix -- moved the whole project to
+  `C:\dev\cornerman` (the old copy, verified clean and identical, was
+  then deleted). Found and fixed a real, previously-undiscovered bug:
+  three router-integration test files
+  (`main-timer-ready`/`onboarding-redirect`/`settings-navigation`)
+  lived inside `src/app/` since Phase 8a, and Expo Router's route
+  scanner has no test-file exception -- it was sweeping them into the
+  real app bundle, which then failed trying to bundle Node's `path`
+  module. Moved them to `src/appTests/`. See `PROJECT_FACTS.md` for the
+  full details on all of the above -- they're durable facts future
+  sessions need, not one-off session notes. Onboarding and Main Timer's
+  Ready state were visually confirmed against `docs/design-direction.md`
+  for the first time, from a real screenshot. All 109 tests still pass,
+  all gates green, after the test-file move.
+- 2026-08-24: Visual-world redesign — the user saw the gunmetal/brass
+  "Corner's Stopwatch & Bell" palette rendered on-device for the first
+  time and asked for a different direction: dark background + orange
+  accent (Claude/VS Code dark-theme register), plus real light/dark mode
+  support, not one locked dark world. `docs/design-direction.md` rewritten
+  as a redesign record (analog-dial motifs -- sweep-ring, phase badge,
+  lap-dial round counter -- kept per explicit confirmation, only the
+  palette/type changed). New `src/shared/theme/` (`tokens.ts` +
+  `ThemeContext.tsx`) replaces the old static `src/features/session/theme.ts`
+  with a light/dark-aware token system driven by a new
+  `Settings.themeMode` field (`"system" | "light" | "dark"`, defaults to
+  `"system"`) plus the device's own `useColorScheme()`. New Appearance
+  section (Settings screen, leads the section order) exposes the
+  System/Light/Dark toggle. Barlow Condensed retired in favor of Inter
+  for display/label text; numerals specifically (countdown readout,
+  wheel-picker values, slider values, num badges) now render in JetBrains
+  Mono -- the one deliberate monospace touch, not a blanket swap. All ~29
+  consuming files converted from a static `theme.colors.X` import to a
+  `useTheme()` hook + memoized `createStyles(colors, fonts)` pattern so
+  every screen actually re-renders on a mode change. 109/109 tests still
+  pass, lint/typecheck clean. **Not done**: real on-device visual
+  confirmation of the new palette (same standing gap as every screen
+  before it -- this environment still has no simulator/screenshot
+  capability) and the deliberate `/impeccable audit`/`critique`/`polish`
+  passes, still outstanding from before this redesign.
+- 2026-08-24: Palette correction — Light/Dark are now genuinely
+  monochrome, no orange or any accent hue in either mode (two corrections
+  the same day: first a per-mode-tuned orange, then one shared orange,
+  both wrong against the actual ask — the Claude/VS Code reference means
+  those modes are literally black-and-white). `accent` now equals
+  `textPrimary` per mode; `accentDim` is a plain gray; `danger` stays the
+  one deliberate red exception. See `PROJECT_FACTS.md` and
+  `docs/design-direction.md` for the full record. 109/109 tests still
+  pass, lint/typecheck clean.
+- 2026-08-24: Appearance model correction — three real palettes now,
+  not two-plus-an-OS-alias. "System" (default) is the fixed Claude/VS
+  Code dark+orange look, no longer tied to `useColorScheme()`; "Light"/
+  "Dark" stay the genuinely monochrome overrides from the previous
+  correction. Also fixed a real bug found while verifying this on-device:
+  `react-native-wheely`'s item component is wrapped in a permanently-true
+  `React.memo`, so it never re-rendered on an Appearance change — Dark
+  mode's wheel-picker numbers (Rounds/Work/Rest/Warmup) were invisible,
+  stuck on whatever color they first mounted with. Fixed by keying
+  `<Wheely>` on the theme mode to force a remount on change. 109/109
+  tests still pass, lint/typecheck clean.

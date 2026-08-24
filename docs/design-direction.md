@@ -1,14 +1,114 @@
 # Cornerman — Design Direction
 
+Status: **redesigned** 2026-08-24, superseding the original 2026-08-23
+decision below. The user saw the original gunmetal/brass palette
+rendered on a real device for the first time and asked for a different
+world -- not a hypothetical revisit, a direct reaction to the actual
+build. Per Impeccable's redesign process, this is a pinned direction
+(the user named it explicitly), which beats a `concept-seed.mjs` roll
+outright -- no dice round was run for this pass. Went through three
+corrections the same day, each from direct user feedback after seeing
+the previous pass rendered: (1) the initial ask, "dark background +
+orange accent, like Claude/VS Code," first read as one orange accent
+used throughout every mode; (2) the user clarified their actual
+Light/Dark modes are literally black-and-white, no color, so orange was
+stripped from both -- but that also (wrongly) stripped it from
+everywhere, including the "System" option, which just aliased to
+whichever of Light/Dark the OS reported; (3) the user pointed out System
+specifically should still show the Claude/VS Code look. **The settled
+model**: `system` IS the Claude/VS Code-style dark+orange look, fixed
+(not OS-linked) and shown by default; `light`/`dark` are explicit,
+genuinely monochrome overrides. The original decision record (below the
+divider) stays in the file as evidence/anti-reference, not deleted; the
+retired palette is what the current one is a reaction against.
+
+## The redesign contract (current)
+
+Two structural questions were asked and answered before any code
+changed, since "dark background + orange accent" alone doesn't decide
+either:
+
+1. **Keep the analog-dial motifs, recolored** (sweep-ring countdown,
+   engraved-style phase badge, lap-dial round counter, bell-strike
+   animation) -- confirmed over flattening to a chrome-less Claude/VSCode-
+   style layout (cards/lists/no dial imagery). The "stopwatch you glance
+   at mid-round" identity survives; only the palette and type changed.
+2. **Typography splits by role, not a blanket monospace swap.** Barlow
+   Condensed retired entirely in favor of Inter for every stylized
+   display/label use (section titles, phase badge text, button labels,
+   punch names) -- these are words, not digits. JetBrains Mono is
+   reserved specifically for actual numeral readouts: the countdown
+   timer, wheel-picker values, slider values, num badges. This is the
+   one deliberate "developer tool" touch, not a wholesale font swap.
+
+**THESIS:** A timer that still reads as a tool you glance at mid-round
+-- the corner-man's analog-stopwatch dial retained -- recolored out of
+the gunmetal/brass instrument-panel world into a code-editor-style
+register, with three real appearance modes rather than one locked dark
+world.
+
+**OWN-WORLD:** Three distinct palettes behind the Settings > Appearance
+toggle, not "two palettes + an OS-linked auto option":
+- **System** (default) -- the Claude/VS Code-style look: near-black
+  ground, one orange accent (`#EA580C`) carrying every active/
+  interactive element. Fixed, not OS-dependent.
+- **Light** / **Dark** -- explicit overrides, genuinely monochrome, no
+  orange or any other accent hue (`#FFFFFF`/`#171717` light,
+  `#121212`/`#F2F2F2` dark). `accent` equals `textPrimary` in each, so a
+  filled "accent" button/badge is really an inverted monochrome one
+  (Dark: white fill, black label).
+
+`danger` is the one deliberate exception across all three -- red for
+real error states, kept even where the rest of the palette is
+monochrome. Primary/muted neutral text tokens (`textPrimary`/
+`textMuted`) replace the old enamel-white/enamel-muted naming now that
+they're genuinely dynamic. Display/label text: Inter. Numerals: JetBrains
+Mono (see above). Motion unchanged from the original contract:
+sweep-hand-style continuous easing for the countdown (never a digital
+blink), a genuine bell-strike moment at phase changes -- mechanical and
+earned, never bouncy or gamified.
+
+**STORY:** Unchanged -- the user glances down mid-round and reads phase,
+time remaining, and round count in under a second, then looks back up
+and keeps training. Audio carries the session; the screen exists for the
+moments eyes actually land on it.
+
+**FIRST VIEWPORT:** Unchanged in composition from the original contract
+(full-bleed dark ground, center-dominant countdown, lap-dial round
+counter, engraved-style phase badge, large accent-colored Start button,
+quiet settings gear) -- only the palette and type resolve differently
+now (monochrome inverted-fill accent instead of brass, Inter/JetBrains
+Mono instead of Barlow Condensed/Inter).
+
+**FORM:** Redesign of "The Corner's Stopwatch & Bell" (original seed key
+`ca58d365`) -- pinned by explicit user direction, not a roll.
+
+**FINISH:** unreviewed and undocumented is unfinished; this build ends
+with the finish review, the verdict, and `DESIGN.md`. Still outstanding
+as of this redesign (same standing gap as before it): real on-device
+visual confirmation of the new palette (no simulator/screenshot
+capability in this environment), and the deliberate `/impeccable audit`
++ Phase 8 close's `critique`/`polish` passes.
+
+## Implementation
+
+`src/shared/theme/tokens.ts` + `ThemeContext.tsx` (new) replace the old
+static `src/features/session/theme.ts` (deleted) -- see
+`PROJECT_FACTS.md` for the full token map, the `Settings.themeMode`
+field, and why `ThemeProvider` owns theme state at the root rather than
+through the usual per-screen `settings`/`onChange` flow.
+
+---
+
+## Original decision (2026-08-23, retired) -- kept as evidence/anti-reference
+
 Status: decided with user, 2026-08-23, via `/impeccable new-work`. Seed
 key `ca58d365` (mode: operate). This is a decision record, not
 `DESIGN.md` — per Impeccable's process, `DESIGN.md` is written at
 *finish*, from the actually-built world, once the first real screen
-exists and passes review. This file exists so that first build (inside
-the `feature-planner` loop) inherits a fully committed direction instead
-of defaulting to something generic.
+exists and passes review.
 
-## How this was chosen
+### How this was chosen
 
 Mode: **Operate** (task completion — starting/monitoring a workout, not
 persuasion). Physical scene (forces dark-vs-light, per the process — never
@@ -35,11 +135,7 @@ No image-generation tool was available this session, so this ran as the
 text/fact-card version of the decision (no rendered comps) — disclosed to
 the user before they chose, not after.
 
-## The direction contract
-
-*(To be copied verbatim as the opening comment of the first built screen
-— `App.tsx` or `features/timer/components/MainTimer.tsx`, whichever ends
-up hosting the Main Timer screen — per Impeccable's Step 5 format.)*
+### The original direction contract (retired -- see above for current)
 
 **THESIS:** A timer built to look like what a corner-man actually holds
 in their hand mid-fight — an analog stopwatch and a brass ring bell — not
@@ -82,13 +178,3 @@ the user over the assigned roll ("The Ring"). Seed key `ca58d365`.
 
 **FINISH:** unreviewed and undocumented is unfinished; this build ends
 with the finish review, the verdict, and DESIGN.md.
-
-## What happens next
-
-This direction is now locked for the first build. Per the standing
-workflow, the next steps are `roadmap-planner` (to sequence phases,
-now informed by both `docs/user-flows.md` and this direction), and then
-the `feature-planner` build loop — where the Main Timer screen gets
-actually built against this contract, inspected (native simulator/
-emulator screenshots), reviewed by the finish reviewer, and `DESIGN.md`
-gets written from the real, shipped result.

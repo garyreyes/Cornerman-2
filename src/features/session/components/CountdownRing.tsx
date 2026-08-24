@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import { Circle, Svg } from "react-native-svg";
 
-import { theme } from "../theme";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -36,6 +37,8 @@ interface CountdownRingProps {
  * the ring itself look stepped.
  */
 export function CountdownRing({ phaseEndAt, phaseDurationMs, isPaused }: CountdownRingProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const progress = useSharedValue(0);
   const [remainingMs, setRemainingMs] = useState(() =>
     phaseEndAt === null ? phaseDurationMs : Math.max(0, phaseEndAt - Date.now()),
@@ -76,12 +79,12 @@ export function CountdownRing({ phaseEndAt, phaseDurationMs, isPaused }: Countdo
   return (
     <View style={styles.container}>
       <Svg width={SIZE} height={SIZE}>
-        <Circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} stroke={theme.colors.panel} strokeWidth={STROKE_WIDTH} fill="none" />
+        <Circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} stroke={colors.panel} strokeWidth={STROKE_WIDTH} fill="none" />
         <AnimatedCircle
           cx={SIZE / 2}
           cy={SIZE / 2}
           r={RADIUS}
-          stroke={theme.colors.brassAmber}
+          stroke={colors.accent}
           strokeWidth={STROKE_WIDTH}
           strokeLinecap="round"
           fill="none"
@@ -99,22 +102,24 @@ export function CountdownRing({ phaseEndAt, phaseDurationMs, isPaused }: Countdo
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    width: SIZE,
-    height: SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  labelOverlay: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  label: {
-    fontFamily: theme.fonts.displayBold,
-    fontSize: 64,
-    color: theme.colors.enamelWhite,
-    fontVariant: ["tabular-nums"],
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    container: {
+      width: SIZE,
+      height: SIZE,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    labelOverlay: {
+      position: "absolute",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    label: {
+      fontFamily: fonts.numericBold,
+      fontSize: 64,
+      color: colors.textPrimary,
+      fontVariant: ["tabular-nums"],
+    },
+  });
+}

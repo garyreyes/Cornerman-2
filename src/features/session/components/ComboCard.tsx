@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import type { Combo } from "../../comboEngine/types";
-import { theme } from "../theme";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 
 interface ComboCardProps {
   combo: Combo | null;
@@ -15,6 +17,9 @@ interface ComboCardProps {
  * component special-casing phase.
  */
 export function ComboCard({ combo, comboCount }: ComboCardProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
+
   if (combo === null) {
     return null;
   }
@@ -34,34 +39,36 @@ export function ComboCard({ combo, comboCount }: ComboCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: theme.colors.panelLine,
-    backgroundColor: theme.colors.panel,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    alignItems: "center",
-    gap: 6,
-  },
-  punchRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-  },
-  punchName: {
-    fontFamily: theme.fonts.displaySemiBold,
-    fontSize: 22,
-    color: theme.colors.enamelWhite,
-    textTransform: "uppercase",
-  },
-  separator: {
-    color: theme.colors.brassAmberDim,
-  },
-  stat: {
-    fontFamily: theme.fonts.body,
-    fontSize: 12,
-    color: theme.colors.enamelMuted,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    card: {
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+      backgroundColor: colors.panel,
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      alignItems: "center",
+      gap: 6,
+    },
+    punchRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "center",
+    },
+    punchName: {
+      fontFamily: fonts.displaySemiBold,
+      fontSize: 22,
+      color: colors.textPrimary,
+      textTransform: "uppercase",
+    },
+    separator: {
+      color: colors.accentDim,
+    },
+    stat: {
+      fontFamily: fonts.body,
+      fontSize: 12,
+      color: colors.textMuted,
+    },
+  });
+}

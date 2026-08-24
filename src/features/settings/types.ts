@@ -3,6 +3,9 @@ export type ComboMode = "random" | "preset";
 /** Whether combo speech announces a punch's name ("Lead Hook") or its number ("three"). */
 export type AnnounceStyle = "name" | "number";
 
+/** "system" follows the device's own light/dark setting; "light"/"dark" is an explicit override. */
+export type ThemeModeSetting = "system" | "light" | "dark";
+
 export interface Settings {
   rounds: number;
   workDurationSec: number;
@@ -28,6 +31,7 @@ export interface Settings {
   defenseCueGapMaxSec: number;
   /** Whether the first-launch onboarding screen (docs/user-flows.md Flow 1) has ever been completed */
   hasCompletedOnboarding: boolean;
+  themeMode: ThemeModeSetting;
 }
 
 export interface Punch {
