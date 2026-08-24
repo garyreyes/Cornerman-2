@@ -1,6 +1,6 @@
-import { AudioBufferSourceNode } from "react-native-audio-api";
+import { AudioBufferSourceNode, AudioContext } from "react-native-audio-api";
 
-import { createSpeechEngine, normalizeToKey, resolveBundledClip } from "./service";
+import { createSpeechEngine, normalizeToKey, rateForSpeechRate, resolveBundledClip } from "./service";
 
 describe("normalizeToKey", () => {
   test("lowercases and joins words with underscores", () => {
@@ -46,7 +46,76 @@ describe("resolveBundledClip", () => {
   });
 });
 
+describe("rateForSpeechRate", () => {
+  test("passes valid rates through unchanged", () => {
+    expect(rateForSpeechRate(0.25)).toBe(0.25);
+    expect(rateForSpeechRate(1.0)).toBe(1.0);
+    expect(rateForSpeechRate(4.0)).toBe(4.0);
+  });
+
+  test("clamps below the floor and above the library's native WSOLA ceiling", () => {
+    expect(rateForSpeechRate(0.1)).toBe(0.25);
+    // The originally-discussed 5.0 must clamp to 4.0, not pass through --
+    // react-native-audio-api's WsolaTimeStretcher::MAX_PLAYBACK_RATE is a
+    // fixed native constant (PROJECT_FACTS.md).
+    expect(rateForSpeechRate(5.0)).toBe(4.0);
+    expect(rateForSpeechRate(4.5)).toBe(4.0);
+  });
+});
+
 describe("createSpeechEngine", () => {
+  test("plays bundled clips with pitch correction enabled", async () => {
+    const createBufferSourceSpy = jest.spyOn(AudioContext.prototype, "createBufferSource");
+
+    const engine = createSpeechEngine();
+    engine.playWord("Jab");
+    await Promise.resolve();
+
+    expect(createBufferSourceSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ pitchCorrection: true }),
+    );
+
+    createBufferSourceSpy.mockRestore();
+  });
+
+  test("setRate clamps and applies to the next playWord's source node", async () => {
+    const engine = createSpeechEngine();
+    engine.setRate(5.0); // must clamp to 4.0, not pass through
+
+    let capturedRate: number | undefined;
+    const startSpy = jest
+      .spyOn(AudioBufferSourceNode.prototype, "start")
+      .mockImplementation(function (this: InstanceType<typeof AudioBufferSourceNode>) {
+        capturedRate = this.playbackRate.value;
+      });
+
+    engine.playWord("Cross");
+    await Promise.resolve();
+
+    expect(capturedRate).toBe(4.0);
+
+    startSpy.mockRestore();
+  });
+
+  test("defaults to 1.0x when setRate is never called", async () => {
+    let capturedRate: number | undefined;
+    const startSpy = jest
+      .spyOn(AudioBufferSourceNode.prototype, "start")
+      .mockImplementation(function (this: InstanceType<typeof AudioBufferSourceNode>) {
+        capturedRate = this.playbackRate.value;
+      });
+
+    const engine = createSpeechEngine();
+    engine.playWord("Roll");
+    await Promise.resolve();
+
+    expect(capturedRate).toBe(1.0);
+
+    startSpy.mockRestore();
+  });
+});
+
+describe("createSpeechEngine (5a coverage)", () => {
   test("playWord returns true and starts playback for a bundled word", async () => {
     const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
 

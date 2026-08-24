@@ -20,7 +20,7 @@ screen-locked, so training continues while the phone is put away.
 | Framework | React Native | Single codebase for iOS + Android, matches existing JS background |
 | Build/tooling | EAS Build with a dev client (NOT Expo Go) | Background/locked-screen audio requires custom native config (iOS `UIBackgroundModes: audio`, Android foreground service) that Expo Go cannot run |
 | Audio engine | `react-native-audio-api` (Web Audio API port for RN) | Matches the extraction doc §1.11 shared-bus approach in spirit, but this library has no `DynamicsCompressorNode` (confirmed 2026-08-24, Phase 4a — it's on the library's own roadmap, not shipped); the built bus is `appVolume gain → makeup gain → WaveShaper soft-clip limiter → destination` instead. See `PROJECT_FACTS.md`. |
-| Combo speech | Pre-generated `VoiceClip` per word, spliced per combo, played back with pitch-preserving time-stretching (WSOLA/phase-vocoder) for a continuous 0.25x–5x rate | Live TTS distorts pitch at extreme rates by nature (the "chipmunk" artifact, extraction doc §1.10/§5.4) — time-stretching real recorded/generated audio is the only mechanism that hits a wide rate range without it |
+| Combo speech | Pre-generated `VoiceClip` per word, spliced per combo, played back with `react-native-audio-api`'s native WSOLA pitch-preserving time-stretch (`createBufferSource({pitchCorrection: true})` + the `playbackRate` param) for a continuous 0.25x–4x rate | Live TTS distorts pitch at extreme rates by nature (the "chipmunk" artifact, extraction doc §1.10/§5.4) — time-stretching real recorded/generated audio is the only mechanism that hits a wide rate range without it. 4x, not 5x: the library's WSOLA implementation hard-caps `playbackRate` at a fixed native ceiling (`WsolaTimeStretcher::MAX_PLAYBACK_RATE = 4`, confirmed 2026-08-24 reading its C++ source) — revised down from the originally-discussed 5x rather than building extra complexity to work around it; see `PROJECT_FACTS.md`. |
 | Bundled voice bank source | Kokoro TTS (open-source, offline, Apache 2.0), batch-generated once on a dev machine via `scripts/generate_voice_bank.py`, not run on-device | Confirmed 2026-08-24, Phase 5a — still "generated ahead of time," same category as a real recording for the pitch-distortion argument above; see `docs/PRD.md` §10 for the 33-word vocabulary |
 | Custom-punch speech fallback | One-time on-device TTS synthesis, cached locally as a `VoiceClip` (`source: "tts-generated"`), then played through the same time-stretch pipeline | Preserves free punch renaming (extraction doc §1.6) without needing a recording for every possible custom name; also the fallback for any word (including a number) outside the bundled bank |
 | Audio assets (bell/clapper/warning) | Real recorded/licensed samples — Freesound.org (CC0) first, AudioJungle (one-time purchase) fallback | User-confirmed requirement: authentic, not synthesized or AI-generated (PRD §6) |
@@ -50,7 +50,7 @@ Punch    *---1 VoiceClip   (resolved by normalized text key, e.g. "Lead
 - **`Settings`** — singleton record (one per device, no accounts). Fields:
   `rounds`, `workDuration`, `restDuration`, `warmupDuration`, `mode`
   (`"random" | "preset"`), `activePresetId`, `comboGapMin`, `comboGapMax`,
-  `speechRate` (0.25–5.0), `appVolume`, `announceStyle`
+  `speechRate` (0.25–4.0), `appVolume`, `announceStyle`
   (`"name" | "number"`, PRD §10 — Phase 5d). Persisted via MMKV, defaults
   applied via `Object.assign(createDefaultSettings(), parsed)` — same
   zero-migration pattern as the old app.
@@ -193,7 +193,7 @@ src/
       service.ts       # gain -> compressor -> destination bus
                        # (extraction doc §1.11-12)
     speech/            # VoiceClip lookup, TTS-fallback generation +
-                       # caching, time-stretch playback (0.25x-5x)
+                       # caching, time-stretch playback (0.25x-4x)
       service.ts
       types.ts
   shared/              # cross-feature UI primitives (populated once

@@ -44,7 +44,7 @@ Not competing on a feature checklist against generic interval-timer apps
 hands-free operation during a real workout: spoken, unattended combo
 call-outs continuing reliably through backgrounding, locking, and
 interruptions, at a speech rate that goes well beyond what on-device TTS
-can normally do without distortion (0.25x–5x via pre-recorded clips +
+can normally do without distortion (0.25x–4x via pre-recorded clips +
 pitch-preserving time-stretch, not live TTS).
 
 ## Operating Context
@@ -72,9 +72,12 @@ stay clearly audible on top of that.
 - `com.gary.cornerman` is the permanent app identifier, continuing an
   existing Play Store listing from the old app.
 - Combo speech uses pre-recorded/cached voice clips + real time-
-  stretching, not live TTS, specifically to hit a 0.25x–5x rate range
+  stretching, not live TTS, specifically to hit a 0.25x–4x rate range
   without the pitch ("chipmunk") distortion live TTS produces at extreme
-  rates. Bell/clapper/warning sounds are real recorded/licensed samples,
+  rates (revised down from an originally-discussed 5x once the actual
+  audio library's native ceiling was confirmed — see
+  `PROJECT_FACTS.md`). Bell/clapper/warning sounds are real
+  recorded/licensed samples,
   not synthesized and not AI-generated.
 - Explicitly out of scope for this version (desired later, not now):
   workout history/stats/streaks, social/sharing, coach/trainer mode,

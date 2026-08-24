@@ -67,6 +67,19 @@ function gainForVolume(appVolume: number): number {
   return Math.min(1, Math.max(0, appVolume));
 }
 
+/**
+ * Clamped to [0.25, 4.0] -- react-native-audio-api's native WSOLA
+ * time-stretch hard-caps playbackRate at a fixed C++ constant
+ * (WsolaTimeStretcher::MAX_PLAYBACK_RATE = 4), confirmed 2026-08-24
+ * reading its source. Revised down from an originally-discussed 5x
+ * rather than building extra complexity (e.g. a second pre-compressed
+ * buffer per clip) to work around a fixed native ceiling -- see
+ * PROJECT_FACTS.md.
+ */
+export function rateForSpeechRate(speechRate: number): number {
+  return Math.min(4.0, Math.max(0.25, speechRate));
+}
+
 export function createSpeechEngine(): SpeechEngine {
   const context = new AudioContext();
   const volumeGain = context.createGain();
@@ -80,15 +93,25 @@ export function createSpeechEngine(): SpeechEngine {
     {} as Record<string, Promise<AudioBuffer>>,
   );
 
+  let currentRate = 1.0;
+
   function setVolume(appVolume: number): void {
     volumeGain.gain.value = gainForVolume(appVolume);
   }
   setVolume(1.0);
 
+  function setRate(rate: number): void {
+    currentRate = rateForSpeechRate(rate);
+  }
+
   async function play(key: string): Promise<void> {
     const buffer = await buffers[key];
-    const source = context.createBufferSource();
+    // pitchCorrection: true -- react-native-audio-api's native WSOLA
+    // time-stretch, the whole point of this sub-phase (docs/PRD.md's
+    // "real unsolved technical requirement").
+    const source = context.createBufferSource({ pitchCorrection: true });
     source.buffer = buffer;
+    source.playbackRate.value = currentRate;
     source.connect(volumeGain);
     source.start();
   }
@@ -102,5 +125,5 @@ export function createSpeechEngine(): SpeechEngine {
     return true;
   }
 
-  return { setVolume, playWord };
+  return { setVolume, setRate, playWord };
 }
