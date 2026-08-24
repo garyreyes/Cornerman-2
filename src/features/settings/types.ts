@@ -1,5 +1,8 @@
 export type ComboMode = "random" | "preset";
 
+/** Whether combo speech announces a punch's name ("Lead Hook") or its number ("three"). */
+export type AnnounceStyle = "name" | "number";
+
 export interface Settings {
   rounds: number;
   workDurationSec: number;
@@ -18,6 +21,11 @@ export interface Settings {
   speechRate: number;
   /** 0-1, this app's own output only, independent of device media volume */
   appVolume: number;
+  announceStyle: AnnounceStyle;
+  /** Whether the defense/movement cue layer (roll/slip/duck/...) fires at all during Work phase */
+  defenseCuesEnabled: boolean;
+  defenseCueGapMinSec: number;
+  defenseCueGapMaxSec: number;
 }
 
 export interface Punch {

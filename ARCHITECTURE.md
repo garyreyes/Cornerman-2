@@ -51,7 +51,10 @@ Punch    *---1 VoiceClip   (resolved by normalized text key, e.g. "Lead
   `rounds`, `workDuration`, `restDuration`, `warmupDuration`, `mode`
   (`"random" | "preset"`), `activePresetId`, `comboGapMin`, `comboGapMax`,
   `speechRate` (0.25–4.0), `appVolume`, `announceStyle`
-  (`"name" | "number"`, PRD §10 — Phase 5d). Persisted via MMKV, defaults
+  (`"name" | "number"`, PRD §10), `defenseCuesEnabled`,
+  `defenseCueGapMinSec`/`defenseCueGapMaxSec` (independent of
+  `comboGapMin`/`Max` — a deliberately separate timing knob, PRD §10 use
+  case 12). Persisted via MMKV, defaults
   applied via `Object.assign(createDefaultSettings(), parsed)` — same
   zero-migration pattern as the old app.
 - **`Punch`** — `{ id: string (uuid), num: number, name: string }`.
@@ -196,8 +199,16 @@ src/
       components/
       service.ts       # gain -> compressor -> destination bus
                        # (extraction doc §1.11-12)
-    speech/            # VoiceClip lookup, TTS-fallback generation +
-                       # caching, time-stretch playback (0.25x-4x)
+    speech/            # bundled VoiceClip lookup + pitch-preserving
+                       # playback (0.25x-4x); live (uncached) on-device
+                       # TTS fallback for anything not bundled -- no
+                       # library can synthesize TTS to a file (5c)
+      service.ts
+      types.ts
+    defenseCues/       # fixed 6-word defense/movement cue set (roll,
+                       # slip, duck, pivot, check, clinch) -- selection +
+                       # independent gap-timing only, not mixed into
+                       # comboEngine (PRD §10 use case 12)
       service.ts
       types.ts
   shared/              # cross-feature UI primitives (populated once
@@ -205,6 +216,9 @@ src/
   lib/
     storage.ts         # MMKV wrapper - single source of truth for
                        # persistence
+    gapTiming.ts        # nextGapFireTime -- shared clamped-random-window
+                       # primitive (extraction doc §1.2), used by
+                       # timer's firstComboAt and defenseCues alike
     backgroundAudio.ts # native background-session config (iOS
                        # UIBackgroundModes, Android foreground service)
   app/                 # navigation entry, thin screens that assemble

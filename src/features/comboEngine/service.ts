@@ -1,4 +1,4 @@
-import type { Preset, Punch, Settings } from "../settings/types";
+import type { AnnounceStyle, Preset, Punch, Settings } from "../settings/types";
 import type { Combo, ComboPunch, RandomFn } from "./types";
 
 /**
@@ -10,6 +10,31 @@ import type { Combo, ComboPunch, RandomFn } from "./types";
 export function resolvePunchName(punches: Punch[], num: number): ComboPunch {
   const found = punches.find((p) => p.num === num);
   return found ? { num: found.num, name: found.name } : { num, name: `Punch ${num}` };
+}
+
+/** Only 1-6 have a bundled word-spelled clip (assets/audio/voice/); anything
+ * else falls through as a plain numeral string, which on-device TTS reads
+ * naturally (same fallback pattern as every other unrecognized word). */
+const NUMBER_WORDS: Readonly<Record<number, string>> = {
+  1: "one",
+  2: "two",
+  3: "three",
+  4: "four",
+  5: "five",
+  6: "six",
+};
+
+/**
+ * Resolves what text to hand SpeechEngine.playWord for a given punch,
+ * per the announceStyle setting (PRD §10) -- sibling to resolvePunchName,
+ * not folded into it, since this is about *how to say it*, not *what
+ * punch is at this number*.
+ */
+export function resolveAnnounceText(punch: ComboPunch, announceStyle: AnnounceStyle): string {
+  if (announceStyle === "name") {
+    return punch.name;
+  }
+  return NUMBER_WORDS[punch.num] ?? String(punch.num);
 }
 
 function effectivePool(punches: Punch[], pool: number[] | null): Punch[] {

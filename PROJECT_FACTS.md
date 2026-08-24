@@ -158,3 +158,27 @@ made during feature work.
   manual mock needed (verified before writing tests, per this project's
   established "don't assume a native module works under Jest" lesson —
   unlike `react-native-mmkv`/`expo-crypto`, which needed one).
+- **No recurring combo-repeat loop exists yet, even after Phase 5
+  (confirmed 2026-08-24, Phase 5d).** `timer/service.ts`'s
+  `firstComboAt` only ever computed the *first* combo of a Work phase
+  (a single-shot clamped-window calculation) — nothing re-arms it for
+  combo #2, #3, etc. within the same phase. This was true before 5d too;
+  reading the timer code closely for 5d's defense-cue timer just
+  surfaced it explicitly. That recurring loop (and arming
+  `defenseCues`' independent gap timer alongside it, only during Work
+  phase) is Phase 6's job when the Main Timer screen actually exists to
+  drive it — don't assume it's built just because Phase 5 says
+  "complete."
+- `src/lib/gapTiming.ts`'s `nextGapFireTime(now, minMs, maxMs, random)`
+  is the shared clamped-random-window primitive (extraction doc §1.2)
+  — `timer/service.ts`'s `firstComboAt` and
+  `defenseCues/service.ts`'s `nextDefenseCueFireTime` both delegate to
+  it rather than duplicating the formula. Any future "fire again
+  somewhere in this random window" need should reuse this, not
+  re-derive it a third time.
+- Default defense-cue gap range is `15s`-`30s`
+  (`defenseCueGapMinSec`/`Max`), deliberately independent of
+  `comboGapMinSec`/`Max` — sparse enough not to compete with the primary
+  combo call-outs. A proposed, easily-retuned default, not a
+  user-confirmed number — flag if it feels wrong once actually heard
+  during a workout (Phase 6).

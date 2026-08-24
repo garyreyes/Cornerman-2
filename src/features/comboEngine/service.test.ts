@@ -1,6 +1,12 @@
 import { createDefaultSettings } from "../settings/service";
 import type { Preset, Punch, Settings } from "../settings/types";
-import { generateCombo, generatePresetCombo, generateRandomCombo, resolvePunchName } from "./service";
+import {
+  generateCombo,
+  generatePresetCombo,
+  generateRandomCombo,
+  resolveAnnounceText,
+  resolvePunchName,
+} from "./service";
 
 const punches: Punch[] = [
   { id: "p1", num: 1, name: "Jab" },
@@ -16,6 +22,22 @@ describe("resolvePunchName", () => {
 
   test("falls back to a generic label when the number no longer exists (extraction doc §1.5)", () => {
     expect(resolvePunchName(punches, 99)).toEqual({ num: 99, name: "Punch 99" });
+  });
+});
+
+describe("resolveAnnounceText -- announceStyle: name vs number (Phase 5d)", () => {
+  test("\"name\" style returns the punch's name regardless of num", () => {
+    expect(resolveAnnounceText({ num: 4, name: "Rear Hook" }, "name")).toBe("Rear Hook");
+  });
+
+  test("\"number\" style maps 1-6 to their bundled word-spelled form, not the numeral", () => {
+    expect(resolveAnnounceText({ num: 1, name: "Jab" }, "number")).toBe("one");
+    expect(resolveAnnounceText({ num: 6, name: "Rear Uppercut" }, "number")).toBe("six");
+  });
+
+  test("\"number\" style falls back to a plain numeral string outside 1-6 (e.g. Body Hook, num 7)", () => {
+    expect(resolveAnnounceText({ num: 7, name: "Body Hook" }, "number")).toBe("7");
+    expect(resolveAnnounceText({ num: 12, name: "Crescent Kick" }, "number")).toBe("12");
   });
 });
 

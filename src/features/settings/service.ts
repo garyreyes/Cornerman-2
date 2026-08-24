@@ -24,6 +24,10 @@ export function createDefaultSettings(): Settings {
     randomPunchPool: null,
     speechRate: 1.0,
     appVolume: 1.0,
+    announceStyle: "name",
+    defenseCuesEnabled: true,
+    defenseCueGapMinSec: 15,
+    defenseCueGapMaxSec: 30,
   };
 }
 
