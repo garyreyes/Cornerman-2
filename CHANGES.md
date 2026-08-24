@@ -128,3 +128,22 @@ Dated log of shipped changes, appended to as features complete.
   into the `Speech.speak` call); verified `expo-speech` works cleanly
   under Jest without a manual mock before relying on that. 4 new tests,
   all passing (74/74 total).
+- 2026-08-24: Sub-phase 5d — Number announce-style + defensive/movement
+  cue layer, closing out Phase 5. `comboEngine`'s new
+  `resolveAnnounceText` maps a punch to spoken text per the new
+  `announceStyle` setting (name vs number), reusing 1-6's bundled
+  word-spelled clips rather than always falling through to TTS.
+  Reading `timer/service.ts` closely surfaced that only the *first*
+  combo's timing was ever built (`firstComboAt`) — no recurring
+  gap-timer re-arming exists for combos yet, that's Phase 6's job.
+  Extracted the proven clamped-window formula into
+  `src/lib/gapTiming.ts`'s `nextGapFireTime` instead of duplicating it
+  for defense cues, refactored `firstComboAt` to use it
+  (behavior-preserving — all 21 pre-existing timer tests pass
+  unchanged), and built `src/features/defenseCues/` on that same
+  primitive, deliberately not touching the already-shipped, tested
+  `Combo`/`comboEngine` type. New independent
+  `defenseCuesEnabled`/`defenseCueGapMinSec`/`defenseCueGapMaxSec`
+  settings (15s/30s default). Test-first throughout. 12 new tests, all
+  passing (90/90 total). Phase 5 (Speech Pipeline) is now fully
+  complete.

@@ -95,12 +95,26 @@ as each sub-phase completes — it should never drift out of sync with
   Preview instead). Last-punch delete guard was already built in Phase
   1b (`LastPunchError`) — nothing new needed there. 4 new tests
   (74/74 total).
-- [ ] **5d. Number announce-style + defensive/movement cue layer** —
-  `not started`, added 2026-08-24 (`docs/PRD.md` §10 use cases 11-12) —
-  `announceStyle: "name" | "number"` setting; defense/movement cues as
-  an independent random-gap-timed layer during Work phase, deliberately
-  not mixed into `Combo`/`comboEngine`. Depends on 5b/5c existing since
-  it reuses the full speech pipeline, not just bundled lookup.
+- [x] **5d. Number announce-style + defensive/movement cue layer** —
+  `done` — `announceStyle: "name" | "number"` setting +
+  `comboEngine`'s new `resolveAnnounceText` (sibling to
+  `resolvePunchName`; nums 1-6 map to their bundled word-spelled clips,
+  outside that range falls through as a plain numeral string). Found
+  while reading `timer/service.ts` closely: only the *first* combo's
+  timing was ever built (`firstComboAt`, a single-shot clamped-window
+  calculation) — no recurring "re-arm the gap timer" mechanism exists
+  yet for combos either, that's implicitly Phase 6's job. Extracted the
+  proven clamped-window math into a shared, tested primitive
+  (`src/lib/gapTiming.ts`'s `nextGapFireTime`) rather than duplicating
+  it, refactored `firstComboAt` to use it (behavior-preserving — all 21
+  pre-existing timer tests pass unchanged, proving equivalence), and
+  built `src/features/defenseCues/` (`pickDefenseCue`,
+  `nextDefenseCueFireTime`) on that same primitive — deliberately not
+  mixed into `Combo`/`comboEngine`, which stays untouched. New Settings
+  fields `defenseCuesEnabled`/`defenseCueGapMinSec`/`defenseCueGapMaxSec`
+  (15s/30s default, independent of `comboGapMin`/`Max`). No phase-gating
+  logic here — same as `firstComboAt`, arming this only during Work
+  phase is Phase 6's job, not built yet. 12 new tests (90/90 total).
 
 ## Phase 6 — Main Timer Screen
 
@@ -204,12 +218,19 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-Phase 2 (Timer Engine), Phase 3 (Combo Engine), Phase 4 (Audio Engine),
-5a (bundled voice-bank lookup + playback), 5b (pitch-preserving
-time-stretch, revised to 0.25x–4x), and 5c (on-device TTS fallback,
-revised to live/uncached) are complete. Next sub-phase to build is
-**5d** (number announce-style + defensive/movement cue layer), the last
-sub-phase in Phase 5. Phase 10+ is planned and written down,
-but confirmed to build *after* Phase 9 ships. Run `/feature-planner` for
-5d when ready. As each sub-phase completes, mark it `done` here and log
-the matching entry in `CHANGES.md`.
+Phases 2-5 (Timer Engine, Combo Engine, Audio Engine, Speech Pipeline —
+5a bundled lookup/playback, 5b pitch-preserving time-stretch revised to
+0.25x–4x, 5c live TTS fallback, 5d announce-style + defense cues) are
+all complete. Every engine/service is headless (no screen consumes any
+of it yet) — that's Phase 6's job. Next sub-phase to build is **6a**
+(Main Timer screen, all states) — the flagship first surface, wired to
+Phases 2-5, built against `docs/design-direction.md`'s locked contract
+("The Corner's Stopwatch & Bell"), ending with the Impeccable finish
+review and `DESIGN.md` written from the real result. This is also where
+the recurring combo-repeat loop (re-arming `comboGapMin`/`MaxSec` after
+each combo, and arming `defenseCues`' independent gap timer during Work
+phase) finally gets built — noted as still-missing during 5d, since it
+was never part of any headless sub-phase. Phase 10+ is planned and
+written down, but confirmed to build *after* Phase 9 ships. Run
+`/feature-planner` for 6a when ready. As each sub-phase completes, mark
+it `done` here and log the matching entry in `CHANGES.md`.

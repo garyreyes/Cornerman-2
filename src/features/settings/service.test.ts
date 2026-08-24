@@ -59,6 +59,33 @@ describe("settings persistence", () => {
     expect(settings.randomPunchPool).toBeNull();
   });
 
+  test("announceStyle and defense-cue fields default correctly when entirely absent from saved data", () => {
+    // Simulates data saved before Phase 5d's fields existed (pre-5d shape,
+    // same zero-migration pattern as the previous test).
+    const preExistingShape = {
+      rounds: 10,
+      workDurationSec: 180,
+      restDurationSec: 60,
+      warmupDurationSec: 0,
+      mode: "random",
+      activePresetId: null,
+      comboGapMinSec: 1.5,
+      comboGapMaxSec: 3,
+      comboLengthMin: 2,
+      comboLengthMax: 4,
+      randomPunchPool: null,
+      speechRate: 1.0,
+      appVolume: 1.0,
+    };
+    saveSettings(preExistingShape as ReturnType<typeof createDefaultSettings>);
+
+    const settings = getSettings();
+    expect(settings.announceStyle).toBe("name");
+    expect(settings.defenseCuesEnabled).toBe(true);
+    expect(settings.defenseCueGapMinSec).toBe(15);
+    expect(settings.defenseCueGapMaxSec).toBe(30);
+  });
+
   test("saved settings round-trip exactly", () => {
     const custom = { ...createDefaultSettings(), rounds: 5, appVolume: 0.5 };
     saveSettings(custom);

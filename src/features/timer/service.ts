@@ -1,7 +1,8 @@
+import { nextGapFireTime } from "../../lib/gapTiming";
 import type { Phase, RandomFn, TimerConfig, TimerEvent, TimerState } from "./types";
 
 const FIRST_COMBO_MIN_MS = 500;
-const FIRST_COMBO_WINDOW_MS = 1000; // clamps to [500ms, 1500ms]
+const FIRST_COMBO_MAX_MS = 1500; // clamped window (extraction doc §1.2)
 const REST_COUNTDOWN_START_SEC = 3;
 const WORK_WARNING_THRESHOLD_MS = 10_000;
 
@@ -17,7 +18,7 @@ function beginWork(
     phaseEndAt: transitionAt + config.workDurationMs,
     tenWarned: false,
     lastRestCountdown: null,
-    firstComboAt: transitionAt + FIRST_COMBO_MIN_MS + random() * FIRST_COMBO_WINDOW_MS,
+    firstComboAt: nextGapFireTime(transitionAt, FIRST_COMBO_MIN_MS, FIRST_COMBO_MAX_MS, random),
     isPaused: false,
     pausedAt: null,
   };
