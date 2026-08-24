@@ -377,6 +377,55 @@ made during feature work.
   since Phase 5b (`react-native-audio-api`'s WSOLA hard limit); the
   roadmap text just never got updated when that revision happened.
   `docs/PRD.md` was already correct (never hardcoded a number).
+- **Settings form widget choices, confirmed 2026-08-24 (Phase 8a):**
+  `react-native-wheely` (pure JS, no native module) for the Round/Work/
+  Rest/Warmup duration wheels — user explicitly chose "add a library"
+  over hand-building a scroll-wheel, and this one avoids a native
+  rebuild dependency a heavier wheel-picker library would need.
+  `@react-native-community/slider` — a real native view, needs a
+  dev-client rebuild like every other native dependency already in this
+  project — used for every slider-shaped control (volume, speech rate,
+  and all min/max ranges), rather than a separate dual-thumb range-slider
+  library: two of these stacked, with each slider's opposite bound
+  clamped live to the other's current value (min's `maximumValue` =
+  current max, and vice versa), stand in for a min/max range so the user
+  structurally can't drag one past the other — no separate clamp-on-save
+  validation needed. Both choices were explicit user picks among named
+  alternatives, not defaults.
+- **"Combinations" is now a mode-aware section, not Preset-only
+  (confirmed 2026-08-24, Phase 8a).** The newer `comboLengthMin`/`Max` +
+  `randomPunchPool` fields (Phase 3a, postdating Flow 3's original
+  section list) needed a home; rather than add a 7th top-level section,
+  Random mode now shows combo length + a punch-pool chip picker in the
+  same "Combinations" slot Preset mode uses for the Presets List row —
+  same confirmed extraction-doc §1.14 order, mode-dependent content.
+  `docs/user-flows.md` Flow 3 itself hasn't been edited to reflect this;
+  read this fact as the current source of truth over that doc's original
+  wording.
+- **"Defense Cues" is a new Settings section, appended after Combo
+  Timing and before Punches (confirmed 2026-08-24, Phase 8a)** — it
+  postdates Flow 3's originally-confirmed section order (Phase 5d),
+  so rather than force it into an existing section it got its own,
+  placed low in the order as the newest/most tangential feature.
+- **There is no bell/clapper "choice" of multiple sound variants, despite
+  Flow 3's wording (confirmed 2026-08-24, Phase 8a).** `audio/service.ts`'s
+  `CUE_ASSETS` is exactly one fixed bell asset and one fixed clapper
+  asset — the Settings "Sounds" section is just the `appVolume` slider,
+  nothing else. If per-cue sound variants ever become a real feature
+  (PRD §8 lists "wider variety in sound cues" as a Should-have, not v1),
+  that's new `SoundAsset` plumbing, not something this pass silently
+  half-built.
+- **8b/8c must refresh Settings' punches/presets on focus, not just on
+  mount (flagged by review, 2026-08-24, Phase 8a).** `src/app/settings/
+  index.tsx` loads `punches`/`presets` once via `useState(() => ...)`.
+  That's fine today since `settings/punches.tsx`/`presets.tsx` are still
+  placeholders with no mutation capability, but once 8b/8c actually let a
+  user add/rename/delete a punch or preset, navigating back to Settings
+  (which stays mounted underneath in the stack) will show stale data --
+  the "N defined" summary rows and the Random-mode punch-pool chip list --
+  until the screen fully remounts. Fix when 8b/8c ship: a focus-triggered
+  refetch (e.g. `useFocusEffect` from `@react-navigation/native`,
+  available transitively through `expo-router`), not a mount-only load.
 - **`expo-router@57.0.15` pulls in a real `react-dom@19.2.8` conflict via
   a transitive web-only chain** (`expo-router` → `@expo/ui` → `vaul` →
   `@radix-ui/*`, unrelated to this mobile-only app), which needs

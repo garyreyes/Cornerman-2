@@ -248,3 +248,59 @@ Dated log of shipped changes, appended to as features complete.
   shared one file — see `PROJECT_FACTS.md`). Also corrected this
   roadmap's stale "0.25x–5x" rate-dial reference to the actual confirmed
   0.25x–4x cap. 109/109 tests passing, all gates green.
+- 2026-08-24: Sub-phase 8a (Settings form content pass, closing out 8a) —
+  the real form replacing the nav-infra pass's placeholder, in the
+  confirmed extraction-doc §1.14 order: Round (rounds + Work/Rest/Warmup
+  duration, via a new themed `WheelPicker` wrapping `react-native-wheely`
+  — pure-JS, no native module, per PRD §3.1/§8's "iOS-style continuous
+  scroll picker" requirement) → Mode (Random/Preset segmented control) →
+  Sounds (app volume slider — confirmed there's no bell/clapper "choice"
+  of multiple variants, `audio/service.ts`'s `CUE_ASSETS` is one fixed
+  asset per cue, so this section is just the volume slider) →
+  Combinations, made mode-aware to give the newer `comboLengthMin/Max` +
+  `randomPunchPool` fields a home without adding a 7th section: Random
+  mode shows a combo-length range + a punch-pool chip multi-select
+  (with a "restrict pool" toggle and a last-chip guard), Preset mode
+  keeps the existing Presets List summary row → Combo Timing (gap range
+  respecting the 0.5s "Blitz" floor per extraction doc §1.7, the
+  0.25x–4x speech-rate dial, Name/Number announce-style toggle) →
+  Defense Cues (new section, not in the original Flow 3 order since it
+  postdates Phase 5d — enabled toggle + gap range, shown only when
+  enabled) → Punches (summary row). New dependencies:
+  `react-native-wheely` (pure JS) and `@react-native-community/slider`
+  (real native view, needs a dev-client rebuild to actually run, same as
+  every other native dependency added so far — no `app.json` plugin
+  entry needed, it autolinks). New `src/shared/components/` primitives
+  (`SectionCard`, `SegmentedControl`, `LabeledSlider`, `RangeSliderPair`,
+  `WheelPicker`, `SummaryRow`, `ChipMultiSelect`) — the first real use of
+  the `shared/` folder `ARCHITECTURE.md` reserved for this. Also shipped
+  minimal placeholder routes for `/settings/punches` and
+  `/settings/presets` (same "proves reachable" pattern the nav-infra pass
+  used for `/settings` itself), so the new summary rows actually navigate
+  instead of dead-ending ahead of 8b/8c. Judgment/presentation work, no
+  new tests — updated the one existing navigation test
+  (`settings-navigation.test.tsx`) to assert on real form content instead
+  of the retired placeholder's body text, and registered the two new
+  placeholder routes in its `renderRouter` call so the nested layout's
+  screen list matches. 109/109 tests passing, all gates green; visual
+  correctness is unverified for the same reason as every screen so far
+  (no device/simulator in this environment). Phase 8a is now fully done —
+  8b (Punches) is next.
+- 2026-08-24: `reviewer` pass on 8a's Settings form content caught three
+  real issues, all fixed: `WheelPicker`'s out-of-range fallback silently
+  showed index 0 (e.g. "Rounds: 1") instead of the nearest valid value
+  when a persisted setting isn't on the wheel's discretized grid — now
+  snaps to nearest, matching the codebase's existing graceful-fallback
+  pattern (`resolvePunchName`/`effectivePool`); the punch-pool chip
+  multi-select's "can't deselect the last one" guard undercounted when
+  two punches share a `num` (explicitly allowed, extraction doc §1.6) —
+  `randomPunchPool` is now deduped on every write in
+  `CombinationsSection.tsx`; `settings/index.tsx`'s `handleChange` read
+  `settings` from a stale render closure instead of a functional updater
+  like `useSession.ts`'s established pattern — fixed. Also normalized a
+  `SafeAreaView` `edges` inconsistency between the new placeholder routes
+  and the new real screen. One more finding (Settings' punches/presets
+  loaded once on mount, not refreshed on focus) is correctly harmless
+  today — 8b/8c have no mutation yet — logged in `PROJECT_FACTS.md` as
+  required follow-up when they ship. 109/109 tests passing, all gates
+  green after fixes.

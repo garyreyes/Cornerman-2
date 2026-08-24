@@ -22,6 +22,8 @@ export default function SettingsLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: "SETTINGS" }} />
+      <Stack.Screen name="punches" options={{ title: "PUNCHES" }} />
+      <Stack.Screen name="presets" options={{ title: "PRESETS" }} />
     </Stack>
   );
 }

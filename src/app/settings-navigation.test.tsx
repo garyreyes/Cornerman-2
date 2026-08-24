@@ -7,6 +7,8 @@ import Index from "./index";
 import Onboarding from "./onboarding";
 import SettingsLayout from "./settings/_layout";
 import SettingsIndex from "./settings/index";
+import SettingsPresets from "./settings/presets";
+import SettingsPunches from "./settings/punches";
 
 beforeEach(() => {
   clearAll();
@@ -22,6 +24,8 @@ test("the gear icon pushes to a real, back-navigable Settings screen", async () 
       onboarding: Onboarding,
       "settings/_layout": SettingsLayout,
       "settings/index": SettingsIndex,
+      "settings/punches": SettingsPunches,
+      "settings/presets": SettingsPresets,
     });
   });
   await waitFor(() => expect(screen.getByText("READY")).toBeTruthy());
@@ -29,5 +33,5 @@ test("the gear icon pushes to a real, back-navigable Settings screen", async () 
   fireEvent.press(screen.getByLabelText("Settings"));
 
   await waitFor(() => expect(router.getPathname()).toBe("/settings"));
-  expect(screen.getByText("SETTINGS")).toBeTruthy();
+  expect(screen.getByText("ROUND")).toBeTruthy();
 });

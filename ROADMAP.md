@@ -193,7 +193,7 @@ from the real, shipped result)*
 
 *(inherits the now-locked `DESIGN.md` — no new visual-world decisions)*
 
-- [ ] **8a. Settings screen** — `in progress` — split into two passes
+- [x] **8a. Settings screen** — `done` — split into two passes
   (confirmed, matches how Phase 5 was sequenced):
   - [x] **Navigation infrastructure** — `done` — installed and wired
     `expo-router` (the confirmed real trigger point, not 7b's one-way
@@ -211,16 +211,21 @@ from the real, shipped result)*
     `expo-router/testing-library`'s `renderRouter`, one per file (see
     `PROJECT_FACTS.md` for why one file per test was needed). 109/109
     tests passing, all gates green.
-  - [ ] **Settings form content** — `not started` — the real form:
-    Round → Mode → Sounds (bell/clapper + independent volume slider) →
-    Combinations (Presets List, Mode = Preset only) → Combo Timing (gap
-    range + **0.25x–4x** speech rate dial — corrected from this
-    roadmap's earlier stale "5x", see `PROJECT_FACTS.md`) → Punches
-    (`docs/user-flows.md` Flow 3). Still needs a decision on where the
-    Phase 3a/5d fields (`comboLengthMin`/`Max`, `randomPunchPool`,
-    `announceStyle`, `defenseCuesEnabled`, `defenseCueGapMinSec`/`MaxSec`
-    — all added after Flow 3 was originally written) actually go in the
-    layout.
+  - [x] **Settings form content** — `done` — the real form: Round
+    (rounds + Work/Rest/Warmup via a new `react-native-wheely`-based
+    wheel picker) → Mode → Sounds (just the volume slider — confirmed
+    there's no bell/clapper "choice" of variants to pick between) →
+    Combinations, made mode-aware (Random: combo length + punch pool;
+    Preset: the existing Presets List row) so `comboLengthMin`/`Max` +
+    `randomPunchPool` didn't need a 7th section → Combo Timing (gap
+    range, **0.25x–4x** speech rate dial, announce style) → Defense
+    Cues (new section, not in Flow 3's original order) → Punches.
+    New `src/shared/components/` primitives (first real use of that
+    folder); placeholder `/settings/punches` and `/settings/presets`
+    routes shipped so the new summary rows navigate ahead of 8b/8c.
+    Judgment/presentation, no new tests. 109/109 tests passing, all
+    gates green; visual correctness unverified, same standing gap as
+    every other screen.
 - [ ] **8b. Punches screen** — `not started` — add/rename/delete, plus
   the non-blocking **Preview** action (live TTS playback) per
   `docs/user-flows.md` Flow 4 — revised 2026-08-24 (Phase 5c) from the
@@ -316,13 +321,18 @@ dev-client build, not Expo Go, per the native modules already
 installed), check both, then run `/impeccable audit`. `DESIGN.md` still
 doesn't exist — per Impeccable's process it gets written *from* the
 real, inspected result, so it waits on that audit, not on this handoff.
-Once that's done: Phase 8 is now in progress. `expo-router` is
-installed and wired (8a's navigation-infrastructure pass) — the gear
-icon reaches a real, back-navigable Settings route, but that screen is
-still a placeholder. **8a's Settings form content is the next actual
-build step** (see the Phase 8 section above for the exact field list
-and the still-open question of where the newer Phase 3a/5d fields go),
-followed by 8b (Punches) and 8c (Presets). Phase 10+ is planned and
-written down, but confirmed to build *after* Phase 9 ships. As each
-sub-phase completes, mark it `done` here and log the matching entry in
+Once that's done: **Phase 8a is now fully done** — the Settings screen
+has its real form content (Round/Mode/Sounds/Combinations/Combo
+Timing/Defense Cues/Punches), autosaving on change, built against
+`docs/design-direction.md`'s contract the same way 6a was (still
+visually unverified for the same reason). **8b (Punches screen) is the
+next actual build step** — add/rename/delete + the non-blocking Preview
+action (`docs/user-flows.md` Flow 4); its placeholder route already
+exists at `src/app/settings/punches.tsx` and is already wired into
+`settings/_layout.tsx`, so 8b replaces that placeholder's body rather
+than starting navigation from scratch. 8c (Presets List + Editor)
+follows the same pattern against its own existing placeholder at
+`src/app/settings/presets.tsx`. Phase 10+ is planned and written down,
+but confirmed to build *after* Phase 9 ships. As each sub-phase
+completes, mark it `done` here and log the matching entry in
 `CHANGES.md`.
