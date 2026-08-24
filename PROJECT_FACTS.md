@@ -463,3 +463,28 @@ made during feature work.
   `rm -rf node_modules package-lock.json && npm install` + `npm ci`. If
   a future `expo-router`/Expo SDK bump changes the pinned `react`
   version, this override needs to move in lockstep with it.
+- **How the active preset gets chosen was a real, undocumented gap in
+  `docs/user-flows.md` Flow 5, resolved by explicit user decision
+  (2026-08-24, Phase 8c).** Flow 5 describes creating/editing/deleting
+  a preset but never says how `Settings.activePresetId` actually gets
+  set. Confirmed choice: a separate radio-style control per row on the
+  Presets List (`src/features/settings/components/PresetRow.tsx`), kept
+  distinct from tapping the row body (which opens the Editor, per Flow
+  5's literal "tap existing -> Preset Editor" wording) -- not
+  overloading the same tap with two meanings, and not moving activation
+  onto the Settings screen itself. `docs/user-flows.md` itself hasn't
+  been edited to reflect this; treat this fact as current over that
+  doc's original silence on the question.
+- **The Preset Editor uses an explicit Save button, not autosave
+  (confirmed 2026-08-24, Phase 8c)** -- deliberately different from
+  Settings' and Punches' autosave-on-change pattern. Reason: Flow 5
+  itself lists "save" as its own distinct step (unlike Flow 3/Flow 4),
+  and autosaving a brand-new preset's draft on every keystroke would
+  persist an abandoned/partial preset if the user backs out mid-edit,
+  unlike a punch rename where every intermediate typed value is already
+  a valid, harmless name.
+- **`Alert.alert` (Punches' last-punch delete guard, Phase 8b) is still
+  the only native OS dialog in this app as of Phase 8's close** --
+  flagged for the Phase 8 close `/impeccable critique` pass to
+  reconcile against the rest of the app's fully custom-themed inline
+  banners, not fixed piecemeal mid-phase.

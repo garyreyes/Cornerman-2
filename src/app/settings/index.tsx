@@ -31,15 +31,20 @@ export function SettingsScreen() {
   const [punches, setPunches] = useState(() => getPunches());
   const [presets, setPresets] = useState(() => getPresets());
 
-  // Punches/Presets can now be mutated on their own sub-screens (Phase 8b
-  // shipped add/rename/delete for punches; 8c will do the same for
-  // presets), and this screen stays mounted underneath them in the stack
-  // rather than unmounting -- so a mount-only load would show stale data
-  // (the "N defined" summary rows, the Random-mode punch-pool chips) after
-  // navigating back. Refetch on focus instead (PROJECT_FACTS.md flagged
-  // this as required once 8b/8c actually mutate anything).
+  // Punches/Presets can be mutated on their own sub-screens (Phase 8b
+  // shipped add/rename/delete for punches; 8c does the same for presets,
+  // plus setting Settings.activePresetId from the Presets List screen's
+  // radio control), and this screen stays mounted underneath them in the
+  // stack rather than unmounting -- so a mount-only load would show stale
+  // data (the "N defined" summary rows, the Random-mode punch-pool chips,
+  // and Combinations' active-preset name) after navigating back. Refetch
+  // all three on focus instead. Always safe to overwrite local `settings`
+  // with the persisted copy here specifically because this screen
+  // autosaves every change immediately -- there's never an unsaved draft
+  // to lose.
   useFocusEffect(
     useCallback(() => {
+      setSettings(getSettings());
       setPunches(getPunches());
       setPresets(getPresets());
     }, []),

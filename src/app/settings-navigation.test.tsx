@@ -7,7 +7,8 @@ import Index from "./index";
 import Onboarding from "./onboarding";
 import SettingsLayout from "./settings/_layout";
 import SettingsIndex from "./settings/index";
-import SettingsPresets from "./settings/presets";
+import SettingsPresetEditor from "./settings/presets/[id]";
+import SettingsPresetsList from "./settings/presets/index";
 import SettingsPunches from "./settings/punches";
 
 beforeEach(() => {
@@ -25,7 +26,8 @@ test("the gear icon pushes to a real, back-navigable Settings screen", async () 
       "settings/_layout": SettingsLayout,
       "settings/index": SettingsIndex,
       "settings/punches": SettingsPunches,
-      "settings/presets": SettingsPresets,
+      "settings/presets/index": SettingsPresetsList,
+      "settings/presets/[id]": SettingsPresetEditor,
     });
   });
   await waitFor(() => expect(screen.getByText("READY")).toBeTruthy());

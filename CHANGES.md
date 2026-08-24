@@ -344,3 +344,43 @@ Dated log of shipped changes, appended to as features complete.
   suite for a currently-unobservable edge case, since the committed
   voice-bank WAVs are silent placeholders, not corrupt ones). 109/109
   tests passing, all gates green after fixes.
+- 2026-08-24: Sub-phase 8c — Presets List + Preset Editor, closing out
+  Phase 8. Restructured the flat `src/app/settings/presets.tsx`
+  placeholder into a `presets/` folder (`index.tsx` List, `[id].tsx`
+  Editor, `id === "new"` the create-mode sentinel) since
+  `docs/user-flows.md` Flow 5 needs two distinct screens, not one.
+  Presets List: "+ New Preset", an empty state, and -- a real gap in
+  Flow 5 resolved by an explicit user decision rather than a silent
+  one, since Flow 5 describes create/edit/delete but never actually
+  says how the active preset gets chosen -- a separate radio-style
+  control per row sets `Settings.activePresetId`, distinct from tapping
+  the row body (which opens the Editor, per Flow 5's literal wording).
+  Deleting the active preset clears the selection. Preset Editor: name
+  field + an ordered sequence builder (tap-to-append from the current
+  Punches list -- deliberately not a toggle/multi-select like
+  `ChipMultiSelect`, since a punch can legitimately repeat in a combo --
+  plus up/down reorder and remove per entry, no drag-and-drop, no new
+  gesture dependency), with an explicit Save button unlike Settings/
+  Punches' autosave -- Flow 5 itself lists "save" as its own step, and
+  autosaving a new preset's draft on every keystroke would persist
+  abandoned entries. `settings/index.tsx`'s focus-refresh now also
+  refetches `settings` itself (not just punches/presets), since the new
+  List screen's activation control mutates `Settings.activePresetId`
+  from a sibling screen. Judgment/presentation, no new tests. 109/109
+  tests passing, all gates green. Phase 8 (Settings, Punches, Presets)
+  is now done -- next is the Phase close `/impeccable critique` +
+  `/impeccable polish` pass, then Phase 9.
+- 2026-08-24: `reviewer` pass on 8c caught one real Medium-severity
+  issue, fixed: `PresetsListScreen`'s `handleDelete` compared against
+  `settings.activePresetId` from a stale render closure instead of a
+  functional update, so two rows' controls firing in the same batch
+  (e.g. simultaneous multi-touch -- activating one preset while
+  deleting another) could let the delete's stale check clobber the
+  just-made activation. Fixed by switching `handleActivate`/
+  `handleDelete` to functional `setSettings` updaters throughout,
+  matching the pattern `settings/index.tsx`'s `handleChange` already
+  established. Every other scrutinized area (mode detection on
+  remount, the defensive redirect-if-preset-not-found effect, reorder/
+  remove logic with duplicate `Punch.num` values, keying, layer
+  boundaries, Save gating) checked out correct. 109/109 tests passing,
+  all gates green after the fix.

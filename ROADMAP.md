@@ -235,10 +235,28 @@ from the real, shipped result)*
   unmount, not the app's process lifetime — see `PROJECT_FACTS.md`).
   Judgment/presentation + untested native wiring, no new tests.
   109/109 tests passing, all gates green.
-- [ ] **8c. Presets List + Preset Editor** — `not started`.
+- [x] **8c. Presets List + Preset Editor** — `done` — two screens,
+  replacing the flat placeholder (`src/app/settings/presets.tsx`
+  restructured into a `presets/` folder: `index.tsx` for the List,
+  `[id].tsx` for the Editor, `id === "new"` the create-mode sentinel).
+  List: "+ New Preset", empty state, and a per-row separate radio
+  control for `Settings.activePresetId` — a real gap in
+  `docs/user-flows.md` Flow 5 (which never actually says how the active
+  preset gets chosen) resolved by explicit user confirmation rather
+  than a silent decision, see `PROJECT_FACTS.md`. Editor: name + ordered
+  sequence builder (tap-to-append, up/down reorder, remove — not
+  drag-and-drop, no new gesture dependency), with an **explicit Save
+  button** unlike Settings/Punches' autosave, since Flow 5 itself lists
+  "save" as its own step and autosaving a new preset's draft would
+  persist abandoned entries. Judgment/presentation, no new tests.
+  109/109 tests passing, all gates green.
 - [ ] **Phase close: `/impeccable critique` + `/impeccable polish`** —
   `not started` — all three screens judged together for visual
-  consistency, not one at a time.
+  consistency, not one at a time. One known, deliberately-deferred item
+  for this pass: Punches' last-punch-delete guard uses a native
+  `Alert.alert` (the app's only native dialog so far, everywhere else is
+  a themed inline banner) — flagged in `PROJECT_FACTS.md` as a candidate
+  for reconciling here rather than fixed piecemeal.
 
 ## Phase 9 — Platform Builds & Ship Readiness
 
@@ -325,14 +343,22 @@ dev-client build, not Expo Go, per the native modules already
 installed), check both, then run `/impeccable audit`. `DESIGN.md` still
 doesn't exist — per Impeccable's process it gets written *from* the
 real, inspected result, so it waits on that audit, not on this handoff.
-Once that's done: **Phase 8a is now fully done** — the Settings screen
-has its real form content (Round/Mode/Sounds/Combinations/Combo
-Timing/Defense Cues/Punches), autosaving on change, built against
-`docs/design-direction.md`'s contract the same way 6a was (still
-visually unverified for the same reason). **8b is now done** — the Punches screen has real add/rename/delete +
-Preview, replacing its placeholder. **8c (Presets List + Editor) is the
-next actual build step**, following the same pattern against its own
-existing placeholder at `src/app/settings/presets.tsx`. Phase 10+ is planned and written down,
-but confirmed to build *after* Phase 9 ships. As each sub-phase
+Once that's done: **all of Phase 8 is now done** — Settings (8a), Punches
+(8b), and Presets List + Editor (8c) all have real content, replacing
+every placeholder shipped during the nav-infra pass. All three screens
+were built against `docs/design-direction.md`'s contract the same way 6a
+was and are still visually unverified for the same reason (no device/
+simulator in this environment). Each sub-phase went through an
+independent `reviewer` pass before being marked done; real issues that
+pass caught are already fixed (see `CHANGES.md`'s dated entries and
+`PROJECT_FACTS.md` for the durable ones). **What's next: the Phase 8
+close step** — `/impeccable critique` + `/impeccable polish` across all
+three Settings-stack screens judged together, which (like every other
+`/impeccable` step so far) needs a device/simulator this environment
+doesn't have, so it waits on the same real-device session as 6a/7a's
+outstanding audits above. After that: **Phase 9** (EAS build config,
+real-device/simulator verification on both platforms, final full-app
+polish) is what actually closes out v1. Phase 10+ is planned and written
+down, but confirmed to build *after* Phase 9 ships. As each sub-phase
 completes, mark it `done` here and log the matching entry in
 `CHANGES.md`.

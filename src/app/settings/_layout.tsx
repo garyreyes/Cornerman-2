@@ -23,7 +23,11 @@ export default function SettingsLayout() {
     >
       <Stack.Screen name="index" options={{ title: "SETTINGS" }} />
       <Stack.Screen name="punches" options={{ title: "PUNCHES" }} />
-      <Stack.Screen name="presets" options={{ title: "PRESETS" }} />
+      <Stack.Screen name="presets/index" options={{ title: "PRESETS" }} />
+      {/* Title is set dynamically from within the screen itself (NEW
+          PRESET vs EDIT PRESET, depending on the `id` param) -- see
+          presets/[id].tsx. */}
+      <Stack.Screen name="presets/[id]" options={{ title: "PRESET" }} />
     </Stack>
   );
 }
