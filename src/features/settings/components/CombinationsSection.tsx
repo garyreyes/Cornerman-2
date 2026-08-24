@@ -1,10 +1,12 @@
+import { useMemo } from "react";
 import { StyleSheet, Switch, Text, View } from "react-native";
 
-import { theme } from "../../session/theme";
 import { ChipMultiSelect } from "../../../shared/components/ChipMultiSelect";
 import { RangeSliderPair } from "../../../shared/components/RangeSliderPair";
 import { SectionCard } from "../../../shared/components/SectionCard";
 import { SummaryRow } from "../../../shared/components/SummaryRow";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 import type { Preset, Punch, Settings } from "../types";
 
 interface CombinationsSectionProps {
@@ -24,6 +26,9 @@ interface CombinationsSectionProps {
  * confirmed section slot (extraction doc §1.14) either way.
  */
 export function CombinationsSection({ settings, punches, presets, onChange, onOpenPresets }: CombinationsSectionProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
+
   if (settings.mode === "preset") {
     const activePreset = presets.find((p) => p.id === settings.activePresetId);
     return (
@@ -72,8 +77,8 @@ export function CombinationsSection({ settings, punches, presets, onChange, onOp
         <Switch
           value={restrictPool}
           onValueChange={handleTogglePool}
-          trackColor={{ false: theme.colors.panelLine, true: theme.colors.brassAmberDim }}
-          thumbColor={restrictPool ? theme.colors.brassAmber : theme.colors.enamelMuted}
+          trackColor={{ false: colors.panelLine, true: colors.accentDim }}
+          thumbColor={restrictPool ? colors.accent : colors.textMuted}
         />
       </View>
       {restrictPool ? (
@@ -89,20 +94,22 @@ export function CombinationsSection({ settings, punches, presets, onChange, onOp
   );
 }
 
-const styles = StyleSheet.create({
-  poolHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  poolLabel: {
-    fontFamily: theme.fonts.body,
-    fontSize: 14,
-    color: theme.colors.enamelWhite,
-  },
-  note: {
-    fontFamily: theme.fonts.body,
-    fontSize: 13,
-    color: theme.colors.enamelMuted,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    poolHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    poolLabel: {
+      fontFamily: fonts.body,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    note: {
+      fontFamily: fonts.body,
+      fontSize: 13,
+      color: colors.textMuted,
+    },
+  });
+}

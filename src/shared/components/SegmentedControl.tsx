@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { theme } from "../../features/session/theme";
+import { useTheme } from "../theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../theme/tokens";
 
 interface SegmentedControlProps<T extends string> {
   options: { value: T; label: string }[];
@@ -10,6 +12,8 @@ interface SegmentedControlProps<T extends string> {
 
 /** Themed pill toggle -- Mode (Random/Preset) and Announce Style (Name/Number). */
 export function SegmentedControl<T extends string>({ options, value, onChange }: SegmentedControlProps<T>) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   return (
     <View style={styles.track}>
       {options.map((option) => {
@@ -30,32 +34,34 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
   );
 }
 
-const styles = StyleSheet.create({
-  track: {
-    flexDirection: "row",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: theme.colors.panelLine,
-    backgroundColor: theme.colors.background,
-    padding: 3,
-    gap: 3,
-  },
-  segment: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 4,
-    alignItems: "center",
-  },
-  segmentActive: {
-    backgroundColor: theme.colors.brassAmber,
-  },
-  label: {
-    fontFamily: theme.fonts.bodySemiBold,
-    fontSize: 13,
-    letterSpacing: 1,
-    color: theme.colors.enamelMuted,
-  },
-  labelActive: {
-    color: theme.colors.background,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    track: {
+      flexDirection: "row",
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+      backgroundColor: colors.background,
+      padding: 3,
+      gap: 3,
+    },
+    segment: {
+      flex: 1,
+      paddingVertical: 8,
+      borderRadius: 4,
+      alignItems: "center",
+    },
+    segmentActive: {
+      backgroundColor: colors.accent,
+    },
+    label: {
+      fontFamily: fonts.bodySemiBold,
+      fontSize: 13,
+      letterSpacing: 1,
+      color: colors.textMuted,
+    },
+    labelActive: {
+      color: colors.background,
+    },
+  });
+}

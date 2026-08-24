@@ -578,3 +578,87 @@ made during feature work.
   `/impeccable audit` has still not been run -- this was ad hoc
   verification during a build-troubleshooting session, not that
   deliberate process.
+- **The gunmetal/brass palette above was redesigned the same day it was
+  first seen on-device (2026-08-24) -- the user didn't like it once it
+  was actually rendered, not a hypothetical revisit.** New direction,
+  pinned by explicit user request rather than a `concept-seed.mjs` roll
+  (`docs/design-direction.md`'s "beats the roll, always" rule): dark
+  background + orange accent in the register of Claude/VS Code's own
+  dark themes, plus genuine light/dark mode support (a `Settings.themeMode`
+  field: `"system" | "light" | "dark"`, defaulting to `"system"`) rather
+  than one locked dark world. Two structural questions were asked and
+  answered before touching code, not assumed: (1) the analog-dial motifs
+  (sweep-ring countdown, engraved-style phase badge, lap-dial round
+  counter, bell-strike animation) are **kept, just recolored** -- the
+  user chose this over flattening to a chrome-less Claude/VSCode-style
+  layout; (2) Barlow Condensed is **retired** in favor of Inter for
+  display/label text, with JetBrains Mono reserved specifically for
+  numeral readouts (countdown, wheel-picker values, slider values, num
+  badges) -- not a blanket monospace swap, since most "display" usages
+  (section titles, phase badge text, button labels, punch names) are
+  words, not digits.
+- **`src/shared/theme/` (`tokens.ts` + `ThemeContext.tsx`) replaces the
+  old static `src/features/session/theme.ts` (deleted).** Old token names
+  renamed for clarity now that they're genuinely dynamic:
+  `brassAmber`→`accent`, `brassAmberDim`→`accentDim`,
+  `enamelWhite`→`textPrimary`, `enamelMuted`→`textMuted`
+  (`background`/`panel`/`panelLine`/`danger` kept). Every button's label
+  color is `colors.background` (not a separate "on-accent" token) --
+  this generalizes correctly to both modes for free, since `background`
+  is near-black in dark mode and white in light mode, giving the right
+  contrast either way without special-casing.
+- **Three real, distinct palettes -- not "2 palettes + an OS-linked auto
+  option" -- confirmed 2026-08-24 after three corrections the same day.**
+  Pass 1: `accent` tuned to a different orange per mode. Pass 2: unified
+  to one shared orange. Pass 3 (still wrong): stripped orange from
+  Light/Dark entirely and made "System" alias to whichever of them the
+  device's `useColorScheme()` reported -- which meant the Claude/VS Code
+  look never actually appeared anywhere. **The actual model**: `system`
+  IS the Claude/VS Code-style look (dark ground + `#EA580C` orange
+  accent) -- always, not OS-dependent, and what a fresh install shows by
+  default. `light`/`dark` are explicit overrides to a genuinely
+  monochrome look (`accent` there equals `textPrimary` -- no orange).
+  `useColorScheme()` is no longer read at all -- `ThemeMode` is now
+  `"system" | "light" | "dark"` directly, the exact same type as
+  `Settings.themeMode`, with no separate OS-resolved value in between.
+  `danger` stays a real red in all three. `src/shared/theme/tokens.ts`'s
+  `isDarkGround(mode)` (true for `system`/`dark`) drives the status bar
+  icon color, replacing the old direct `mode === "dark"` check.
+- **`ThemeProvider` owns `themeMode` state at the root
+  (`src/app/_layout.tsx`) and calls `settings/service.ts`'s
+  `getSettings`/`saveSettings` directly** -- a deliberate exception to
+  every other Settings field's flow (screen-local state + `onChange`
+  prop), because the theme has to be visible to every screen the instant
+  it changes, including screens that aren't descendants of the one that
+  changed it. `AppearanceSection` (new, Settings screen, section order:
+  Appearance → Round → ...) reads/writes through `useTheme()` directly
+  rather than the generic `settings`/`handleChange` prop pattern the rest
+  of the form uses, for the same reason. This is still a `service.ts`
+  call from a component, not a raw MMKV/native call -- consistent with
+  `CLAUDE.md`'s layer boundaries, the same pattern `SettingsScreen`'s own
+  autosave already used.
+- **All ~29 files that consumed the old static `theme` import were
+  converted to a `useTheme()` hook + memoized `createStyles(colors,
+  fonts)` pattern** (module-scope `StyleSheet.create` can't react to a
+  runtime mode change, so every one of them moved from a top-level
+  `const styles = StyleSheet.create(...)` to a function called inside the
+  component body via `useMemo(() => createStyles(colors, fonts), [colors,
+  fonts])`). Mechanical but real -- if a future component still imports
+  from a `theme` module directly instead of `useTheme()`, it will not
+  respond to a theme-mode change; there is no compatibility shim, the old
+  module is deleted.
+- **`react-native-wheely`'s `WheelPickerItem` is wrapped in
+  `React.memo(..., () => true)` -- a comparator that always returns
+  `true`, meaning it deliberately never re-renders after its first mount
+  (confirmed 2026-08-24 reading `node_modules/react-native-wheely/lib/
+  WheelPickerItem.js`).** A `textStyle`/`selectedIndicatorStyle` color
+  change (e.g. switching Appearance mode) is silently ignored by
+  already-mounted wheel items -- the numerals stay whatever color they
+  first rendered with, which is how Dark mode shipped with invisible
+  wheel-picker numbers (stuck on their original color, now indistinguishable
+  from the new background). Fixed by keying the `<Wheely>` element itself
+  on `mode` (`src/shared/components/WheelPicker.tsx`) so an Appearance
+  change forces a full remount instead of relying on the library to
+  notice new props -- the only way to get it to actually pick up new
+  colors. Any future themed prop passed into this library needs the same
+  treatment, not just `itemTextStyle`/`selectedIndicatorStyle`.

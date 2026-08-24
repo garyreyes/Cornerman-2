@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { theme } from "../../session/theme";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 
 interface PresetRowProps {
   name: string;
@@ -19,6 +21,8 @@ interface PresetRowProps {
  * tappable to edit + Delete.
  */
 export function PresetRow({ name, summary, isActive, onActivate, onPress, onDelete }: PresetRowProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   return (
     <View style={styles.row}>
       <Pressable
@@ -57,56 +61,58 @@ export function PresetRow({ name, summary, isActive, onActivate, onPress, onDele
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    backgroundColor: theme.colors.panel,
-    borderWidth: 1,
-    borderColor: theme.colors.panelLine,
-  },
-  radioButton: {
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  radioGlyph: {
-    fontSize: 16,
-    color: theme.colors.enamelMuted,
-  },
-  radioGlyphActive: {
-    color: theme.colors.brassAmber,
-  },
-  body: {
-    flex: 1,
-  },
-  name: {
-    fontFamily: theme.fonts.bodyMedium,
-    fontSize: 15,
-    color: theme.colors.enamelWhite,
-  },
-  summary: {
-    fontFamily: theme.fonts.body,
-    fontSize: 12,
-    color: theme.colors.enamelMuted,
-    marginTop: 2,
-  },
-  iconButton: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  deleteGlyph: {
-    fontSize: 15,
-    color: theme.colors.enamelMuted,
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      backgroundColor: colors.panel,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+    },
+    radioButton: {
+      width: 28,
+      height: 28,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    radioGlyph: {
+      fontSize: 16,
+      color: colors.textMuted,
+    },
+    radioGlyphActive: {
+      color: colors.accent,
+    },
+    body: {
+      flex: 1,
+    },
+    name: {
+      fontFamily: fonts.bodyMedium,
+      fontSize: 15,
+      color: colors.textPrimary,
+    },
+    summary: {
+      fontFamily: fonts.body,
+      fontSize: 12,
+      color: colors.textMuted,
+      marginTop: 2,
+    },
+    iconButton: {
+      width: 32,
+      height: 32,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    deleteGlyph: {
+      fontSize: 15,
+      color: colors.textMuted,
+    },
+    pressed: {
+      opacity: 0.6,
+    },
+  });
+}

@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { StyleSheet, Switch, Text, View } from "react-native";
 
-import { theme } from "../../session/theme";
 import { RangeSliderPair } from "../../../shared/components/RangeSliderPair";
 import { SectionCard } from "../../../shared/components/SectionCard";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 import type { Settings } from "../types";
 
 interface DefenseCuesSectionProps {
@@ -18,6 +20,8 @@ interface DefenseCuesSectionProps {
  * disrupting the confirmed core order above it.
  */
 export function DefenseCuesSection({ settings, onChange }: DefenseCuesSectionProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   return (
     <SectionCard title="DEFENSE CUES">
       <View style={styles.header}>
@@ -25,8 +29,8 @@ export function DefenseCuesSection({ settings, onChange }: DefenseCuesSectionPro
         <Switch
           value={settings.defenseCuesEnabled}
           onValueChange={(defenseCuesEnabled) => onChange({ defenseCuesEnabled })}
-          trackColor={{ false: theme.colors.panelLine, true: theme.colors.brassAmberDim }}
-          thumbColor={settings.defenseCuesEnabled ? theme.colors.brassAmber : theme.colors.enamelMuted}
+          trackColor={{ false: colors.panelLine, true: colors.accentDim }}
+          thumbColor={settings.defenseCuesEnabled ? colors.accent : colors.textMuted}
         />
       </View>
       {settings.defenseCuesEnabled ? (
@@ -46,15 +50,17 @@ export function DefenseCuesSection({ settings, onChange }: DefenseCuesSectionPro
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  label: {
-    fontFamily: theme.fonts.body,
-    fontSize: 14,
-    color: theme.colors.enamelWhite,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    label: {
+      fontFamily: fonts.body,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+  });
+}

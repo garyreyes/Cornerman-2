@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
+import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { theme } from "../../features/session/theme";
+import { useTheme } from "../theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../theme/tokens";
 
 interface SectionCardProps {
   title: string;
@@ -9,13 +11,14 @@ interface SectionCardProps {
 }
 
 /**
- * Themed panel + engraved-style all-caps header, reused by every Settings
- * section (docs/design-direction.md's "instrument panel" world) -- the
- * same panel/panelLine/borderRadius language ControlRow/PhaseBadge already
- * established, generalized into a shared primitive now that Settings is
- * the second real screen to need it.
+ * Themed panel + all-caps header, reused by every Settings section --
+ * the same panel/panelLine/borderRadius language ControlRow/PhaseBadge
+ * already established, generalized into a shared primitive now that
+ * Settings is the second real screen to need it.
  */
 export function SectionCard({ title, children }: SectionCardProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   return (
     <View style={styles.card}>
       <Text style={styles.title}>{title}</Text>
@@ -24,22 +27,24 @@ export function SectionCard({ title, children }: SectionCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.panelLine,
-    backgroundColor: theme.colors.panel,
-    padding: 16,
-    gap: 14,
-  },
-  title: {
-    fontFamily: theme.fonts.displaySemiBold,
-    fontSize: 15,
-    letterSpacing: 2,
-    color: theme.colors.brassAmber,
-  },
-  body: {
-    gap: 14,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    card: {
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+      backgroundColor: colors.panel,
+      padding: 16,
+      gap: 14,
+    },
+    title: {
+      fontFamily: fonts.displaySemiBold,
+      fontSize: 15,
+      letterSpacing: 2,
+      color: colors.accent,
+    },
+    body: {
+      gap: 14,
+    },
+  });
+}

@@ -29,6 +29,7 @@ export function createDefaultSettings(): Settings {
     defenseCueGapMinSec: 15,
     defenseCueGapMaxSec: 30,
     hasCompletedOnboarding: false,
+    themeMode: "system",
   };
 }
 

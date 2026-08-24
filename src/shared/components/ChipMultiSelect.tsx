@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { theme } from "../../features/session/theme";
+import { useTheme } from "../theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../theme/tokens";
 
 interface ChipMultiSelectProps {
   items: { id: string; value: number; label: string }[];
@@ -18,6 +20,8 @@ interface ChipMultiSelectProps {
  * already degrades gracefully).
  */
 export function ChipMultiSelect({ items, selected, onToggle }: ChipMultiSelectProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   return (
     <View style={styles.wrap}>
       {items.map((item) => {
@@ -39,33 +43,35 @@ export function ChipMultiSelect({ items, selected, onToggle }: ChipMultiSelectPr
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  chip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.panelLine,
-    backgroundColor: theme.colors.background,
-  },
-  chipActive: {
-    backgroundColor: theme.colors.brassAmberDim,
-    borderColor: theme.colors.brassAmber,
-  },
-  chipDisabled: {
-    opacity: 0.6,
-  },
-  label: {
-    fontFamily: theme.fonts.bodyMedium,
-    fontSize: 13,
-    color: theme.colors.enamelMuted,
-  },
-  labelActive: {
-    color: theme.colors.enamelWhite,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    wrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    chip: {
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+      backgroundColor: colors.background,
+    },
+    chipActive: {
+      backgroundColor: colors.accentDim,
+      borderColor: colors.accent,
+    },
+    chipDisabled: {
+      opacity: 0.6,
+    },
+    label: {
+      fontFamily: fonts.bodyMedium,
+      fontSize: 13,
+      color: colors.textMuted,
+    },
+    labelActive: {
+      color: colors.textPrimary,
+    },
+  });
+}

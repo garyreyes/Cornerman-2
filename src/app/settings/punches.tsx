@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -7,7 +7,8 @@ import { PunchRow } from "../../features/settings/components/PunchRow";
 import { disposePreviewEngine, initPreviewEngine } from "../../features/settings/previewEngine";
 import { LastPunchError, createPunch, deletePunch, getPunches, renamePunch } from "../../features/settings/service";
 import type { Punch } from "../../features/settings/types";
-import { theme } from "../../features/session/theme";
+import { useTheme } from "../../shared/theme/ThemeContext";
+import type { ColorTokens } from "../../shared/theme/tokens";
 
 /**
  * Add/rename/delete + non-blocking Preview (docs/user-flows.md Flow 4).
@@ -17,6 +18,8 @@ import { theme } from "../../features/session/theme";
  * (LastPunchError) already exists in settings/service.ts from Phase 1b.
  */
 export function PunchesScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [punches, setPunches] = useState<Punch[]>(() => getPunches());
 
   // Preview's engine is scoped to this screen's lifetime, not the app's --
@@ -65,13 +68,15 @@ export function PunchesScreen() {
 
 export default PunchesScreen;
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  content: {
-    padding: 16,
-    gap: 10,
-  },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    content: {
+      padding: 16,
+      gap: 10,
+    },
+  });
+}

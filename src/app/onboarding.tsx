@@ -1,17 +1,8 @@
 /**
- * THESIS: A timer built to look like what a corner-man actually holds in
- * their hand mid-fight -- an analog stopwatch and a brass ring bell -- not
- * another phone-screen fitness app. Refuses the neon-gradient HIIT-timer
- * default and the sterile wellness-app opposite alike.
- *
- * OWN-WORLD: Gunmetal/brass instrument-panel dark ground. Brass-amber
- * carries every active/interactive element -- the one accent. Enamel-white
- * for secondary labels. Numerals and dial-style display type: Barlow
- * Condensed. Body/label text: Inter.
- *
- * (Same locked contract index.tsx opens with, per docs/design-direction.md
+ * (Same contract src/app/index.tsx opens with, per docs/design-direction.md
  * -- this is the app's first screen chronologically (first launch only)
- * but inherits the same world, not a new one.)
+ * but inherits the same redesigned world, not a new one. See index.tsx's
+ * opening comment for the full THESIS/OWN-WORLD/STORY/FORM/FINISH record.)
  *
  * Flow (docs/user-flows.md Flow 1): intro explainer -> Android 13+ system
  * notification permission dialog (iOS has no runtime prompt for this) ->
@@ -22,18 +13,21 @@
  * Flow 1's "never shown again" behavior.
  */
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { requestNotificationPermission } from "../lib/backgroundAudio";
 import { markOnboardingComplete } from "../features/settings/service";
-import { theme } from "../features/session/theme";
+import { useTheme } from "../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../shared/theme/tokens";
 
 type Step = "intro" | "batteryTip";
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const [step, setStep] = useState<Step>("intro");
 
   const finish = () => {
@@ -94,57 +88,59 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 20,
-    paddingHorizontal: 32,
-  },
-  title: {
-    fontFamily: theme.fonts.displayBold,
-    fontSize: 32,
-    letterSpacing: 1,
-    color: theme.colors.enamelWhite,
-    textAlign: "center",
-  },
-  body: {
-    fontFamily: theme.fonts.body,
-    fontSize: 16,
-    lineHeight: 24,
-    color: theme.colors.enamelMuted,
-    textAlign: "center",
-  },
-  link: {
-    fontFamily: theme.fonts.bodySemiBold,
-    fontSize: 14,
-    letterSpacing: 1,
-    color: theme.colors.brassAmber,
-    textAlign: "center",
-    marginTop: 4,
-  },
-  bottom: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-  },
-  primaryButton: {
-    paddingVertical: 16,
-    borderRadius: 8,
-    backgroundColor: theme.colors.brassAmber,
-    alignItems: "center",
-  },
-  primaryLabel: {
-    fontFamily: theme.fonts.bodySemiBold,
-    fontSize: 16,
-    letterSpacing: 2,
-    color: theme.colors.background,
-  },
-  pressed: {
-    opacity: 0.8,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    center: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 20,
+      paddingHorizontal: 32,
+    },
+    title: {
+      fontFamily: fonts.displayBold,
+      fontSize: 32,
+      letterSpacing: 1,
+      color: colors.textPrimary,
+      textAlign: "center",
+    },
+    body: {
+      fontFamily: fonts.body,
+      fontSize: 16,
+      lineHeight: 24,
+      color: colors.textMuted,
+      textAlign: "center",
+    },
+    link: {
+      fontFamily: fonts.bodySemiBold,
+      fontSize: 14,
+      letterSpacing: 1,
+      color: colors.accent,
+      textAlign: "center",
+      marginTop: 4,
+    },
+    bottom: {
+      paddingHorizontal: 24,
+      paddingBottom: 24,
+    },
+    primaryButton: {
+      paddingVertical: 16,
+      borderRadius: 8,
+      backgroundColor: colors.accent,
+      alignItems: "center",
+    },
+    primaryLabel: {
+      fontFamily: fonts.bodySemiBold,
+      fontSize: 16,
+      letterSpacing: 2,
+      color: colors.background,
+    },
+    pressed: {
+      opacity: 0.8,
+    },
+  });
+}

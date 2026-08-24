@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -7,7 +7,8 @@ import { resolvePunchName } from "../../../features/comboEngine/service";
 import { PresetRow } from "../../../features/settings/components/PresetRow";
 import { deletePreset, getPresets, getPunches, getSettings, saveSettings } from "../../../features/settings/service";
 import type { Preset, Punch, Settings } from "../../../features/settings/types";
-import { theme } from "../../../features/session/theme";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 
 function summarizeSequence(sequence: number[], punches: Punch[]): string {
   if (sequence.length === 0) {
@@ -25,6 +26,8 @@ function summarizeSequence(sequence: number[], punches: Punch[]): string {
  */
 export function PresetsListScreen() {
   const router = useRouter();
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const [presets, setPresets] = useState<Preset[]>(() => getPresets());
   const [punches, setPunches] = useState<Punch[]>(() => getPunches());
   const [settings, setSettings] = useState<Settings>(() => getSettings());
@@ -100,37 +103,39 @@ export function PresetsListScreen() {
 
 export default PresetsListScreen;
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  content: {
-    padding: 16,
-    gap: 10,
-  },
-  newButton: {
-    paddingVertical: 12,
-    borderRadius: 6,
-    backgroundColor: theme.colors.brassAmber,
-    alignItems: "center",
-  },
-  pressed: {
-    opacity: 0.8,
-  },
-  newButtonLabel: {
-    fontFamily: theme.fonts.bodySemiBold,
-    fontSize: 14,
-    letterSpacing: 1,
-    color: theme.colors.background,
-  },
-  empty: {
-    paddingVertical: 24,
-    alignItems: "center",
-  },
-  emptyText: {
-    fontFamily: theme.fonts.body,
-    fontSize: 14,
-    color: theme.colors.enamelMuted,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    content: {
+      padding: 16,
+      gap: 10,
+    },
+    newButton: {
+      paddingVertical: 12,
+      borderRadius: 6,
+      backgroundColor: colors.accent,
+      alignItems: "center",
+    },
+    pressed: {
+      opacity: 0.8,
+    },
+    newButtonLabel: {
+      fontFamily: fonts.bodySemiBold,
+      fontSize: 14,
+      letterSpacing: 1,
+      color: colors.background,
+    },
+    empty: {
+      paddingVertical: 24,
+      alignItems: "center",
+    },
+    emptyText: {
+      fontFamily: fonts.body,
+      fontSize: 14,
+      color: colors.textMuted,
+    },
+  });
+}

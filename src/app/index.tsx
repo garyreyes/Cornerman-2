@@ -1,21 +1,25 @@
 /**
- * THESIS: A timer built to look like what a corner-man actually holds in
- * their hand mid-fight -- an analog stopwatch and a brass ring bell -- not
- * another phone-screen fitness app. Refuses the neon-gradient HIIT-timer
- * default and the sterile wellness-app opposite alike.
+ * THESIS: A timer that reads like a tool you actually work in, not
+ * another phone-screen fitness app -- the corner-man's analog-stopwatch
+ * dial retained (this is still an instrument you glance at mid-round),
+ * recolored out of the gunmetal/brass world into a dark-ground/orange-
+ * accent register (code-editor dark themes) per explicit user redirect
+ * after seeing the original palette rendered on-device.
  *
- * OWN-WORLD: Gunmetal/brass instrument-panel dark ground (not book-cream,
- * not neon-black-with-glow). Brass-amber carries every active/interactive
- * element -- the one accent, restrained-strategy palette, chosen
- * specifically because it reads clearly in a dim evening room.
- * Enamel-white for tick marks, dial numerals, and secondary labels.
- * Numerals and dial-style display type: Barlow Condensed (open,
- * road-sign/stenciled-numeral heritage). Body/label text: Inter -- plain,
- * workhorse, appropriate for an Operate surface where legibility
- * outranks personality in running text. Motion: sweep-hand-style
- * continuous easing for the countdown (never a digital blink), a genuine
- * bell-strike moment at phase changes -- mechanical and earned, never
- * bouncy or gamified.
+ * OWN-WORLD: Near-black ground, one orange accent carrying every active/
+ * interactive element (the sweep-ring, Start button, phase-badge accents),
+ * tuned per light/dark mode rather than one fixed hex (see
+ * src/shared/theme/tokens.ts) -- both modes are real, designed palettes,
+ * user-selectable in Settings > Appearance (System/Light/Dark), not one
+ * locked dark world. Primary/muted neutral text tokens replace the old
+ * enamel-white/enamel-muted naming. Display/label text: Inter (unchanged
+ * role, retired Barlow Condensed). Numerals specifically -- the countdown
+ * readout, wheel-picker values, slider values, num badges -- render in
+ * JetBrains Mono, the one deliberate monospace touch, not a blanket swap.
+ * Motion: sweep-hand-style continuous easing for the countdown (never a
+ * digital blink), a genuine bell-strike moment at phase changes --
+ * mechanical and earned, never bouncy or gamified. Unchanged from the
+ * original contract.
  *
  * STORY: The user glances down mid-round and reads phase, time
  * remaining, and round count in under a second, the way they'd glance at
@@ -23,14 +27,15 @@
  * (spoken combos, bell, clapper) carries the session; the screen exists
  * for the moments eyes actually land on it.
  *
- * FORM: "The Corner's Stopwatch & Bell" -- docs/design-direction.md,
- * seed key ca58d365.
+ * FORM: Redesign of "The Corner's Stopwatch & Bell" (original seed key
+ * ca58d365) -- pinned by explicit user direction, not a concept-seed
+ * roll (docs/design-direction.md's "Redesign" record).
  *
- * (Copied verbatim from docs/design-direction.md's direction contract,
- * per Impeccable's Step 5 format.)
+ * FINISH: unreviewed and undocumented is unfinished -- this build ends
+ * with the finish review, the verdict, and DESIGN.md.
  */
 import { Redirect, useRouter } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -41,9 +46,10 @@ import { CountdownRing } from "../features/session/components/CountdownRing";
 import { PhaseBadge } from "../features/session/components/PhaseBadge";
 import { RoundCounter } from "../features/session/components/RoundCounter";
 import { SettingsGear } from "../features/session/components/SettingsGear";
-import { theme } from "../features/session/theme";
 import { useSession } from "../features/session/useSession";
 import { getSettings } from "../features/settings/service";
+import { useTheme } from "../shared/theme/ThemeContext";
+import type { ColorTokens } from "../shared/theme/tokens";
 
 /**
  * Route-level gate only -- redirects to Onboarding before Main Timer's
@@ -63,6 +69,8 @@ export default function MainTimerRoute() {
 
 function MainTimerScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { timerState, session, settings, audioError, start, togglePause, reset } = useSession();
 
   const phase = timerState?.phase ?? "ready";
@@ -104,27 +112,29 @@ function MainTimerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 8,
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 24,
-    paddingHorizontal: 24,
-  },
-  bottom: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-  },
-});
+function createStyles(colors: ColorTokens) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    topRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 8,
+    },
+    center: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 24,
+      paddingHorizontal: 24,
+    },
+    bottom: {
+      paddingHorizontal: 24,
+      paddingBottom: 24,
+    },
+  });
+}

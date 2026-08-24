@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { theme } from "../../session/theme";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 
 interface AddPunchRowProps {
   onAdd: (name: string) => void;
@@ -9,6 +10,8 @@ interface AddPunchRowProps {
 
 /** "Saved immediately -- no generation step" (docs/user-flows.md Flow 4). */
 export function AddPunchRow({ onAdd }: AddPunchRowProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const [name, setName] = useState("");
 
   function handleAdd() {
@@ -28,7 +31,7 @@ export function AddPunchRow({ onAdd }: AddPunchRowProps) {
         onChangeText={setName}
         onSubmitEditing={handleAdd}
         placeholder="New punch name"
-        placeholderTextColor={theme.colors.enamelMuted}
+        placeholderTextColor={colors.textMuted}
         returnKeyType="done"
       />
       <Pressable
@@ -48,40 +51,42 @@ export function AddPunchRow({ onAdd }: AddPunchRowProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  input: {
-    flex: 1,
-    fontFamily: theme.fonts.body,
-    fontSize: 15,
-    color: theme.colors.enamelWhite,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    backgroundColor: theme.colors.panel,
-    borderWidth: 1,
-    borderColor: theme.colors.panelLine,
-  },
-  addButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    backgroundColor: theme.colors.brassAmber,
-  },
-  pressed: {
-    opacity: 0.8,
-  },
-  disabled: {
-    opacity: 0.4,
-  },
-  addLabel: {
-    fontFamily: theme.fonts.bodySemiBold,
-    fontSize: 13,
-    letterSpacing: 1,
-    color: theme.colors.background,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    input: {
+      flex: 1,
+      fontFamily: fonts.body,
+      fontSize: 15,
+      color: colors.textPrimary,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      backgroundColor: colors.panel,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+    },
+    addButton: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 6,
+      backgroundColor: colors.accent,
+    },
+    pressed: {
+      opacity: 0.8,
+    },
+    disabled: {
+      opacity: 0.4,
+    },
+    addLabel: {
+      fontFamily: fonts.bodySemiBold,
+      fontSize: 13,
+      letterSpacing: 1,
+      color: colors.background,
+    },
+  });
+}

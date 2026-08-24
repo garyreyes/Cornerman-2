@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { theme } from "../../session/theme";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 import { previewPunchName } from "../previewEngine";
 import type { Punch } from "../types";
 
@@ -22,6 +23,8 @@ const PREVIEW_ERROR_TIMEOUT_MS = 2500;
  * (extraction doc §1.6).
  */
 export function PunchRow({ punch, onRename, onDelete }: PunchRowProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   // Resync the draft when `punch.name` changes from outside this row's own
   // edit (e.g. the trimmed value committed on blur flowing back down as a
   // new prop) -- adjusted during render per React's documented pattern for
@@ -79,7 +82,7 @@ export function PunchRow({ punch, onRename, onDelete }: PunchRowProps) {
         onChangeText={setDraftName}
         onBlur={handleBlur}
         placeholder="Punch name"
-        placeholderTextColor={theme.colors.enamelMuted}
+        placeholderTextColor={colors.textMuted}
       />
       <Pressable
         onPress={handlePreview}
@@ -105,58 +108,60 @@ export function PunchRow({ punch, onRename, onDelete }: PunchRowProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    backgroundColor: theme.colors.panel,
-    borderWidth: 1,
-    borderColor: theme.colors.panelLine,
-  },
-  numBadge: {
-    fontFamily: theme.fonts.displaySemiBold,
-    fontSize: 15,
-    color: theme.colors.brassAmber,
-    minWidth: 20,
-    textAlign: "center",
-  },
-  nameInput: {
-    flex: 1,
-    fontFamily: theme.fonts.body,
-    fontSize: 15,
-    color: theme.colors.enamelWhite,
-    paddingVertical: 4,
-    minWidth: 100,
-  },
-  iconButton: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-  disabled: {
-    opacity: 0.35,
-  },
-  previewGlyph: {
-    fontSize: 15,
-    color: theme.colors.brassAmber,
-  },
-  deleteGlyph: {
-    fontSize: 15,
-    color: theme.colors.enamelMuted,
-  },
-  error: {
-    width: "100%",
-    fontFamily: theme.fonts.bodyMedium,
-    fontSize: 12,
-    color: theme.colors.danger,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      backgroundColor: colors.panel,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+    },
+    numBadge: {
+      fontFamily: fonts.numericSemiBold,
+      fontSize: 15,
+      color: colors.accent,
+      minWidth: 20,
+      textAlign: "center",
+    },
+    nameInput: {
+      flex: 1,
+      fontFamily: fonts.body,
+      fontSize: 15,
+      color: colors.textPrimary,
+      paddingVertical: 4,
+      minWidth: 100,
+    },
+    iconButton: {
+      width: 32,
+      height: 32,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    pressed: {
+      opacity: 0.6,
+    },
+    disabled: {
+      opacity: 0.35,
+    },
+    previewGlyph: {
+      fontSize: 15,
+      color: colors.accent,
+    },
+    deleteGlyph: {
+      fontSize: 15,
+      color: colors.textMuted,
+    },
+    error: {
+      width: "100%",
+      fontFamily: fonts.bodyMedium,
+      fontSize: 12,
+      color: colors.danger,
+    },
+  });
+}

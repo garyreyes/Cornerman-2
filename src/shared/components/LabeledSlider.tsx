@@ -1,8 +1,9 @@
 import Slider from "@react-native-community/slider";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { theme } from "../../features/session/theme";
+import { useTheme } from "../theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../theme/tokens";
 
 interface LabeledSliderProps {
   label: string;
@@ -35,6 +36,8 @@ export function LabeledSlider({
   onChange,
   onLiveChange,
 }: LabeledSliderProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const [displayValue, setDisplayValue] = useState(value);
 
   function handleValueChange(next: number) {
@@ -53,9 +56,9 @@ export function LabeledSlider({
         minimumValue={minimumValue}
         maximumValue={maximumValue}
         step={step}
-        minimumTrackTintColor={theme.colors.brassAmber}
-        maximumTrackTintColor={theme.colors.panelLine}
-        thumbTintColor={theme.colors.brassAmber}
+        minimumTrackTintColor={colors.accent}
+        maximumTrackTintColor={colors.panelLine}
+        thumbTintColor={colors.accent}
         onValueChange={handleValueChange}
         onSlidingComplete={onChange}
       />
@@ -63,22 +66,24 @@ export function LabeledSlider({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    gap: 4,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  label: {
-    fontFamily: theme.fonts.body,
-    fontSize: 14,
-    color: theme.colors.enamelWhite,
-  },
-  value: {
-    fontFamily: theme.fonts.bodySemiBold,
-    fontSize: 14,
-    color: theme.colors.brassAmber,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    container: {
+      gap: 4,
+    },
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    label: {
+      fontFamily: fonts.body,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    value: {
+      fontFamily: fonts.numericSemiBold,
+      fontSize: 14,
+      color: colors.accent,
+    },
+  });
+}

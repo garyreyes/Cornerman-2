@@ -147,6 +147,14 @@ from the real, shipped result)*
     simulator; treat the screen as unverified until then, the same
     honesty standard already applied to bell/clapper sound quality
     (4a) and TTS voice quality (5a/5c).
+  - **2026-08-24 redesign**: the gunmetal/brass palette this sub-phase
+    shipped was recolored after the user saw it on-device and asked for
+    a dark-background/orange-accent world (Claude/VS Code register)
+    with real light/dark mode support — see `docs/design-direction.md`'s
+    redesign record and `PROJECT_FACTS.md`. The dial motifs (sweep-ring,
+    phase badge, lap-dial counter) are unchanged, only palette/type. The
+    `/impeccable audit` above still needs to happen against this new
+    palette, not the retired one.
 
 ## Phase 7 — Background Audio + Onboarding
 
@@ -256,7 +264,11 @@ from the real, shipped result)*
   for this pass: Punches' last-punch-delete guard uses a native
   `Alert.alert` (the app's only native dialog so far, everywhere else is
   a themed inline banner) — flagged in `PROJECT_FACTS.md` as a candidate
-  for reconciling here rather than fixed piecemeal.
+  for reconciling here rather than fixed piecemeal. **Also now covers**
+  the new Appearance section (System/Light/Dark toggle, added
+  2026-08-24) and the dark/orange redesign applied across all three
+  screens — this pass should judge the new palette, not the retired
+  gunmetal/brass one.
 
 ## Phase 9 — Platform Builds & Ship Readiness
 
@@ -365,10 +377,34 @@ call). `DESIGN.md` still doesn't exist — per Impeccable's process it
 gets written *from* the real, inspected result of a proper audit, not
 from incidental screenshots taken mid-troubleshooting.
 
+**2026-08-24, later the same day: the visual world was redesigned.**
+Once the gunmetal/brass palette was actually seen running (the
+confirmation above), the user didn't like it and asked for a different
+direction — dark background + orange accent (Claude/VS Code dark-theme
+register) plus real light/dark mode support, not one locked dark world.
+This was a pinned user direction, not a `concept-seed` re-roll. The
+analog-dial motifs (sweep-ring countdown, engraved-style phase badge,
+lap-dial round counter, bell-strike animation) were kept and just
+recolored — confirmed explicitly over flattening to a chrome-less
+Claude/VSCode-style layout. Barlow Condensed was retired for Inter
+(display/label text); JetBrains Mono was added specifically for numeral
+readouts (countdown, wheel-picker values, slider values, num badges).
+New `src/shared/theme/` (`tokens.ts` + `ThemeContext.tsx`) replaces the
+old static `src/features/session/theme.ts`, driven by a new
+`Settings.themeMode` field (System/Light/Dark, new Appearance section in
+Settings) plus the device's own color scheme. All ~29 files that
+consumed the old static theme were converted to a `useTheme()` hook.
+109/109 tests still pass, lint/typecheck clean. See
+`docs/design-direction.md`'s redesign record and `PROJECT_FACTS.md` for
+the full token map and reasoning. **This redesign has not yet been seen
+on a real device either** — same standing verification gap as
+everything else in this environment.
+
 **What's next:** run `/impeccable audit` now that a device is
-genuinely available, covering both 6a/7b's outstanding audit and the
-Phase 8 close step (`/impeccable critique` + `/impeccable polish`
-across all three Settings-stack screens judged together). **9a's
+genuinely available, covering 6a/7b's outstanding audit **against the
+new dark/orange palette** and the Phase 8 close step (`/impeccable
+critique` + `/impeccable polish` across all three Settings-stack
+screens, including the new Appearance section, judged together). **9a's
 `eas.json` is written** (build profiles for a dev-client build), but
 actually linking an EAS project (`eas login`, `eas build:configure`)
 and triggering a real build is still the user's own action. Phase 10+

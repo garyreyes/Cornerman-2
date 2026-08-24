@@ -426,3 +426,48 @@ Dated log of shipped changes, appended to as features complete.
   Ready state were visually confirmed against `docs/design-direction.md`
   for the first time, from a real screenshot. All 109 tests still pass,
   all gates green, after the test-file move.
+- 2026-08-24: Visual-world redesign — the user saw the gunmetal/brass
+  "Corner's Stopwatch & Bell" palette rendered on-device for the first
+  time and asked for a different direction: dark background + orange
+  accent (Claude/VS Code dark-theme register), plus real light/dark mode
+  support, not one locked dark world. `docs/design-direction.md` rewritten
+  as a redesign record (analog-dial motifs -- sweep-ring, phase badge,
+  lap-dial round counter -- kept per explicit confirmation, only the
+  palette/type changed). New `src/shared/theme/` (`tokens.ts` +
+  `ThemeContext.tsx`) replaces the old static `src/features/session/theme.ts`
+  with a light/dark-aware token system driven by a new
+  `Settings.themeMode` field (`"system" | "light" | "dark"`, defaults to
+  `"system"`) plus the device's own `useColorScheme()`. New Appearance
+  section (Settings screen, leads the section order) exposes the
+  System/Light/Dark toggle. Barlow Condensed retired in favor of Inter
+  for display/label text; numerals specifically (countdown readout,
+  wheel-picker values, slider values, num badges) now render in JetBrains
+  Mono -- the one deliberate monospace touch, not a blanket swap. All ~29
+  consuming files converted from a static `theme.colors.X` import to a
+  `useTheme()` hook + memoized `createStyles(colors, fonts)` pattern so
+  every screen actually re-renders on a mode change. 109/109 tests still
+  pass, lint/typecheck clean. **Not done**: real on-device visual
+  confirmation of the new palette (same standing gap as every screen
+  before it -- this environment still has no simulator/screenshot
+  capability) and the deliberate `/impeccable audit`/`critique`/`polish`
+  passes, still outstanding from before this redesign.
+- 2026-08-24: Palette correction — Light/Dark are now genuinely
+  monochrome, no orange or any accent hue in either mode (two corrections
+  the same day: first a per-mode-tuned orange, then one shared orange,
+  both wrong against the actual ask — the Claude/VS Code reference means
+  those modes are literally black-and-white). `accent` now equals
+  `textPrimary` per mode; `accentDim` is a plain gray; `danger` stays the
+  one deliberate red exception. See `PROJECT_FACTS.md` and
+  `docs/design-direction.md` for the full record. 109/109 tests still
+  pass, lint/typecheck clean.
+- 2026-08-24: Appearance model correction — three real palettes now,
+  not two-plus-an-OS-alias. "System" (default) is the fixed Claude/VS
+  Code dark+orange look, no longer tied to `useColorScheme()`; "Light"/
+  "Dark" stay the genuinely monochrome overrides from the previous
+  correction. Also fixed a real bug found while verifying this on-device:
+  `react-native-wheely`'s item component is wrapped in a permanently-true
+  `React.memo`, so it never re-rendered on an Appearance change — Dark
+  mode's wheel-picker numbers (Rounds/Work/Rest/Warmup) were invisible,
+  stuck on whatever color they first mounted with. Fixed by keying
+  `<Wheely>` on the theme mode to force a remount on change. 109/109
+  tests still pass, lint/typecheck clean.

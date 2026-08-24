@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { StyleSheet, Text } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 
-import { theme } from "../theme";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 
 const PHASE_LABEL: Record<string, string> = {
   ready: "READY",
@@ -24,6 +25,8 @@ interface PhaseBadgeProps {
  * gamified," so a single restrained scale-up-and-settle, not a bounce.
  */
 export function PhaseBadge({ phase, isPaused }: PhaseBadgeProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const label = isPaused ? "PAUSED" : (PHASE_LABEL[phase] ?? phase.toUpperCase());
   const scale = useSharedValue(1);
 
@@ -46,19 +49,21 @@ export function PhaseBadge({ phase, isPaused }: PhaseBadgeProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  plate: {
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: theme.colors.panelLine,
-    backgroundColor: theme.colors.panel,
-    paddingVertical: 6,
-    paddingHorizontal: 18,
-  },
-  text: {
-    fontFamily: theme.fonts.displaySemiBold,
-    fontSize: 16,
-    letterSpacing: 3,
-    color: theme.colors.enamelWhite,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    plate: {
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+      backgroundColor: colors.panel,
+      paddingVertical: 6,
+      paddingHorizontal: 18,
+    },
+    text: {
+      fontFamily: fonts.displaySemiBold,
+      fontSize: 16,
+      letterSpacing: 3,
+      color: colors.textPrimary,
+    },
+  });
+}

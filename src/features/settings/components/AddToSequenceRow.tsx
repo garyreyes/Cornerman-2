@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { theme } from "../../session/theme";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 import type { Punch } from "../types";
 
 interface AddToSequenceRowProps {
@@ -16,6 +18,8 @@ interface AddToSequenceRowProps {
  * selected/deselected state.
  */
 export function AddToSequenceRow({ punches, onAdd }: AddToSequenceRowProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   return (
     <View style={styles.wrap}>
       {punches.map((punch) => (
@@ -33,26 +37,28 @@ export function AddToSequenceRow({ punches, onAdd }: AddToSequenceRowProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  chip: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.brassAmberDim,
-    backgroundColor: theme.colors.background,
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-  label: {
-    fontFamily: theme.fonts.bodyMedium,
-    fontSize: 13,
-    color: theme.colors.brassAmber,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    wrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    chip: {
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.accentDim,
+      backgroundColor: colors.background,
+    },
+    pressed: {
+      opacity: 0.6,
+    },
+    label: {
+      fontFamily: fonts.bodyMedium,
+      fontSize: 13,
+      color: colors.accent,
+    },
+  });
+}

@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Wheely from "react-native-wheely";
 
-import { theme } from "../../features/session/theme";
+import { useTheme } from "../theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../theme/tokens";
 
 interface WheelPickerProps {
   label: string;
@@ -39,19 +41,31 @@ function nearestIndex(values: number[], value: number): number {
 /**
  * Themed wrapper around react-native-wheely (pure-JS scroll wheel, no
  * native module) -- PRD's "iOS-style continuous scroll picker" for Round/
- * Work/Rest/Warmup duration, restyled to the gunmetal/brass instrument-
- * panel world instead of a platform-default look. `values` is the ordered
- * list of selectable numbers; wheely itself only knows string options +
- * an index, so the index<->value mapping happens here.
+ * Work/Rest/Warmup duration, restyled to this app's own world instead of
+ * a platform-default look. `values` is the ordered list of selectable
+ * numbers; wheely itself only knows string options + an index, so the
+ * index<->value mapping happens here.
  */
 export function WheelPicker({ label, value, values, formatValue = (v) => String(v), onChange }: WheelPickerProps) {
+  const { mode, colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const options = values.map(formatValue);
   const selectedIndex = nearestIndex(values, value);
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
+      {/* react-native-wheely's own item component is wrapped in
+          React.memo(..., () => true) -- it deliberately never re-renders
+          after its first mount, so a `textStyle`/`selectedIndicatorStyle`
+          color update (e.g. switching Appearance mode) is silently
+          ignored and the numerals stay whatever color they first
+          rendered with, invisible against a new background. Keying on
+          `mode` forces a full remount on a theme change instead, which
+          is the only way to get the library to actually pick up new
+          colors. */}
       <Wheely
+        key={mode}
         selectedIndex={selectedIndex}
         options={options}
         onChange={(index) => onChange(values[index]!)}
@@ -66,29 +80,31 @@ export function WheelPicker({ label, value, values, formatValue = (v) => String(
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
-  },
-  label: {
-    fontFamily: theme.fonts.body,
-    fontSize: 12,
-    color: theme.colors.enamelMuted,
-  },
-  wheel: {
-    width: "100%",
-  },
-  indicator: {
-    backgroundColor: theme.colors.background,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: theme.colors.brassAmberDim,
-  },
-  itemText: {
-    fontFamily: theme.fonts.displaySemiBold,
-    fontSize: 18,
-    color: theme.colors.enamelWhite,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      alignItems: "center",
+      gap: 4,
+    },
+    label: {
+      fontFamily: fonts.body,
+      fontSize: 12,
+      color: colors.textMuted,
+    },
+    wheel: {
+      width: "100%",
+    },
+    indicator: {
+      backgroundColor: colors.background,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: colors.accentDim,
+    },
+    itemText: {
+      fontFamily: fonts.numericSemiBold,
+      fontSize: 18,
+      color: colors.textPrimary,
+    },
+  });
+}

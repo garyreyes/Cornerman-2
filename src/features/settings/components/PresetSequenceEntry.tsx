@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { theme } from "../../session/theme";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 
 interface PresetSequenceEntryProps {
   position: number;
@@ -27,6 +29,8 @@ export function PresetSequenceEntry({
   onMoveDown,
   onRemove,
 }: PresetSequenceEntryProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   return (
     <View style={styles.row}>
       <Text style={styles.position}>{position}</Text>
@@ -64,46 +68,48 @@ export function PresetSequenceEntry({
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    backgroundColor: theme.colors.background,
-  },
-  position: {
-    fontFamily: theme.fonts.displaySemiBold,
-    fontSize: 14,
-    color: theme.colors.brassAmber,
-    minWidth: 18,
-  },
-  label: {
-    flex: 1,
-    fontFamily: theme.fonts.body,
-    fontSize: 14,
-    color: theme.colors.enamelWhite,
-  },
-  iconButton: {
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-  disabled: {
-    opacity: 0.25,
-  },
-  glyph: {
-    fontSize: 11,
-    color: theme.colors.enamelMuted,
-  },
-  deleteGlyph: {
-    fontSize: 14,
-    color: theme.colors.enamelMuted,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      backgroundColor: colors.background,
+    },
+    position: {
+      fontFamily: fonts.numericSemiBold,
+      fontSize: 14,
+      color: colors.accent,
+      minWidth: 18,
+    },
+    label: {
+      flex: 1,
+      fontFamily: fonts.body,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    iconButton: {
+      width: 28,
+      height: 28,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    pressed: {
+      opacity: 0.6,
+    },
+    disabled: {
+      opacity: 0.25,
+    },
+    glyph: {
+      fontSize: 11,
+      color: colors.textMuted,
+    },
+    deleteGlyph: {
+      fontSize: 14,
+      color: colors.textMuted,
+    },
+  });
+}

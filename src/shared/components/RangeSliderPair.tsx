@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { theme } from "../../features/session/theme";
+import { useTheme } from "../theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../theme/tokens";
 import { LabeledSlider } from "./LabeledSlider";
 
 interface RangeSliderPairProps {
@@ -34,6 +35,8 @@ export function RangeSliderPair({
   formatValue,
   onChange,
 }: RangeSliderPairProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const [liveMin, setLiveMin] = useState(minValue);
   const [liveMax, setLiveMax] = useState(maxValue);
   const [floor, ceiling] = bounds;
@@ -65,13 +68,15 @@ export function RangeSliderPair({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    gap: 10,
-  },
-  title: {
-    fontFamily: theme.fonts.bodyMedium,
-    fontSize: 13,
-    color: theme.colors.enamelMuted,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    container: {
+      gap: 10,
+    },
+    title: {
+      fontFamily: fonts.bodyMedium,
+      fontSize: 13,
+      color: colors.textMuted,
+    },
+  });
+}

@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { theme } from "../theme";
+import { useTheme } from "../../../shared/theme/ThemeContext";
+import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 
 interface ControlRowProps {
   phase: string;
@@ -17,6 +19,8 @@ interface ControlRowProps {
  * action, never competing with Start/Pause.
  */
 export function ControlRow({ phase, isPaused, onStart, onTogglePause, onReset }: ControlRowProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const showReset = phase === "finished";
   const showStart = phase === "ready";
   const showPauseToggle = phase === "warmup" || phase === "work" || phase === "rest";
@@ -59,40 +63,42 @@ export function ControlRow({ phase, isPaused, onStart, onTogglePause, onReset }:
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-  },
-  primaryButton: {
-    minWidth: 160,
-    paddingVertical: 16,
-    borderRadius: 8,
-    backgroundColor: theme.colors.brassAmber,
-    alignItems: "center",
-  },
-  primaryLabel: {
-    fontFamily: theme.fonts.bodySemiBold,
-    fontSize: 16,
-    letterSpacing: 2,
-    color: theme.colors.background,
-  },
-  secondaryButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.panelLine,
-  },
-  secondaryLabel: {
-    fontFamily: theme.fonts.bodySemiBold,
-    fontSize: 14,
-    letterSpacing: 2,
-    color: theme.colors.enamelMuted,
-  },
-  pressed: {
-    opacity: 0.8,
-  },
-});
+function createStyles(colors: ColorTokens, fonts: Fonts) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 16,
+    },
+    primaryButton: {
+      minWidth: 160,
+      paddingVertical: 16,
+      borderRadius: 8,
+      backgroundColor: colors.accent,
+      alignItems: "center",
+    },
+    primaryLabel: {
+      fontFamily: fonts.bodySemiBold,
+      fontSize: 16,
+      letterSpacing: 2,
+      color: colors.background,
+    },
+    secondaryButton: {
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+    },
+    secondaryLabel: {
+      fontFamily: fonts.bodySemiBold,
+      fontSize: 14,
+      letterSpacing: 2,
+      color: colors.textMuted,
+    },
+    pressed: {
+      opacity: 0.8,
+    },
+  });
+}
