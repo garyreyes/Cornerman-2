@@ -488,3 +488,20 @@ made during feature work.
   flagged for the Phase 8 close `/impeccable critique` pass to
   reconcile against the rest of the app's fully custom-themed inline
   banners, not fixed piecemeal mid-phase.
+- **A local `android/` native folder already exists in this project
+  (confirmed 2026-08-24, Phase 9a) -- gitignored, not from this
+  session's work.** Untracked (`/android` and `/ios` are both in
+  `.gitignore`, standard Expo Continuous Native Generation pattern --
+  regenerated on demand via `expo prebuild`/`expo run:android`, never
+  committed), dated from an earlier local-build attempt outside this
+  conversation. Don't be surprised it's there; don't assume it needs
+  regenerating either -- `npm run android` (`expo run:android`) can use
+  it as-is. EAS Build itself doesn't use this local folder at all --
+  it runs its own fresh `expo prebuild` in the cloud from `app.json`'s
+  config plugins, so nothing here needs reconciling with `eas.json`.
+- **`eas.json` exists as of Phase 9a, but no EAS project is linked
+  yet.** `app.json` has no `extra.eas.projectId` -- that only gets
+  written by the user running `eas login` + `eas build:configure`
+  themselves (needs their real Expo account; not something to run on
+  their behalf). Don't assume EAS builds are actually runnable yet just
+  because the config file exists.

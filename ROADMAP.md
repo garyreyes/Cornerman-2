@@ -260,9 +260,21 @@ from the real, shipped result)*
 
 ## Phase 9 — Platform Builds & Ship Readiness
 
-- [ ] **9a. EAS build config, both platforms** — `not started` —
-  confirm `com.gary.cornerman` continuity; real-device/simulator
-  verification on iOS and Android.
+- [ ] **9a. EAS build config, both platforms** — `in progress` — `eas.json`
+  written (development/preview/production profiles; `developmentClient:
+  true` + `distribution: "internal"` + `android.buildType: "apk"` on
+  development/preview for direct-install dev-client testing;
+  `appVersionSource: "remote"` so EAS owns version/build-number bumping
+  rather than hand-maintained native files). `com.gary.cornerman`
+  continuity already confirmed (`PROJECT_FACTS.md`, predates this
+  sub-phase) and unchanged in `app.json`. **What's left, all requiring
+  the user's own action, not something buildable from here:** `eas
+  login` + `eas build:configure` to actually link an EAS project (writes
+  a `projectId` into `app.json` — needs the user's real Expo account,
+  can't be done on their behalf), then a real build +
+  real-device/simulator verification on iOS and Android. iOS
+  specifically also needs an Apple Developer account, which doesn't
+  exist yet (`PROJECT_FACTS.md`).
 - [ ] **Phase close: full-app `/impeccable polish`** — `not started` —
   whole-app pass, not per-section, before considering this
   production-ready.
@@ -356,9 +368,11 @@ close step** — `/impeccable critique` + `/impeccable polish` across all
 three Settings-stack screens judged together, which (like every other
 `/impeccable` step so far) needs a device/simulator this environment
 doesn't have, so it waits on the same real-device session as 6a/7a's
-outstanding audits above. After that: **Phase 9** (EAS build config,
-real-device/simulator verification on both platforms, final full-app
-polish) is what actually closes out v1. Phase 10+ is planned and written
-down, but confirmed to build *after* Phase 9 ships. As each sub-phase
-completes, mark it `done` here and log the matching entry in
-`CHANGES.md`.
+outstanding audits above. **9a's `eas.json` is now written** (build
+profiles for a dev-client build), ahead of that close step since it
+doesn't need a device — but actually using it (`eas login`, `eas
+build:configure`, triggering a build, installing on a device) is the
+user's own action, not something buildable from here. Phase 10+ is
+planned and written down, but confirmed to build *after* Phase 9 ships.
+As each sub-phase completes, mark it `done` here and log the matching
+entry in `CHANGES.md`.

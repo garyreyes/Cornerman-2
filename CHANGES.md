@@ -384,3 +384,22 @@ Dated log of shipped changes, appended to as features complete.
   remove logic with duplicate `Punch.num` values, keying, layer
   boundaries, Save gating) checked out correct. 109/109 tests passing,
   all gates green after the fix.
+- 2026-08-24: Sub-phase 9a (partial) -- wrote `eas.json`: `development`
+  (dev-client, internal distribution, Android APK -- installs directly
+  on a device without Play Store, matching this project's dev-client-
+  not-Expo-Go requirement) and `preview` profiles for direct-install
+  testing builds, plus a minimal `production` profile
+  (`autoIncrement: true`) and empty `submit.production` stub for when
+  actual store submission is eventually in scope (still explicitly not
+  now, per `docs/PRD.md`). `appVersionSource: "remote"` so EAS owns
+  version/build-number bumping rather than hand-maintained native
+  files -- consistent with this project's gitignored, regenerate-on-
+  demand `android`/`ios` folders (confirmed via `git log`/`.gitignore`:
+  an `android/` folder already exists locally from an earlier local-
+  build attempt, untracked, not touched by this change). No `eas.json`
+  or CI/EAS integration existed before this. Config-only, no gates
+  apply. **Not done**: linking an actual EAS project (`eas login` + `eas
+  build:configure`, which needs the user's own Expo account and writes
+  a `projectId` into `app.json`) and the real-device/simulator
+  verification 9a also calls for -- both are the user's own action, not
+  buildable from here.
