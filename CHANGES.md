@@ -147,3 +147,36 @@ Dated log of shipped changes, appended to as features complete.
   settings (15s/30s default). Test-first throughout. 12 new tests, all
   passing (90/90 total). Phase 5 (Speech Pipeline) is now fully
   complete.
+- 2026-08-24: Sub-phase 6a — Main Timer screen, the flagship first
+  surface. New `src/features/session/` orchestration layer
+  (`sessionTick`) coordinates every headless engine from Phases 2-5,
+  building the recurring combo-repeat and defense-cue firing loop that
+  Phase 5d explicitly flagged as still missing — mirrors `tick()`'s
+  pure-decision pattern (returns actions, doesn't call speech/audio
+  directly) so the scheduling logic stays testable; the untested
+  `useSession.ts` effect loop is the thin consumer that makes the
+  actual native calls, same split already used for audio/speech's
+  native wiring. `src/app/MainTimerScreen.tsx` covers all states
+  (Ready/Warmup/Work/Rest/Paused/Finished, plus the audio-init-error
+  banner) against `docs/design-direction.md`'s locked "Corner's
+  Stopwatch & Bell" contract, copied verbatim into the screen's opening
+  comment per Impeccable's format. New dependencies:
+  `react-native-reanimated`/`react-native-worklets` +
+  `react-native-svg` for the sweep-ring countdown and bell-strike
+  pulse, `@expo-google-fonts/barlow-condensed`/`@expo-google-fonts/inter`
+  for the direction contract's exact type choices,
+  `react-native-safe-area-context` (replacing RN's deprecated built-in
+  `SafeAreaView`). Navigation deliberately deferred — only one real
+  screen exists yet; the settings gear is a no-op stub until Phase 8.
+  Two new manual Jest mocks needed (`react-native-worklets`,
+  `react-native-safe-area-context`) — neither has a JS-only fallback
+  under Jest, same established lesson as `react-native-mmkv`/
+  `expo-crypto`; both reuse the packages' own official mocks (like
+  `react-native-audio-api`'s) rather than hand-rolled fakes. 9 new
+  tests for `sessionTick` (test-first, correctness-critical); the
+  screen/animation code is judgment/presentation, no tests, per the
+  usual split — ends in `/impeccable audit` instead, **not run**: this
+  environment has no device/simulator/screenshot capability, so the
+  actual visual result has never been seen. 99/99 tests passing, all
+  gates green; visual correctness is unverified until the user actually
+  looks at it running.
