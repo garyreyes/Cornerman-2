@@ -228,3 +228,23 @@ Dated log of shipped changes, appended to as features complete.
   onboarding is already complete. 108/108 tests passing, all gates
   green; visual correctness for this screen is unverified for the same
   reason as 6a's.
+- 2026-08-24: Sub-phase 8a (navigation infrastructure pass, confirmed
+  split from the Settings form content) — installed and wired
+  `expo-router`, the confirmed real trigger point (Settings/Punches/
+  Presets need a genuine push/pop stack with back arrows, unlike 7b's
+  one-way onboarding gate). `App.tsx`/`index.ts`/`App.test.tsx` retired;
+  `main` is now `expo-router/entry`. `src/app/_layout.tsx` is the new
+  root layout (font loading + `SafeAreaProvider` moved here unchanged,
+  headerless by default). `MainTimerScreen.tsx`/`OnboardingScreen.tsx`
+  became real route files (`src/app/index.tsx`, `src/app/onboarding.tsx`
+  — content otherwise unchanged, `onboarding.tsx` now uses
+  `router.replace("/")` instead of an `onDone` prop). The gear icon now
+  pushes to a real `src/app/settings/` route with its own nested,
+  themed-header stack — shipped as a placeholder screen only, proving
+  the route is reachable and back-navigable; the real form is a
+  following pass. 3 new navigation tests via `expo-router/testing-
+  library`'s `renderRouter`, each in its own file (cross-test
+  navigation-state interference when multiple `renderRouter` calls
+  shared one file — see `PROJECT_FACTS.md`). Also corrected this
+  roadmap's stale "0.25x–5x" rate-dial reference to the actual confirmed
+  0.25x–4x cap. 109/109 tests passing, all gates green.

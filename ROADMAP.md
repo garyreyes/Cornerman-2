@@ -193,10 +193,39 @@ from the real, shipped result)*
 
 *(inherits the now-locked `DESIGN.md` — no new visual-world decisions)*
 
-- [ ] **8a. Settings screen** — `not started` — scroll picker for
-  durations, independent volume slider, 0.25x–5x rate dial.
-- [ ] **8b. Punches screen** — `not started` — add/rename/delete,
-  TTS-generation loading/error states.
+- [ ] **8a. Settings screen** — `in progress` — split into two passes
+  (confirmed, matches how Phase 5 was sequenced):
+  - [x] **Navigation infrastructure** — `done` — installed and wired
+    `expo-router` (the confirmed real trigger point, not 7b's one-way
+    onboarding gate): `App.tsx`/`index.ts`/`App.test.tsx` retired,
+    replaced by `src/app/_layout.tsx` (root layout — font loading +
+    `SafeAreaProvider` moved here unchanged) with `main` set to
+    `expo-router/entry`. `MainTimerScreen.tsx`/`OnboardingScreen.tsx`
+    became real route files (`src/app/index.tsx`, `src/app/onboarding.tsx`,
+    content otherwise unchanged); the gear icon now pushes to a real
+    `src/app/settings/` route (its own nested `_layout.tsx` with a
+    themed header + back arrow, per `docs/user-flows.md`'s navigation
+    convention — index/onboarding stay headerless/full-bleed). Settings
+    itself is a placeholder screen only — proves the route is reachable
+    and back-navigable, no form content yet. 3 new navigation tests via
+    `expo-router/testing-library`'s `renderRouter`, one per file (see
+    `PROJECT_FACTS.md` for why one file per test was needed). 109/109
+    tests passing, all gates green.
+  - [ ] **Settings form content** — `not started` — the real form:
+    Round → Mode → Sounds (bell/clapper + independent volume slider) →
+    Combinations (Presets List, Mode = Preset only) → Combo Timing (gap
+    range + **0.25x–4x** speech rate dial — corrected from this
+    roadmap's earlier stale "5x", see `PROJECT_FACTS.md`) → Punches
+    (`docs/user-flows.md` Flow 3). Still needs a decision on where the
+    Phase 3a/5d fields (`comboLengthMin`/`Max`, `randomPunchPool`,
+    `announceStyle`, `defenseCuesEnabled`, `defenseCueGapMinSec`/`MaxSec`
+    — all added after Flow 3 was originally written) actually go in the
+    layout.
+- [ ] **8b. Punches screen** — `not started` — add/rename/delete, plus
+  the non-blocking **Preview** action (live TTS playback) per
+  `docs/user-flows.md` Flow 4 — revised 2026-08-24 (Phase 5c) from the
+  original blocking "TTS-generation" step; there's nothing to
+  generate-and-cache anymore, saving is instant.
 - [ ] **8c. Presets List + Preset Editor** — `not started`.
 - [ ] **Phase close: `/impeccable critique` + `/impeccable polish`** —
   `not started` — all three screens judged together for visual
@@ -287,8 +316,13 @@ dev-client build, not Expo Go, per the native modules already
 installed), check both, then run `/impeccable audit`. `DESIGN.md` still
 doesn't exist — per Impeccable's process it gets written *from* the
 real, inspected result, so it waits on that audit, not on this handoff.
-Once that's done, Phase 8 (Settings + Punches + Presets) is next — the
-real trigger point for finally adding `expo-router`, per 7b's
-navigation-fork decision. Phase 10+ is planned and written down, but
-confirmed to build *after* Phase 9 ships. As each sub-phase completes,
-mark it `done` here and log the matching entry in `CHANGES.md`.
+Once that's done: Phase 8 is now in progress. `expo-router` is
+installed and wired (8a's navigation-infrastructure pass) — the gear
+icon reaches a real, back-navigable Settings route, but that screen is
+still a placeholder. **8a's Settings form content is the next actual
+build step** (see the Phase 8 section above for the exact field list
+and the still-open question of where the newer Phase 3a/5d fields go),
+followed by 8b (Punches) and 8c (Presets). Phase 10+ is planned and
+written down, but confirmed to build *after* Phase 9 ships. As each
+sub-phase completes, mark it `done` here and log the matching entry in
+`CHANGES.md`.

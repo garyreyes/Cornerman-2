@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "cornerman",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gary.cornerman"
@@ -26,7 +27,11 @@
     "plugins": [
       "react-native-audio-api",
       "expo-font",
-      "expo-asset"
-    ]
+      "expo-asset",
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

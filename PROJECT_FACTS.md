@@ -334,3 +334,46 @@ made during feature work.
   the app, and a live check reflects that correctly where a persisted
   boolean would not. Don't add a persisted flag for this later without
   re-reading this reasoning first.
+- **`expo-router` (Phase 8a) supports this project's existing `src/app/`
+  convention directly, confirmed against live SDK 57 docs before
+  installing** — no restructuring away from `src/` was needed; the
+  initial client file is `src/app/_layout.tsx` automatically since the
+  project already has a `src/` directory. `main` is `expo-router/entry`;
+  `App.tsx`/`index.ts`/`App.test.tsx` are deleted, fully superseded.
+- **`expo-router`'s transitive dependency `standard-navigation` needed
+  adding to `package.json`'s Jest `transformIgnorePatterns`** — shipped
+  as ESM, caused `SyntaxError: Cannot use import statement outside a
+  module` under Jest until added to the existing allowlist regex
+  (`jest-expo`'s default pattern didn't cover it). If a future
+  expo-router-adjacent package throws the same error under Jest, check
+  this list first before assuming something is broken.
+- **`expo-router/testing-library`'s `renderRouter` needs an explicit
+  `await act(async () => { renderRouter(...) })` wrap when the rendered
+  tree includes an async state update after mount** (here: `expo-font`'s
+  `useFonts` resolving after the initial render) — omitting it doesn't
+  error immediately, it manifests as `screen.getByText` failing with
+  "render function has not been called" or, worse, silently stale
+  reads. This is a different flavor of the already-documented "RNTL's
+  `render()` is async" gotcha, not the same bug — `renderRouter` itself
+  is NOT a Promise (don't `await` the call directly), but the tree it
+  mounts can still have pending async effects that need an `act()`
+  flush.
+- **Multiple `renderRouter()` calls in the same test FILE showed real
+  cross-test interference** (confirmed 2026-08-24) — a later test would
+  read the *previous* test's ending route (`getPathname()` returning a
+  stale value) even with `clearAll()` in `beforeEach` and `cleanup` in
+  `afterEach`; root cause not fully isolated (suspected: React
+  Navigation's internal state not being a clean per-render singleton
+  under `renderRouter`'s mock context). **Fixed by giving each
+  `renderRouter`-based test its own file** (`src/app/onboarding-
+  redirect.test.tsx`, `main-timer-ready.test.tsx`, `settings-
+  navigation.test.tsx`) rather than one file with three `test()` blocks
+  — Jest's per-file module registry sidesteps whatever the shared state
+  actually is. If a future router test is flaky only when run alongside
+  siblings in the same file, split the file first before debugging
+  further.
+- **This roadmap's Phase 8a bullet had a stale "0.25x–5x" rate-dial
+  reference, corrected 2026-08-24** — the real cap has been 0.25x–4x
+  since Phase 5b (`react-native-audio-api`'s WSOLA hard limit); the
+  roadmap text just never got updated when that revision happened.
+  `docs/PRD.md` was already correct (never hardcoded a number).
