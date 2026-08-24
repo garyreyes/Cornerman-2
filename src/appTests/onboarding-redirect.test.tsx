@@ -1,9 +1,9 @@
 import { renderRouter, screen, waitFor } from "expo-router/testing-library";
 
 import { clearAll } from "../lib/storage";
-import RootLayout from "./_layout";
-import Index from "./index";
-import Onboarding from "./onboarding";
+import RootLayout from "../app/_layout";
+import Index from "../app/index";
+import Onboarding from "../app/onboarding";
 
 beforeEach(() => {
   clearAll();

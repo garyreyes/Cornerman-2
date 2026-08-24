@@ -403,3 +403,26 @@ Dated log of shipped changes, appended to as features complete.
   a `projectId` into `app.json`) and the real-device/simulator
   verification 9a also calls for -- both are the user's own action, not
   buildable from here.
+- 2026-08-24: First successful real-device (emulator) build and run --
+  a genuine milestone, not a code change, but worth logging since it
+  took real troubleshooting to get here and produced one actual bug
+  fix. Along the way: installed JDK 17 (Android Studio's bundled JBR
+  turned out to be JDK 25, incompatible with this AGP/CMake toolchain);
+  found and deleted a stray `gradle-daemon-jvm.properties` that
+  silently pinned the Gradle daemon to JDK 25 regardless of `JAVA_HOME`;
+  hit a genuine Windows path-length limit breaking native CMake builds
+  under the old, deeply-nested OneDrive project path, which enabling
+  Windows long-paths support did not fix -- moved the whole project to
+  `C:\dev\cornerman` (the old copy, verified clean and identical, was
+  then deleted). Found and fixed a real, previously-undiscovered bug:
+  three router-integration test files
+  (`main-timer-ready`/`onboarding-redirect`/`settings-navigation`)
+  lived inside `src/app/` since Phase 8a, and Expo Router's route
+  scanner has no test-file exception -- it was sweeping them into the
+  real app bundle, which then failed trying to bundle Node's `path`
+  module. Moved them to `src/appTests/`. See `PROJECT_FACTS.md` for the
+  full details on all of the above -- they're durable facts future
+  sessions need, not one-off session notes. Onboarding and Main Timer's
+  Ready state were visually confirmed against `docs/design-direction.md`
+  for the first time, from a real screenshot. All 109 tests still pass,
+  all gates green, after the test-file move.

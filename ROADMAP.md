@@ -339,40 +339,39 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-Phases 2-5 (Timer Engine, Combo Engine, Audio Engine, Speech Pipeline),
-6a (Main Timer screen + the `session` orchestration layer), and all of
-Phase 7 (7a native background-audio session + interruption pause/resume;
-7b Onboarding screen) are done — 108/108 tests passing, all gates
-green. **What's genuinely outstanding, all requiring a real
-device/simulator this environment doesn't have:** `/impeccable audit`
-for both real screens (never actually seen rendered, only built against
-`docs/design-direction.md`'s written contract) and real-device
-verification for 7a's background-audio survival (does audio genuinely
-keep playing through a locked screen or a phone call — reasoned through
-against the library's source, never observed). Run the app yourself
-(`npx expo start`, real device or simulator — this project needs a
-dev-client build, not Expo Go, per the native modules already
-installed), check both, then run `/impeccable audit`. `DESIGN.md` still
-doesn't exist — per Impeccable's process it gets written *from* the
-real, inspected result, so it waits on that audit, not on this handoff.
-Once that's done: **all of Phase 8 is now done** — Settings (8a), Punches
-(8b), and Presets List + Editor (8c) all have real content, replacing
-every placeholder shipped during the nav-infra pass. All three screens
-were built against `docs/design-direction.md`'s contract the same way 6a
-was and are still visually unverified for the same reason (no device/
-simulator in this environment). Each sub-phase went through an
-independent `reviewer` pass before being marked done; real issues that
-pass caught are already fixed (see `CHANGES.md`'s dated entries and
-`PROJECT_FACTS.md` for the durable ones). **What's next: the Phase 8
-close step** — `/impeccable critique` + `/impeccable polish` across all
-three Settings-stack screens judged together, which (like every other
-`/impeccable` step so far) needs a device/simulator this environment
-doesn't have, so it waits on the same real-device session as 6a/7a's
-outstanding audits above. **9a's `eas.json` is now written** (build
-profiles for a dev-client build), ahead of that close step since it
-doesn't need a device — but actually using it (`eas login`, `eas
-build:configure`, triggering a build, installing on a device) is the
-user's own action, not something buildable from here. Phase 10+ is
-planned and written down, but confirmed to build *after* Phase 9 ships.
-As each sub-phase completes, mark it `done` here and log the matching
-entry in `CHANGES.md`.
+Phases 1–8 are all done — 109/109 tests passing, all gates green. Each
+Phase 8 sub-phase went through an independent `reviewer` pass before
+being marked done; real issues that pass caught are already fixed (see
+`CHANGES.md`'s dated entries and `PROJECT_FACTS.md` for the durable
+ones).
+
+**A real device is now available and the app has actually been run**
+(2026-08-24) — this changes the standing "no device/simulator in this
+environment" caveat that applied to every phase before this. The
+project also moved to `C:\dev\cornerman` (a Windows path-length issue
+broke native builds at the old OneDrive location — see
+`PROJECT_FACTS.md`), and a real bug was found and fixed in the process:
+three router-integration tests were living inside `src/app/` and Expo
+Router's route scanner was sweeping them into the real app bundle
+(moved to `src/appTests/`). Onboarding and Main Timer's Ready state
+were visually confirmed from a real screenshot and match
+`docs/design-direction.md`'s contract closely. **Still not done, even
+though a device now exists:** the actual deliberate `/impeccable audit`
+process (this was ad hoc verification during build troubleshooting, not
+that process), visual confirmation of Settings/Punches/Presets and the
+Work/Rest/Finished timer states, and 7a's background-audio survival
+(does audio genuinely keep playing through a locked screen or a phone
+call). `DESIGN.md` still doesn't exist — per Impeccable's process it
+gets written *from* the real, inspected result of a proper audit, not
+from incidental screenshots taken mid-troubleshooting.
+
+**What's next:** run `/impeccable audit` now that a device is
+genuinely available, covering both 6a/7b's outstanding audit and the
+Phase 8 close step (`/impeccable critique` + `/impeccable polish`
+across all three Settings-stack screens judged together). **9a's
+`eas.json` is written** (build profiles for a dev-client build), but
+actually linking an EAS project (`eas login`, `eas build:configure`)
+and triggering a real build is still the user's own action. Phase 10+
+is planned and written down, but confirmed to build *after* Phase 9
+ships. As each sub-phase completes, mark it `done` here and log the
+matching entry in `CHANGES.md`.

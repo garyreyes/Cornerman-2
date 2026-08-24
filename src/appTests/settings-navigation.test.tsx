@@ -2,14 +2,14 @@ import { act, fireEvent, renderRouter, screen, waitFor } from "expo-router/testi
 
 import { markOnboardingComplete } from "../features/settings/service";
 import { clearAll } from "../lib/storage";
-import RootLayout from "./_layout";
-import Index from "./index";
-import Onboarding from "./onboarding";
-import SettingsLayout from "./settings/_layout";
-import SettingsIndex from "./settings/index";
-import SettingsPresetEditor from "./settings/presets/[id]";
-import SettingsPresetsList from "./settings/presets/index";
-import SettingsPunches from "./settings/punches";
+import RootLayout from "../app/_layout";
+import Index from "../app/index";
+import Onboarding from "../app/onboarding";
+import SettingsLayout from "../app/settings/_layout";
+import SettingsIndex from "../app/settings/index";
+import SettingsPresetEditor from "../app/settings/presets/[id]";
+import SettingsPresetsList from "../app/settings/presets/index";
+import SettingsPunches from "../app/settings/punches";
 
 beforeEach(() => {
   clearAll();

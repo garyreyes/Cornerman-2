@@ -505,3 +505,76 @@ made during feature work.
   themselves (needs their real Expo account; not something to run on
   their behalf). Don't assume EAS builds are actually runnable yet just
   because the config file exists.
+- **The project now lives at `C:\dev\cornerman`, not the old OneDrive
+  path (moved 2026-08-24, first real device build session).** The old
+  path (`OneDrive - De La Salle University - Manila\Desktop\Claude
+  Projects\Cornerman\Cornerman-2`, ~89 characters before any project
+  file names even start) broke native Android builds: CMake's
+  `CMAKE_OBJECT_PATH_MAX` check flagged object-file paths for
+  `react-native-worklets`/`react-native-nitro-modules`/
+  `react-native-screens` as unsafely long, and Ninja looped forever
+  ("manifest 'build.ninja' still dirty after 100 tries") trying to
+  regenerate a build graph it could never actually write. Enabling
+  Windows' `LongPathsEnabled` registry key (plus a reboot) did **not**
+  fix this -- this specific CMake/Ninja toolchain doesn't respect it.
+  Moving to a short path was the only fix that worked. The old
+  directory was deleted after verifying git history and a clean
+  working tree matched exactly. If this repo is ever cloned fresh,
+  clone it somewhere short (e.g. `C:\dev\...`), not deep inside
+  OneDrive or another long, space-containing path.
+- **Test files cannot live inside `src/app/`, confirmed 2026-08-24.**
+  `expo-router`'s `_ctx.*.js` builds its route `require.context` with a
+  hardcoded regex (`/^(?:\.\/)(?!...+api|...+html|...+middleware)...\.
+  [tj]sx?$/`) that matches *every* `.tsx`/`.ts`/`.js` file recursively
+  under `EXPO_ROUTER_APP_ROOT` (`src/app`, per `app.json`) -- there is
+  no built-in exception for `.test.tsx` files, and no documented config
+  option to add one (checked live SDK 57 docs and the installed
+  package's source; `getRoutesCore.js`'s own `ignoreList` only runs
+  *after* Metro has already tried to bundle the file, too late to
+  matter). Three router-integration tests
+  (`main-timer-ready`/`onboarding-redirect`/`settings-navigation`) lived
+  directly in `src/app/` since Phase 8a's nav-infra pass and were never
+  caught, because this was the first time the app was ever actually
+  bundled and run -- `npm test` alone never exercises Metro's route
+  scanning. Moved to `src/appTests/` (a sibling to `app/`, so `../app/`
+  imports work) -- this is the correct home for any future test that
+  needs to import real route files via `expo-router/testing-library`.
+  Regular unit tests colocated with their source elsewhere in the repo
+  (`service.test.ts` next to `service.ts`) are unaffected -- they were
+  never inside `src/app/` to begin with.
+- **Android Studio's bundled JBR JDK was 25 -- far too new for this
+  AGP/CMake toolchain (confirmed 2026-08-24).** A separate JDK 17
+  (Eclipse Temurin, installed via `winget install
+  EclipseAdoptium.Temurin.17.JDK`) is required. Three things had to
+  each be fixed, in order, because each one masked the next:
+  1. `JAVA_HOME` (env var) must point at the JDK 17 install, not
+     Android Studio's `jbr` folder.
+  2. **`android/gradle/gradle-daemon-jvm.properties`, if present, wins
+     over everything else** -- Gradle's newer "Daemon JVM criteria"
+     file, auto-generated at some point with `toolchainVersion=25`
+     baked in, silently overrides `JAVA_HOME`/`org.gradle.java.home`
+     entirely and tries to auto-provision JDK 25 for the daemon itself.
+     Delete this file if it reappears (e.g. after `expo prebuild`
+     regenerates `android/`); don't just re-set env vars and assume
+     that's sufficient.
+  3. `android/gradle.properties` also has
+     `org.gradle.java.home=C:\Program Files\Eclipse
+     Adoptium\jdk-17.0.20.8-hotspot` and
+     `org.gradle.java.installations.auto-download=false` /
+     `auto-detect=false` pinned explicitly, as defense in depth against
+     Gradle's toolchain resolver silently fetching yet another stray
+     JDK for a worker task. All of this is machine-local (`android/` is
+     gitignored) -- redo it if `android/` is ever regenerated on this or
+     another machine.
+- **The app has now been visually verified for the first time
+  (2026-08-24)** -- Onboarding and Main Timer's Ready state both render
+  and match `docs/design-direction.md`'s "Corner's Stopwatch & Bell"
+  contract closely (gunmetal-dark ground, brass-amber sweep-ring
+  countdown, engraved-plate phase badge, lap-dial round counter, large
+  brass-amber Start button). This was a real screenshot from a running
+  emulator, not reasoning-through-the-contract. Still unverified:
+  Settings/Punches/Presets' actual rendered appearance, the Work/Rest/
+  Finished states, and 7a's background-audio survival. A full
+  `/impeccable audit` has still not been run -- this was ad hoc
+  verification during a build-troubleshooting session, not that
+  deliberate process.
