@@ -75,7 +75,16 @@ as each sub-phase completes — it should never drift out of sync with
   not run on-device). Committed WAVs are silent placeholders pending
   that script actually being run (no Python in this environment, same
   gap as Phase 4a's sound assets). 10 new tests (66/66 total).
-- [ ] **5b. Pitch-preserving time-stretch, 0.25x–5x** — `not started`.
+- [x] **5b. Pitch-preserving time-stretch, 0.25x–4x** — `done` — range
+  revised down from an originally-discussed 5x: `react-native-audio-api`
+  has a genuine native WSOLA time-stretch built in
+  (`createBufferSource({pitchCorrection: true})` + the `playbackRate`
+  param), no hand-rolled DSP needed, but it hard-caps at 4x in its C++
+  core (confirmed 2026-08-24 reading `WsolaTimeStretcher.h`) — see
+  `PROJECT_FACTS.md` for the decision not to build extra complexity
+  around that fixed ceiling. `rateForSpeechRate` clamps to [0.25, 4.0];
+  `SpeechEngine.setRate`/`playWord` wire it into playback. 4 new tests
+  (71/71 total).
 - [ ] **5c. On-device TTS fallback + caching for custom punches** —
   `not started` — loading/error states per `docs/user-flows.md` Flow 4;
   last-punch delete guard belongs here too; also the fallback path for
@@ -190,10 +199,11 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 ## Handoff
 
 Phase 2 (Timer Engine), Phase 3 (Combo Engine), Phase 4 (Audio Engine),
-and 5a (bundled voice-bank lookup + playback) are complete. Next
-sub-phase to build is **5b** (pitch-preserving time-stretch, 0.25x–5x).
-5d (number announce-style + defensive/movement cue layer) was added
-2026-08-24 and comes after 5b/5c. Phase 10+ is planned and written down,
+5a (bundled voice-bank lookup + playback), and 5b (pitch-preserving
+time-stretch, revised to 0.25x–4x) are complete. Next sub-phase to build
+is **5c** (on-device TTS fallback + caching for custom punches). 5d
+(number announce-style + defensive/movement cue layer) was added
+2026-08-24 and comes after 5c. Phase 10+ is planned and written down,
 but confirmed to build *after* Phase 9 ships. Run `/feature-planner` for
-5b when ready. As each sub-phase completes, mark it `done` here and log
+5c when ready. As each sub-phase completes, mark it `done` here and log
 the matching entry in `CHANGES.md`.

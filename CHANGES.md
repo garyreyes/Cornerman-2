@@ -92,3 +92,19 @@ Dated log of shipped changes, appended to as features complete.
   Test-first for the pure lookup logic and the native playback wiring
   (via `react-native-audio-api`'s own official Jest mock, same pattern
   as Phase 4a). 10 new tests, all passing (66/66 total).
+- 2026-08-24: Sub-phase 5b — Pitch-preserving time-stretch. Discovered
+  `react-native-audio-api` has a genuine native WSOLA time-stretch built
+  in (`createBufferSource({pitchCorrection: true})` + the `playbackRate`
+  param) — no hand-rolled phase-vocoder/WSOLA needed, resolving what
+  `docs/PRD.md` calls the project's single real unsolved technical
+  requirement. One real gap: the library hard-caps `playbackRate` at 4x
+  in its C++ core (`WsolaTimeStretcher::MAX_PLAYBACK_RATE`), not the
+  originally-discussed 5x. Revised the spec down to 0.25x–4x rather than
+  building a dual-buffer workaround for the 4x-5x band, updating
+  `docs/user-flows.md`/`ARCHITECTURE.md`/`PRODUCT.md`/
+  `src/features/settings/types.ts` to match (`docs/PRD.md` itself never
+  hardcoded "5x" — it already said "whatever rate ends up being the
+  practical ceiling," so no PRD edit was needed).
+  `rateForSpeechRate`/`SpeechEngine.setRate` wire the clamped rate into
+  `src/features/speech/service.ts`'s playback. 4 new tests, all passing
+  (71/71 total).

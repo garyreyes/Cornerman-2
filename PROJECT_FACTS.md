@@ -112,3 +112,24 @@ made during feature work.
   clapper `SoundAsset`s, not a new CRUD feature parallel to Punches.
   Stated assumption during 5a's planning, not explicitly confirmed by
   the user — revisit if customizable defense cues turn out to matter.
+- **Speech rate range is 0.25x-4x, not the originally-discussed 0.25x-5x
+  (confirmed 2026-08-24, Phase 5b).** `react-native-audio-api` has a
+  real native WSOLA pitch-preserving time-stretch built in
+  (`createBufferSource({pitchCorrection: true})` + the `playbackRate`
+  `AudioParam`) — this resolves what `docs/PRD.md` calls the project's
+  one genuinely unsolved technical requirement, with no hand-rolled DSP
+  needed. But its C++ core hard-caps `playbackRate` at a fixed constant
+  (`WsolaTimeStretcher::MAX_PLAYBACK_RATE = 4`,
+  `common/cpp/audioapi/dsp/WsolaTimeStretcher.h`), enforced via
+  `std::clamp` at the native layer — not adjustable from JS. User
+  explicitly chose to revise the spec down to 0.25x-4x rather than build
+  a workaround (e.g. a second pre-time-compressed buffer per clip for
+  the 4x-5x band, switched in above the native ceiling). `docs/PRD.md`
+  itself never hardcoded "5x" — it said "whatever rate ends up being the
+  practical ceiling," so needed no edit; `ARCHITECTURE.md`,
+  `docs/user-flows.md`, `PRODUCT.md`, and
+  `src/features/settings/types.ts`'s `speechRate` comment were updated
+  to say 4x. `src/features/speech/service.ts`'s `rateForSpeechRate`
+  clamps to `[0.25, 4.0]` — if this project ever needs the full 5x
+  later, that clamp (and the workaround this fact describes) is where
+  to revisit it, not by assuming the native library changed.

@@ -146,8 +146,9 @@ Settings screen sections, **same confirmed order as the old app**
 
 Round → Mode → Sounds (bell/clapper choice + **new independent in-app
 volume slider**, PRD §3.4) → Combinations (summary row → Presets List,
-shown only when Mode = Preset) → Combo Timing (gap range + **new 0.25x–5x
-speech rate dial**, always visible) → Punches (summary row → Punches
+shown only when Mode = Preset) → Combo Timing (gap range + **new 0.25x–4x
+speech rate dial**, always visible — revised down from 5x, see
+`PROJECT_FACTS.md`) → Punches (summary row → Punches
 screen, **now reachable in both modes** per your fix above, not hidden in
 Preset mode).
 
