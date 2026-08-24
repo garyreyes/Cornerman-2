@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { AudioManager, PlaybackNotificationManager } from "react-native-audio-api";
 
 import type { InterruptionEvent } from "../features/session/types";
@@ -57,4 +58,25 @@ export function showSessionNotification(state: "playing" | "paused"): void {
 
 export function hideSessionNotification(): void {
   PlaybackNotificationManager.hide().catch(() => {});
+}
+
+/**
+ * The Android 13+ runtime notification permission (docs/user-flows.md
+ * Flow 1) -- iOS has no equivalent runtime prompt (background audio mode
+ * is a declared capability there, not a user permission), so this
+ * resolves true immediately on every other platform. Denial is
+ * non-fatal by design (Flow 1's proposed default): the app proceeds
+ * either way, this is only ever used to decide whether to show the
+ * onboarding flow's battery-optimization follow-up step.
+ */
+export async function requestNotificationPermission(): Promise<boolean> {
+  if (Platform.OS !== "android") {
+    return true;
+  }
+  try {
+    const status = await AudioManager.requestNotificationPermissions();
+    return status === "Granted";
+  } catch {
+    return false;
+  }
 }

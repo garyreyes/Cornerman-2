@@ -170,9 +170,24 @@ from the real, shipped result)*
     audio genuinely survives a locked screen or a real phone call has
     never been observed, only reasoned through against the library's
     source. Verify once you can run this on a real device.
-- [ ] **7b. Onboarding/permission screen** — `not started` —
-  first-launch only, per `docs/user-flows.md` Flow 1.
-  - [ ] `/impeccable audit`
+- [x] **7b. Onboarding/permission screen** — `done` —
+  `src/app/OnboardingScreen.tsx`, first-launch only per
+  `docs/user-flows.md` Flow 1: intro explainer → Android 13+
+  notification permission request (`AudioManager.requestNotification-
+  Permissions`, wrapped in `backgroundAudio.ts`) → battery-optimization
+  tip (only if granted) → done; a denial proceeds anyway per Flow 1's
+  proposed default, no separate screen for it. iOS skips straight
+  through (no runtime prompt for this). Gated by a new
+  `Settings.hasCompletedOnboarding` boolean (same zero-migration MMKV
+  pattern as every other Settings field, 2 new tests), never re-shown
+  once true. Navigation fork resolved: kept the plain conditional-render
+  pattern `App.tsx` already used for the fonts-loading gate rather than
+  installing `expo-router` — Onboarding is a one-way gate with no
+  back-navigation need, unlike Phase 8's Settings/Punches/Presets stack,
+  which is still the real trigger for adding a router. 108/108 tests
+  passing, all gates green.
+  - [ ] `/impeccable audit` — **not run**, same standing gap as 6a (no
+    device/simulator/screenshot capability in this environment).
 
 ## Phase 8 — Settings + Punches + Presets
 
@@ -257,13 +272,14 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 ## Handoff
 
 Phases 2-5 (Timer Engine, Combo Engine, Audio Engine, Speech Pipeline),
-6a (Main Timer screen + the `session` orchestration layer), and 7a
-(native background-audio session + interruption pause/resume) are done
-— 105/105 tests passing, all gates green. **What's genuinely
-outstanding, both requiring a real device/simulator this environment
-doesn't have:** `/impeccable audit` for 6a's screen (never actually
-seen rendered, only built against `docs/design-direction.md`'s written
-contract) and real-device verification for 7a (does audio genuinely
+6a (Main Timer screen + the `session` orchestration layer), and all of
+Phase 7 (7a native background-audio session + interruption pause/resume;
+7b Onboarding screen) are done — 108/108 tests passing, all gates
+green. **What's genuinely outstanding, all requiring a real
+device/simulator this environment doesn't have:** `/impeccable audit`
+for both real screens (never actually seen rendered, only built against
+`docs/design-direction.md`'s written contract) and real-device
+verification for 7a's background-audio survival (does audio genuinely
 keep playing through a locked screen or a phone call — reasoned through
 against the library's source, never observed). Run the app yourself
 (`npx expo start`, real device or simulator — this project needs a
@@ -271,7 +287,8 @@ dev-client build, not Expo Go, per the native modules already
 installed), check both, then run `/impeccable audit`. `DESIGN.md` still
 doesn't exist — per Impeccable's process it gets written *from* the
 real, inspected result, so it waits on that audit, not on this handoff.
-Once that's done, Phase 7b (Onboarding/permission screen) is next.
-Phase 10+ is planned and written down, but confirmed to build *after*
-Phase 9 ships. As each sub-phase completes, mark it `done` here and log
-the matching entry in `CHANGES.md`.
+Once that's done, Phase 8 (Settings + Punches + Presets) is next — the
+real trigger point for finally adding `expo-router`, per 7b's
+navigation-fork decision. Phase 10+ is planned and written down, but
+confirmed to build *after* Phase 9 ships. As each sub-phase completes,
+mark it `done` here and log the matching entry in `CHANGES.md`.

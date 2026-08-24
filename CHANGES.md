@@ -208,3 +208,23 @@ Dated log of shipped changes, appended to as features complete.
   (does it actually survive a lock screen / phone call on a real device)
   is unverified from this environment, same honesty standard as the
   visual/audio-quality gaps already logged for earlier phases.
+- 2026-08-24: Sub-phase 7b — Onboarding screen
+  (`src/app/OnboardingScreen.tsx`), first-launch only per
+  `docs/user-flows.md` Flow 1: intro explainer → Android 13+
+  notification permission request → battery-optimization tip (shown
+  only if granted) → done, with a denial proceeding anyway per Flow 1's
+  proposed default. iOS skips both permission steps (no runtime prompt
+  needed there). Gated by a new `Settings.hasCompletedOnboarding`
+  boolean, same zero-migration MMKV pattern as every other Settings
+  field (2 new tests: defaults `false` on old saved data,
+  `markOnboardingComplete()` round-trips `true`). `App.tsx` now
+  conditionally renders `OnboardingScreen` vs. `MainTimerScreen` off
+  that flag, reusing the same plain conditional-render pattern already
+  in place for the fonts-loading gate — real navigation (`expo-router`)
+  stays deliberately deferred to Phase 8, since this is a one-way gate
+  with no back-navigation need, not the push/pop stack Settings/
+  Punches/Presets will actually require. `App.test.tsx` updated: one
+  test for the fresh-install onboarding path, one for Main Timer once
+  onboarding is already complete. 108/108 tests passing, all gates
+  green; visual correctness for this screen is unverified for the same
+  reason as 6a's.

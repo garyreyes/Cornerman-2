@@ -28,6 +28,7 @@ export function createDefaultSettings(): Settings {
     defenseCuesEnabled: true,
     defenseCueGapMinSec: 15,
     defenseCueGapMaxSec: 30,
+    hasCompletedOnboarding: false,
   };
 }
 
@@ -57,6 +58,10 @@ export function getSettings(): Settings {
 
 export function saveSettings(settings: Settings): void {
   setItem(SETTINGS_KEY, settings);
+}
+
+export function markOnboardingComplete(): void {
+  saveSettings({ ...getSettings(), hasCompletedOnboarding: true });
 }
 
 export function getPunches(): Punch[] {

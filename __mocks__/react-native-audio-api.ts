@@ -22,6 +22,8 @@ const AudioManager = {
   setAudioSessionOptions: () => {},
   observeAudioInterruptions: () => {},
   disableSessionManagement: () => {},
+  requestNotificationPermissions: async () => "Granted",
+  checkNotificationPermissions: async () => "Granted",
 };
 
 const PlaybackNotificationManager = {
