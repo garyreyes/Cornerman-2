@@ -244,3 +244,65 @@ made during feature work.
   this recurs, check whether the pinned override versions have gone
   stale against a newer `unrs-resolver`, not whether to regenerate the
   lockfile again.
+- **The declarative half of Phase 7's background-audio requirement was
+  already done before 7a started, confirmed 2026-08-24.**
+  `react-native-audio-api` ships its own Expo config plugin
+  (`node_modules/react-native-audio-api/src/plugin/withAudioAPI.ts`)
+  that, with zero options (a bare string in `app.json`'s `plugins`
+  array, already present since Phase 4a), defaults to
+  `iosBackgroundMode: true` (sets `UIBackgroundModes: ['audio']`) and
+  `androidForegroundService: true` (adds `FOREGROUND_SERVICE`/
+  `FOREGROUND_SERVICE_MEDIA_PLAYBACK` permissions and registers the
+  library's own `CentralizedForegroundService`). No `app.json` change
+  was needed for this — don't re-add it later assuming it's missing.
+- **7a's real remaining work was the runtime half**: activating the iOS
+  audio session with the `playback` category (required for playback to
+  survive backgrounding/lock — the default `ambient` category does not)
+  and detecting audio-focus interruptions, both via the library's
+  `AudioManager` singleton (`react-native-audio-api`'s `system/
+  AudioManager.ts` — `setAudioSessionOptions`, `setAudioSessionActivity`,
+  `observeAudioInterruptions`, `addSystemEventListener('interruption', ...)`
+  with payload `{type: 'began'|'ended', shouldResume: boolean}`). Built
+  as `src/lib/backgroundAudio.ts`. The exact recommended call sequence
+  (once at startup vs. per-play) is inferred from the source/TSDoc, not
+  from a fetched setup guide — the library's hosted docs site
+  (docs.swmansion.com/react-native-audio-api) 404s on every guessed
+  guide path and the GitHub repo has no `docs/` folder either; this is
+  read-the-source-directly territory, same as the WSOLA cap in 5b.
+- **Auto-resuming a paused timer on `interruption: ended` must never
+  override a pause the user triggered manually** (e.g. they tapped
+  Pause, then a call arrived) — a real fork surfaced during 7a's
+  planning, not an edge case invented after the fact. Solved with a
+  `pausedByInterruption` boolean round-tripped through the new pure
+  `decideInterruptionAction` (`session/service.ts`): only a pause that
+  function itself caused is eligible for auto-resume; a manual pause
+  is left alone regardless of what the interruption system reports.
+- **A minimal "session running" lock-screen/notification-shade
+  indicator (via `PlaybackNotificationManager.show`/`.hide`) is
+  confirmed in scope for 7a** — user chose this over deferring it,
+  explicitly for standard background-audio-app UX and safer Play Store
+  review, even though it's likely not strictly required for the Android
+  foreground service to survive (Android generates *some* default
+  notification for any running foreground service regardless — inferred
+  from platform behavior, not confirmed against this library on a real
+  device).
+- **The official `react-native-audio-api` Jest mock's `AudioManager` is
+  a class with `static` methods — object-spreading it
+  (`{...officialMock.AudioManager}`) silently drops every method**,
+  since ES6 class methods (including `static` ones) are non-enumerable
+  by spec and object spread only copies enumerable own properties. Hit
+  this extending `__mocks__/react-native-audio-api.ts` for 7a (needed
+  methods the official mock doesn't implement:
+  `setAudioSessionActivity`, `setAudioSessionOptions`,
+  `observeAudioInterruptions`, and `PlaybackNotificationManager`'s real
+  `.show()`/`.hide()` singleton API, which doesn't match the mock's
+  unrelated static `.create()` shape at all) — fixed by forwarding each
+  method explicitly rather than spreading. If a future native-module
+  mock patch silently "loses" a method that's visibly right there in
+  the source, check whether it's a class static being spread, not a
+  typo.
+- **Real-device verification for 7a has not happened** — same
+  environment gap as 6a's visual audit, just for background-audio
+  survival (locked screen, real phone call) instead of visuals. Treat
+  as unverified until tested on a real device; don't assume it works
+  just because the JS-level wiring is tested and typechecks.

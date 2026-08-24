@@ -32,6 +32,7 @@ screen-locked, so training continues while the phone is put away.
 | Screen animation | `react-native-reanimated` v4 (+ `react-native-worklets`) + `react-native-svg` | Confirmed 2026-08-24, Phase 6a — the design contract's continuous sweep-ring countdown and mechanical bell-strike motion need real native-thread animation and precise arc drawing; the plain RN `Animated` API can't do either well |
 | Screen typography | `@expo-google-fonts/barlow-condensed` + `@expo-google-fonts/inter` via `expo-font` | The direction contract's exact type choices (Barlow Condensed for dial numerals, Inter for body text) — not a substitutable system-font default |
 | Navigation | None yet — deliberately deferred (Phase 6a) | Only one real screen exists (Main Timer). Adding `expo-router` before there's a second screen to route to would be premature architecture; revisit at Phase 7/8. Settings gear icon is present but a no-op stub until then. |
+| Background audio session | `react-native-audio-api`'s own `AudioManager` (iOS `playback` session category + interruption event observation) + `PlaybackNotificationManager` for a minimal lock-screen indicator | Confirmed 2026-08-24, Phase 7a — the declarative background-mode config (iOS `UIBackgroundModes`, Android foreground service) is already free via this same library's Expo config plugin (defaulted on, already listed in `app.json`); this is the runtime activation + interruption-detection half, closing the gap Phase 2b's `pause`/`resume` deliberately left open |
 
 ## Entities
 
@@ -228,10 +229,14 @@ src/
                        # AudioErrorBanner -- the Main Timer screen's
                        # sub-components, built against
                        # docs/design-direction.md's locked contract
-      service.ts
+      service.ts        # sessionTick + decideInterruptionAction (Phase
+                       # 7a's pure pause/resume decision for native
+                       # audio-focus interruptions -- never auto-resumes
+                       # a pause the user triggered manually)
       types.ts
       theme.ts         # "The Corner's Stopwatch & Bell" color/font tokens
       useSession.ts    # native audio/speech wiring + the 200ms poll loop
+                       # + backgroundAudio.ts's interruption subscription
   shared/              # cross-feature UI primitives (populated once
                        # design direction is set)
   lib/
@@ -240,9 +245,15 @@ src/
     gapTiming.ts        # nextGapFireTime -- shared clamped-random-window
                        # primitive (extraction doc §1.2), used by
                        # timer's firstComboAt and defenseCues alike
-    backgroundAudio.ts # native background-session config (iOS
-                       # UIBackgroundModes, Android foreground service) --
-                       # not built yet, Phase 7
+    backgroundAudio.ts # Phase 7a -- activates the iOS background audio
+                       # session + interruption event observation via
+                       # AudioManager, plus a minimal lock-screen/
+                       # notification-shade "session running" indicator
+                       # via PlaybackNotificationManager. Declarative
+                       # config (UIBackgroundModes, Android foreground
+                       # service) is separately covered by
+                       # react-native-audio-api's own Expo config plugin
+                       # (app.json), not this file.
   app/                 # navigation entry, thin screens that assemble
                        # features - no business logic
     MainTimerScreen.tsx # Phase 6a -- the flagship first screen; holds

@@ -180,3 +180,31 @@ Dated log of shipped changes, appended to as features complete.
   actual visual result has never been seen. 99/99 tests passing, all
   gates green; visual correctness is unverified until the user actually
   looks at it running.
+- 2026-08-24: Sub-phase 7a — Native background audio session +
+  interruption handling. The declarative half (iOS
+  `UIBackgroundModes: audio`, Android foreground service) turned out to
+  already be free: `react-native-audio-api`'s own Expo config plugin
+  defaults both on and is already listed in `app.json` — no changes
+  needed there. Built the runtime half: `src/lib/backgroundAudio.ts`
+  activates the iOS audio session with the `playback` category (required
+  for playback to continue locked/backgrounded) and turns on interruption
+  event delivery via the library's `AudioManager`. New pure, tested
+  `decideInterruptionAction` (`src/features/session/service.ts`, 6 new
+  tests) is the actual decision logic Phase 2b deferred to "native
+  wiring, Phase 7" — began → pause, ended → resume, but critically only
+  auto-resumes a pause *it* caused, never one the user triggered
+  manually. `useSession.ts` wires it to the already-tested
+  `pause`/`resume` timer functions. Also added a minimal "session
+  running" lock-screen/notification-shade indicator via
+  `PlaybackNotificationManager`, shown on start, updated on pause/resume
+  (manual or interruption), hidden on reset/finish — confirmed scope,
+  not strictly required for the Android foreground service to survive
+  but standard UX for any app claiming background audio. The official
+  Jest mock was missing several `AudioManager`/`PlaybackNotificationManager`
+  methods this needs; patched `__mocks__/react-native-audio-api.ts` with
+  explicit no-op forwards (its static class methods are non-enumerable,
+  so a naive object-spread silently dropped them — had to list each one).
+  105/105 tests passing, all gates green. Real background-audio behavior
+  (does it actually survive a lock screen / phone call on a real device)
+  is unverified from this environment, same honesty standard as the
+  visual/audio-quality gaps already logged for earlier phases.

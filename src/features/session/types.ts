@@ -17,3 +17,16 @@ export type SessionAction =
   | { type: "speak-defense-cue"; cue: DefenseCueName };
 
 export type RandomFn = () => number;
+
+/** Mirrors react-native-audio-api's AudioManager 'interruption' system event. */
+export interface InterruptionEvent {
+  type: "began" | "ended";
+  shouldResume: boolean;
+}
+
+export interface InterruptionDecision {
+  shouldPause: boolean;
+  shouldResume: boolean;
+  /** Whether the *current* pause (after this decision) was caused by an interruption, not the user. */
+  pausedByInterruption: boolean;
+}
