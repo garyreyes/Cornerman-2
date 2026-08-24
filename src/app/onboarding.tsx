@@ -9,16 +9,19 @@
  * for secondary labels. Numerals and dial-style display type: Barlow
  * Condensed. Body/label text: Inter.
  *
- * (Same locked contract MainTimerScreen.tsx opens with, per
- * docs/design-direction.md -- this is the app's first screen chronologically
- * (first launch only) but inherits the same world, not a new one.)
+ * (Same locked contract index.tsx opens with, per docs/design-direction.md
+ * -- this is the app's first screen chronologically (first launch only)
+ * but inherits the same world, not a new one.)
  *
  * Flow (docs/user-flows.md Flow 1): intro explainer -> Android 13+ system
  * notification permission dialog (iOS has no runtime prompt for this) ->
  * battery-optimization tip (only shown if that permission was granted) ->
  * done. A denial doesn't block anything -- proceeds straight to done per
- * Flow 1's proposed default.
+ * Flow 1's proposed default. router.replace (not push) back to "/" so
+ * there's no back-stack entry pointing back here once done, matching
+ * Flow 1's "never shown again" behavior.
  */
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -29,16 +32,13 @@ import { theme } from "../features/session/theme";
 
 type Step = "intro" | "batteryTip";
 
-interface OnboardingScreenProps {
-  onDone: () => void;
-}
-
-export function OnboardingScreen({ onDone }: OnboardingScreenProps) {
+export default function OnboardingScreen() {
+  const router = useRouter();
   const [step, setStep] = useState<Step>("intro");
 
   const finish = () => {
     markOnboardingComplete();
-    onDone();
+    router.replace("/");
   };
 
   const handleContinue = async () => {
@@ -62,8 +62,8 @@ export function OnboardingScreen({ onDone }: OnboardingScreenProps) {
             <Text style={styles.title}>THE BELL KEEPS RINGING</Text>
             <Text style={styles.body}>
               Cornerman calls your combos and rings the bell even with your screen off or another app open — like a
-              corner-man who doesn&apos;t stop working the moment you look away. On Android, allowing notifications keeps
-              that reliable.
+              corner-man who doesn&apos;t stop working the moment you look away. On Android, allowing notifications
+              keeps that reliable.
             </Text>
           </>
         ) : (

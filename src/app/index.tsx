@@ -29,6 +29,8 @@
  * (Copied verbatim from docs/design-direction.md's direction contract,
  * per Impeccable's Step 5 format.)
  */
+import { Redirect, useRouter } from "expo-router";
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -41,8 +43,26 @@ import { RoundCounter } from "../features/session/components/RoundCounter";
 import { SettingsGear } from "../features/session/components/SettingsGear";
 import { theme } from "../features/session/theme";
 import { useSession } from "../features/session/useSession";
+import { getSettings } from "../features/settings/service";
 
-export function MainTimerScreen() {
+/**
+ * Route-level gate only -- redirects to Onboarding before Main Timer's
+ * useSession() (native audio/speech engines, background-audio session,
+ * the 200ms poll loop) ever spins up, rather than mounting all of that
+ * just to immediately redirect away from it.
+ */
+export default function MainTimerRoute() {
+  const [hasCompletedOnboarding] = useState(() => getSettings().hasCompletedOnboarding);
+
+  if (!hasCompletedOnboarding) {
+    return <Redirect href="/onboarding" />;
+  }
+
+  return <MainTimerScreen />;
+}
+
+function MainTimerScreen() {
+  const router = useRouter();
   const { timerState, session, settings, audioError, start, togglePause, reset } = useSession();
 
   const phase = timerState?.phase ?? "ready";
@@ -60,7 +80,7 @@ export function MainTimerScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.topRow}>
         <RoundCounter round={round} totalRounds={settings.rounds} />
-        <SettingsGear />
+        <SettingsGear onPress={() => router.push("/settings")} />
       </View>
 
       <View style={styles.center}>
