@@ -108,3 +108,23 @@ Dated log of shipped changes, appended to as features complete.
   `rateForSpeechRate`/`SpeechEngine.setRate` wire the clamped rate into
   `src/features/speech/service.ts`'s playback. 4 new tests, all passing
   (71/71 total).
+- 2026-08-24: Sub-phase 5c — On-device TTS fallback for custom punches.
+  Checked before assuming (same discipline as 4a/5b's library-capability
+  surprises): neither `expo-speech` nor `react-native-tts` can
+  synthesize TTS to a file, only live-play it — the "synthesize once,
+  cache as a VoiceClip file" design `ARCHITECTURE.md` assumed isn't
+  buildable with any available library, only a custom native module
+  (real Swift/Kotlin, unverifiable in this environment). User explicitly
+  chose live `expo-speech` playback over that native-module route — an
+  unrecognized word (custom punch/kick name, or a number outside the
+  bundled 1-6) now falls through to live on-device TTS every time it's
+  spoken, through the OS's own audio output rather than the app's
+  `AudioContext`/WSOLA bus, with the same `[0.25, 4.0]` rate clamp and
+  `appVolume` applied for consistency. `docs/user-flows.md` Flow 4
+  revised to drop the now-inapplicable blocking generate/cache step.
+  Confirmed the last-punch delete guard (Flow 4's other requirement) was
+  already built in Phase 1b — no new work needed there. Test-first for
+  the dispatch logic (bundled-vs-fallback routing, rate/volume clamping
+  into the `Speech.speak` call); verified `expo-speech` works cleanly
+  under Jest without a manual mock before relying on that. 4 new tests,
+  all passing (74/74 total).

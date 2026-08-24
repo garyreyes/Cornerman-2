@@ -22,7 +22,7 @@ screen-locked, so training continues while the phone is put away.
 | Audio engine | `react-native-audio-api` (Web Audio API port for RN) | Matches the extraction doc §1.11 shared-bus approach in spirit, but this library has no `DynamicsCompressorNode` (confirmed 2026-08-24, Phase 4a — it's on the library's own roadmap, not shipped); the built bus is `appVolume gain → makeup gain → WaveShaper soft-clip limiter → destination` instead. See `PROJECT_FACTS.md`. |
 | Combo speech | Pre-generated `VoiceClip` per word, spliced per combo, played back with `react-native-audio-api`'s native WSOLA pitch-preserving time-stretch (`createBufferSource({pitchCorrection: true})` + the `playbackRate` param) for a continuous 0.25x–4x rate | Live TTS distorts pitch at extreme rates by nature (the "chipmunk" artifact, extraction doc §1.10/§5.4) — time-stretching real recorded/generated audio is the only mechanism that hits a wide rate range without it. 4x, not 5x: the library's WSOLA implementation hard-caps `playbackRate` at a fixed native ceiling (`WsolaTimeStretcher::MAX_PLAYBACK_RATE = 4`, confirmed 2026-08-24 reading its C++ source) — revised down from the originally-discussed 5x rather than building extra complexity to work around it; see `PROJECT_FACTS.md`. |
 | Bundled voice bank source | Kokoro TTS (open-source, offline, Apache 2.0), batch-generated once on a dev machine via `scripts/generate_voice_bank.py`, not run on-device | Confirmed 2026-08-24, Phase 5a — still "generated ahead of time," same category as a real recording for the pitch-distortion argument above; see `docs/PRD.md` §10 for the 33-word vocabulary |
-| Custom-punch speech fallback | One-time on-device TTS synthesis, cached locally as a `VoiceClip` (`source: "tts-generated"`), then played through the same time-stretch pipeline | Preserves free punch renaming (extraction doc §1.6) without needing a recording for every possible custom name; also the fallback for any word (including a number) outside the bundled bank |
+| Custom-punch speech fallback | Live `expo-speech` playback (`Speech.speak`), re-synthesized every call, through the OS's own audio output — NOT cached, NOT played through the WSOLA pipeline | Revised 2026-08-24, Phase 5c: no available library (`expo-speech`, `react-native-tts`) can synthesize TTS to a file, only a custom native module could (not built — real Swift/Kotlin work, unverifiable in this environment, disproportionate for a fallback path). Still preserves free punch renaming (extraction doc §1.6) without a recording for every custom name; accepted tradeoffs are a different voice than bundled clips, per-play latency, and `expo-speech`'s own `rate` param instead of true pitch-preserving stretch (undocumented behavior above ~2-3x). See `PROJECT_FACTS.md`. |
 | Audio assets (bell/clapper/warning) | Real recorded/licensed samples — Freesound.org (CC0) first, AudioJungle (one-time purchase) fallback | User-confirmed requirement: authentic, not synthesized or AI-generated (PRD §6) |
 | Local persistence (Settings/Punch/Preset metadata) | MMKV | Fast, synchronous key-value storage; directly mirrors the old app's zero-migration `Object.assign(defaults, parsed)` pattern (extraction doc §1.13) |
 | Audio file storage | App document directory (filesystem) — MMKV holds only metadata/file paths | Binary audio doesn't belong in a JSON-blob key-value store |
@@ -66,12 +66,16 @@ Punch    *---1 VoiceClip   (resolved by normalized text key, e.g. "Lead
   2026-08-24, Phase 5a — the original punch-keyed design didn't account
   for numbers or defense/movement words needing clips with no owning
   Punch). `{ id: string (uuid), key: string, filePath: string, source:
-  "bundled" | "tts-generated" }`. `"bundled"` clips are a static
-  compile-time asset map (`src/features/speech/service.ts`'s
-  `BUNDLED_CLIPS`), not persisted — only `"tts-generated"` clips need an
-  actual MMKV record + filesystem file (Phase 5c, not yet built). Audio
-  data lives on the filesystem; a persisted record is just the pointer +
-  provenance.
+  "bundled" }` in practice — `"bundled"` clips are a static compile-time
+  asset map (`src/features/speech/service.ts`'s `BUNDLED_CLIPS`), not
+  persisted. **The `"tts-generated"` (cached) source is not built and
+  not currently plannable**: confirmed 2026-08-24, Phase 5c — no
+  available library (`expo-speech`, `react-native-tts`) can synthesize
+  TTS to a file, only live-play it, so there is nothing to cache. A word
+  outside the bundled bank instead falls through to live `expo-speech`
+  playback every time it's spoken, through the OS's own audio output,
+  not this app's `AudioContext`/WSOLA bus — see `PROJECT_FACTS.md` for
+  the tradeoffs accepted and the native-module path not taken.
 - **`SoundAsset`** (bell, clapper, warning) — bundled app resources, not
   user-editable data. Referenced by filename from `Settings`, not modeled
   as its own persisted entity. Defense/movement cues (PRD §10, Phase 5d)

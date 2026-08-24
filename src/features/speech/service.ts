@@ -1,3 +1,4 @@
+import * as Speech from "expo-speech";
 import { AudioContext } from "react-native-audio-api";
 import type { AudioBuffer } from "react-native-audio-api";
 
@@ -117,11 +118,21 @@ export function createSpeechEngine(): SpeechEngine {
   }
 
   function playWord(text: string): boolean {
-    const key = normalizeToKey(text);
-    if (!(key in BUNDLED_CLIPS)) {
+    if (text.trim() === "") {
       return false;
     }
-    void play(key);
+    const key = normalizeToKey(text);
+    if (key in BUNDLED_CLIPS) {
+      void play(key);
+      return true;
+    }
+    // No library can synthesize TTS to a cacheable file (PROJECT_FACTS.md
+    // -- neither expo-speech nor react-native-tts support it, only a
+    // custom native module would), so an unrecognized word falls through
+    // to live on-device synthesis every time it's spoken, through the
+    // OS's own audio output rather than this engine's AudioContext bus.
+    // Speaks the original text, not the normalized key.
+    Speech.speak(text, { rate: currentRate, volume: volumeGain.gain.value });
     return true;
   }
 
