@@ -226,11 +226,15 @@ from the real, shipped result)*
     Judgment/presentation, no new tests. 109/109 tests passing, all
     gates green; visual correctness unverified, same standing gap as
     every other screen.
-- [ ] **8b. Punches screen** — `not started` — add/rename/delete, plus
-  the non-blocking **Preview** action (live TTS playback) per
-  `docs/user-flows.md` Flow 4 — revised 2026-08-24 (Phase 5c) from the
-  original blocking "TTS-generation" step; there's nothing to
-  generate-and-cache anymore, saving is instant.
+- [x] **8b. Punches screen** — `done` — add/rename/delete, plus the
+  non-blocking **Preview** action (live playback through the real
+  `SpeechEngine`) per `docs/user-flows.md` Flow 4. New punches get the
+  next unused `num` automatically — no `num` picker, matching how the
+  old app's rename flow only ever wrote the name field (extraction doc
+  §1.6). New `previewEngine.ts` (scoped to the screen's own mount/
+  unmount, not the app's process lifetime — see `PROJECT_FACTS.md`).
+  Judgment/presentation + untested native wiring, no new tests.
+  109/109 tests passing, all gates green.
 - [ ] **8c. Presets List + Preset Editor** — `not started`.
 - [ ] **Phase close: `/impeccable critique` + `/impeccable polish`** —
   `not started` — all three screens judged together for visual
@@ -325,14 +329,10 @@ Once that's done: **Phase 8a is now fully done** — the Settings screen
 has its real form content (Round/Mode/Sounds/Combinations/Combo
 Timing/Defense Cues/Punches), autosaving on change, built against
 `docs/design-direction.md`'s contract the same way 6a was (still
-visually unverified for the same reason). **8b (Punches screen) is the
-next actual build step** — add/rename/delete + the non-blocking Preview
-action (`docs/user-flows.md` Flow 4); its placeholder route already
-exists at `src/app/settings/punches.tsx` and is already wired into
-`settings/_layout.tsx`, so 8b replaces that placeholder's body rather
-than starting navigation from scratch. 8c (Presets List + Editor)
-follows the same pattern against its own existing placeholder at
-`src/app/settings/presets.tsx`. Phase 10+ is planned and written down,
+visually unverified for the same reason). **8b is now done** — the Punches screen has real add/rename/delete +
+Preview, replacing its placeholder. **8c (Presets List + Editor) is the
+next actual build step**, following the same pattern against its own
+existing placeholder at `src/app/settings/presets.tsx`. Phase 10+ is planned and written down,
 but confirmed to build *after* Phase 9 ships. As each sub-phase
 completes, mark it `done` here and log the matching entry in
 `CHANGES.md`.

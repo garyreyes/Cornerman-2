@@ -16,4 +16,13 @@ export interface SpeechEngine {
    * only for blank/empty text.
    */
   playWord(text: string): boolean;
+  /**
+   * Releases the underlying native AudioContext. useSession.ts's own engine
+   * never calls this (Main Timer is the app's one long-lived screen, so it
+   * was never needed there), but any engine created for a shorter-lived
+   * screen -- e.g. Punches' Preview action (previewEngine.ts) -- should
+   * call this on unmount rather than leaking a native context for the rest
+   * of the process lifetime.
+   */
+  close(): Promise<void>;
 }

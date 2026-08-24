@@ -415,17 +415,38 @@ made during feature work.
   (PRD §8 lists "wider variety in sound cues" as a Should-have, not v1),
   that's new `SoundAsset` plumbing, not something this pass silently
   half-built.
-- **8b/8c must refresh Settings' punches/presets on focus, not just on
-  mount (flagged by review, 2026-08-24, Phase 8a).** `src/app/settings/
-  index.tsx` loads `punches`/`presets` once via `useState(() => ...)`.
-  That's fine today since `settings/punches.tsx`/`presets.tsx` are still
-  placeholders with no mutation capability, but once 8b/8c actually let a
-  user add/rename/delete a punch or preset, navigating back to Settings
-  (which stays mounted underneath in the stack) will show stale data --
-  the "N defined" summary rows and the Random-mode punch-pool chip list --
-  until the screen fully remounts. Fix when 8b/8c ship: a focus-triggered
-  refetch (e.g. `useFocusEffect` from `@react-navigation/native`,
-  available transitively through `expo-router`), not a mount-only load.
+- **Settings' punches/presets now refresh on focus, not just on mount
+  (fixed 2026-08-24, Phase 8b -- resolves the gap flagged in Phase 8a's
+  review).** `src/app/settings/index.tsx` now wraps `getPunches()`/
+  `getPresets()` in `useFocusEffect` (imported directly from
+  `expo-router`, which re-exports it -- no need for a direct
+  `@react-navigation/native` dependency). Became reachable the moment 8b
+  shipped real add/rename/delete: Settings stays mounted underneath
+  Punches in the stack, so a mount-only load showed stale "N defined"
+  summary rows and a stale Random-mode punch-pool chip list after
+  navigating back. If 8c's Preset Editor needs the same treatment for
+  its own mutations, this is the established pattern to follow.
+- **`SpeechEngine` now has a `close()` method (added 2026-08-24, Phase
+  8b review).** `react-native-audio-api`'s `AudioContext` always had
+  `close()`/`suspend()` -- this codebase's own `SpeechEngine` wrapper
+  (`speech/types.ts`/`service.ts`) just never surfaced it, which a
+  review caught after `previewEngine.ts` (Punches' Preview action)
+  copied `useSession.ts`'s "never close" pattern for an inaccurate
+  reason (claiming no release mechanism existed). `useSession.ts`'s own
+  engine still deliberately never calls `close()` -- Main Timer is the
+  app's one long-lived screen, so there's nothing to release it for --
+  but any future short-lived-screen engine (like `previewEngine.ts`,
+  now scoped to Punches' own mount/unmount) should call it rather than
+  leaking a native AudioContext for the rest of the process lifetime.
+- **`Alert.alert` (Punches' last-punch delete guard, Phase 8b) is this
+  app's first use of a native OS alert dialog** -- every other error
+  state so far (`AudioErrorBanner`) is a custom themed inline banner.
+  Functionally correct per Flow 4's "Blocked" framing, but visually
+  inconsistent with the rest of the app's fully custom-themed surfaces.
+  Deliberately not replaced with a themed modal now -- `ROADMAP.md`'s
+  Phase 8 close already has a dedicated `/impeccable critique` step for
+  reconciling exactly this kind of cross-screen consistency question
+  once 8a/8b/8c all exist; revisit there, not piecemeal.
 - **`expo-router@57.0.15` pulls in a real `react-dom@19.2.8` conflict via
   a transitive web-only chain** (`expo-router` → `@expo/ui` → `vaul` →
   `@radix-ui/*`, unrelated to this mobile-only app), which needs

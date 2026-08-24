@@ -304,3 +304,43 @@ Dated log of shipped changes, appended to as features complete.
   today — 8b/8c have no mutation yet — logged in `PROJECT_FACTS.md` as
   required follow-up when they ship. 109/109 tests passing, all gates
   green after fixes.
+- 2026-08-24: Sub-phase 8b — Punches screen, replacing its placeholder.
+  `src/app/settings/punches.tsx`: each punch is an inline-editable name
+  field (commits on blur) + num badge + non-blocking Preview + Delete
+  (`docs/user-flows.md` Flow 4). Preview plays through the real
+  `SpeechEngine` (bundled clip or on-device TTS fallback, at the
+  current speech rate/volume) via a new `previewEngine.ts`, not a
+  simplified stand-in — so it actually sounds like what the user will
+  hear mid-session. Adding a punch assigns the next unused `num`
+  automatically; there's no `num` picker anywhere in this UI, matching
+  how the old app's rename flow only ever wrote the name field
+  (extraction doc §1.6). Delete keeps the existing Phase 1b last-punch
+  guard (`LastPunchError`), surfaced via `Alert.alert` (blocking, per
+  Flow 4's own "Blocked" framing — the app's first use of a native
+  alert dialog rather than a themed inline banner; flagged in
+  `PROJECT_FACTS.md` for the Phase 8 close critique pass, not fixed
+  now). Judgment/presentation + untested native wiring (matches
+  `useSession.ts`/`speech/service.ts`'s existing precedent), no new
+  tests. 109/109 tests passing, all gates green.
+- 2026-08-24: `reviewer` pass on 8b caught one High-severity issue and
+  two Medium, all fixed: the Settings screen (`settings/index.tsx`)
+  loaded punches/presets once on mount and never refreshed — a gap this
+  project's own `PROJECT_FACTS.md` had explicitly flagged as "fix when
+  8b/8c ship," now actually reachable since 8b lets a user mutate
+  punches and navigate back to Settings underneath. Fixed with a
+  `useFocusEffect`-driven refetch (re-exported directly from
+  `expo-router`). `previewEngine.ts`'s original "no way to release the
+  AudioContext" justification for never closing its engine was
+  factually wrong — the library's `AudioContext.close()` exists,
+  `SpeechEngine` (this codebase's own wrapper) just never surfaced it;
+  added `close()` to the `SpeechEngine` interface and scoped
+  `previewEngine.ts` to the Punches screen's own mount/unmount instead
+  of the app's process lifetime, so visiting Punches no longer leaves a
+  second native AudioContext open forever. Also caught and fixed a real
+  unhandled-promise-rejection risk in the pre-existing (Phase 5a)
+  `speech/service.ts`'s fire-and-forget bundled-clip playback — added a
+  `.catch()`; left `playWord`'s synchronous boolean contract alone
+  (changing it would have broken its own well-covered Phase 5 test
+  suite for a currently-unobservable edge case, since the committed
+  voice-bank WAVs are silent placeholders, not corrupt ones). 109/109
+  tests passing, all gates green after fixes.

@@ -1,21 +1,64 @@
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AddPunchRow } from "../../features/settings/components/AddPunchRow";
+import { PunchRow } from "../../features/settings/components/PunchRow";
+import { disposePreviewEngine, initPreviewEngine } from "../../features/settings/previewEngine";
+import { LastPunchError, createPunch, deletePunch, getPunches, renamePunch } from "../../features/settings/service";
+import type { Punch } from "../../features/settings/types";
 import { theme } from "../../features/session/theme";
 
 /**
- * Placeholder for Phase 8b -- proves the Settings summary row actually
- * reaches a real, back-navigable screen (same "prove reachable first"
- * pattern the settings/index.tsx nav-infra pass used). The real add/
- * rename/delete + Preview form (docs/user-flows.md Flow 4) is 8b's job.
+ * Add/rename/delete + non-blocking Preview (docs/user-flows.md Flow 4).
+ * `num` is never user-facing here -- a new punch gets the next unused
+ * number automatically, matching how the old app's rename flow only ever
+ * wrote the name field (extraction doc §1.6). The last-punch delete guard
+ * (LastPunchError) already exists in settings/service.ts from Phase 1b.
  */
 export function PunchesScreen() {
+  const [punches, setPunches] = useState<Punch[]>(() => getPunches());
+
+  // Preview's engine is scoped to this screen's lifetime, not the app's --
+  // see previewEngine.ts for why (a real native AudioContext, released on
+  // unmount rather than left open for the rest of the process).
+  useEffect(() => {
+    initPreviewEngine();
+    return () => disposePreviewEngine();
+  }, []);
+
+  function handleRename(id: string, name: string) {
+    renamePunch(id, name);
+    setPunches((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)));
+  }
+
+  function handleDelete(id: string) {
+    try {
+      deletePunch(id);
+      setPunches((prev) => prev.filter((p) => p.id !== id));
+    } catch (error) {
+      if (error instanceof LastPunchError) {
+        Alert.alert("At least one punch is required");
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  function handleAdd(name: string) {
+    const nextNum = punches.reduce((max, p) => Math.max(max, p.num), 0) + 1;
+    const punch = createPunch(name, nextNum);
+    setPunches((prev) => [...prev, punch]);
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
-      <View style={styles.center}>
-        <Text style={styles.title}>PUNCHES</Text>
-        <Text style={styles.body}>The add/rename/delete form lands in Phase 8b.</Text>
-      </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        {punches.map((punch) => (
+          <PunchRow key={punch.id} punch={punch} onRename={handleRename} onDelete={handleDelete} />
+        ))}
+        <AddPunchRow onAdd={handleAdd} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -27,23 +70,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    paddingHorizontal: 32,
-  },
-  title: {
-    fontFamily: theme.fonts.displayBold,
-    fontSize: 28,
-    letterSpacing: 1,
-    color: theme.colors.enamelWhite,
-  },
-  body: {
-    fontFamily: theme.fonts.body,
-    fontSize: 15,
-    color: theme.colors.enamelMuted,
-    textAlign: "center",
+  content: {
+    padding: 16,
+    gap: 10,
   },
 });

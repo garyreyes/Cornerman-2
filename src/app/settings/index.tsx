@@ -1,5 +1,5 @@
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -28,13 +28,22 @@ import { theme } from "../../features/session/theme";
 export function SettingsScreen() {
   const router = useRouter();
   const [settings, setSettings] = useState<Settings>(() => getSettings());
-  // Loaded once on mount, not re-fetched on focus -- fine while 8b/8c are
-  // still placeholders with no mutation capability. Once they can actually
-  // add/rename/delete a punch or preset, navigating back here will show
-  // stale data (this screen's summary rows / punch-pool chips) until 8b/8c
-  // add a focus-triggered refresh -- see PROJECT_FACTS.md.
-  const [punches] = useState(() => getPunches());
-  const [presets] = useState(() => getPresets());
+  const [punches, setPunches] = useState(() => getPunches());
+  const [presets, setPresets] = useState(() => getPresets());
+
+  // Punches/Presets can now be mutated on their own sub-screens (Phase 8b
+  // shipped add/rename/delete for punches; 8c will do the same for
+  // presets), and this screen stays mounted underneath them in the stack
+  // rather than unmounting -- so a mount-only load would show stale data
+  // (the "N defined" summary rows, the Random-mode punch-pool chips) after
+  // navigating back. Refetch on focus instead (PROJECT_FACTS.md flagged
+  // this as required once 8b/8c actually mutate anything).
+  useFocusEffect(
+    useCallback(() => {
+      setPunches(getPunches());
+      setPresets(getPresets());
+    }, []),
+  );
 
   // Functional updater (matches useSession.ts's established pattern for
   // this exact kind of merge-update) so two onChange calls in the same

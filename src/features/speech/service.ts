@@ -123,7 +123,12 @@ export function createSpeechEngine(): SpeechEngine {
     }
     const key = normalizeToKey(text);
     if (key in BUNDLED_CLIPS) {
-      void play(key);
+      // Fire-and-forget: playWord's own contract is synchronous (existing
+      // callers, and this engine's test suite, rely on an immediate
+      // boolean return -- see service.test.ts), so a decode/playback
+      // failure here can't be reported back through this call's return
+      // value. Still must not become an unhandled promise rejection.
+      play(key).catch(() => {});
       return true;
     }
     // No library can synthesize TTS to a cacheable file (PROJECT_FACTS.md
@@ -136,5 +141,9 @@ export function createSpeechEngine(): SpeechEngine {
     return true;
   }
 
-  return { setVolume, setRate, playWord };
+  function close(): Promise<void> {
+    return context.close();
+  }
+
+  return { setVolume, setRate, playWord, close };
 }
