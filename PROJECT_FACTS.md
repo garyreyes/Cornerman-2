@@ -182,3 +182,65 @@ made during feature work.
   combo call-outs. A proposed, easily-retuned default, not a
   user-confirmed number — flag if it feels wrong once actually heard
   during a workout (Phase 6).
+- **This environment has no way to visually verify a React Native
+  screen at all — no device, no simulator, no screenshot capability**
+  (confirmed 2026-08-24, Phase 6a). The Main Timer screen was built
+  entirely by reasoning against `docs/design-direction.md`'s written
+  contract, never actually seen rendered. Treat any visual claim about
+  it (colors, layout, animation feel) as unverified until a human
+  actually looks at it running on a device/simulator — this is the
+  same honesty standard already applied to bell/clapper sound quality
+  (4a) and TTS voice quality (5a/5c), just for the visual dimension.
+  `/impeccable audit` genuinely has not run for this reason, not an
+  oversight — don't mark it done without it actually happening.
+- **Navigation is deliberately deferred as of 6a** — only one real
+  screen exists (Main Timer). `App.tsx` renders it directly; the
+  settings gear icon is present (design-contract-required) but wired
+  as a no-op. Add real navigation (`expo-router` is the natural fit for
+  an Expo project) once Phase 7/8 actually needs a second screen —
+  don't build routing infrastructure ahead of that need.
+- **Two more native modules needed manual Jest mocks, confirmed 2026-08-24
+  (Phase 6a):** `react-native-worklets` (Reanimated v4's native runtime —
+  no JS fallback, throws on import under Jest) and
+  `react-native-safe-area-context` (`SafeAreaProvider` waits for a real
+  `onLayout` that never fires under Jest, so children render as
+  nothing without it). Both reuse the packages' own official mocks
+  (`react-native-worklets/lib/module/mock`,
+  `react-native-safe-area-context/jest/mock`) rather than hand-rolled
+  fakes, matching `react-native-audio-api`'s pattern — but
+  safe-area-context's official mock ships as a **default** export, so
+  `__mocks__/react-native-safe-area-context.tsx` unwraps `mock.default`
+  before re-exporting; naively re-exporting the raw `require()` result
+  (like the other two mocks do) resolves every named import as
+  `undefined` and fails with a cryptic "Element type is invalid" error,
+  not an obvious "module not found."
+- **`react-native-testing-library`'s `render()` being async (React 19)
+  is an easy mistake to repeat** — got this wrong a second time writing
+  `App.test.tsx` for 6a despite it already being a documented fix from
+  harness-setup, and it produced a genuine multi-minute Jest hang (not
+  a fast, obvious error) because `{ findByText } = render(...)`
+  silently destructures `undefined` off an unawaited Promise rather
+  than throwing immediately. If a component test hangs instead of
+  failing fast, check for a missing `await` on `render()` before
+  suspecting the component/native-module code.
+- **The recurring `@emnapi/*` lockfile-drift issue (hit 4 times across
+  this project) is now permanently fixed, not just re-rolled again
+  (2026-08-24, Phase 6a).** Root cause, finally traced: `eslint-config-expo`
+  → `eslint-import-resolver-typescript` → `unrs-resolver` →
+  `@unrs/resolver-binding-wasm32-wasi` (a WASM fallback for ESLint's
+  import resolver, nothing to do with the app itself) requires
+  `@emnapi/core`/`@emnapi/runtime` via a wide, ambiguous range
+  (`^1.7.1 || ^2.0.0-alpha.4`). These are optional, platform-conditional
+  packages that don't install on Windows at all (`npm ls` shows nothing
+  locally), so **local `npm ci` verification on this Windows machine
+  cannot actually catch a Linux-side resolution mismatch** — confirmed
+  when a lockfile that passed local `npm ci` twice still failed CI
+  twice in a row with the identical error. Fixed for real via a
+  `package.json` `overrides` block pinning
+  `@emnapi/core`/`@emnapi/runtime`/`@emnapi/wasi-threads` to one exact
+  version each, eliminating the ambiguous range (and therefore the
+  cross-platform resolution non-determinism) entirely, rather than
+  hoping a regenerate happens to land on a matching version again. If
+  this recurs, check whether the pinned override versions have gone
+  stale against a newer `unrs-resolver`, not whether to regenerate the
+  lockfile again.

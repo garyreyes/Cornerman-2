@@ -29,6 +29,9 @@ screen-locked, so training continues while the phone is put away.
 | Backend | None — fully local, offline-first | No accounts/login in v1 (PRD §2); nothing needs a server |
 | Auth | None in v1 | Single-user, no accounts — see "Deferred decisions" below for what happens if this changes later |
 | Hosting/distribution | Google Play Console (existing `com.gary.cornerman` listing, carried forward) + Apple App Store (deferred — no Developer account yet, PRD §6) | Both platforms are in scope for the build; actual submission is explicitly out of scope for this phase |
+| Screen animation | `react-native-reanimated` v4 (+ `react-native-worklets`) + `react-native-svg` | Confirmed 2026-08-24, Phase 6a — the design contract's continuous sweep-ring countdown and mechanical bell-strike motion need real native-thread animation and precise arc drawing; the plain RN `Animated` API can't do either well |
+| Screen typography | `@expo-google-fonts/barlow-condensed` + `@expo-google-fonts/inter` via `expo-font` | The direction contract's exact type choices (Barlow Condensed for dial numerals, Inter for body text) — not a substitutable system-font default |
+| Navigation | None yet — deliberately deferred (Phase 6a) | Only one real screen exists (Main Timer). Adding `expo-router` before there's a second screen to route to would be premature architecture; revisit at Phase 7/8. Settings gear icon is present but a no-op stub until then. |
 
 ## Entities
 
@@ -211,6 +214,24 @@ src/
                        # comboEngine (PRD §10 use case 12)
       service.ts
       types.ts
+    session/           # Phase 6a: the running-session orchestration layer
+                       # -- owns what pure engines alone can't (re-arming
+                       # comboGapMin/MaxSec after each combo, arming
+                       # defenseCues' independent timer), coordinating
+                       # timer+comboEngine+defenseCues+speech+audio.
+                       # sessionTick mirrors tick()'s pattern: a pure
+                       # decision fn returning actions, consumed by the
+                       # untested useSession.ts effect loop that makes
+                       # the actual native calls.
+      components/      # CountdownRing, PhaseBadge, RoundCounter,
+                       # ComboCard, ControlRow, SettingsGear,
+                       # AudioErrorBanner -- the Main Timer screen's
+                       # sub-components, built against
+                       # docs/design-direction.md's locked contract
+      service.ts
+      types.ts
+      theme.ts         # "The Corner's Stopwatch & Bell" color/font tokens
+      useSession.ts    # native audio/speech wiring + the 200ms poll loop
   shared/              # cross-feature UI primitives (populated once
                        # design direction is set)
   lib/
@@ -220,9 +241,13 @@ src/
                        # primitive (extraction doc §1.2), used by
                        # timer's firstComboAt and defenseCues alike
     backgroundAudio.ts # native background-session config (iOS
-                       # UIBackgroundModes, Android foreground service)
+                       # UIBackgroundModes, Android foreground service) --
+                       # not built yet, Phase 7
   app/                 # navigation entry, thin screens that assemble
                        # features - no business logic
+    MainTimerScreen.tsx # Phase 6a -- the flagship first screen; holds
+                       # the design-direction.md contract as its opening
+                       # comment per Impeccable's Step 5 format
 
 ```
 

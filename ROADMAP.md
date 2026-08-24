@@ -122,10 +122,31 @@ as each sub-phase completes — it should never drift out of sync with
 time here; ends with the Impeccable finish review and `DESIGN.md` written
 from the real, shipped result)*
 
-- [ ] **6a. Main Timer screen, all states** — `not started` — wired to
-  Phases 2–5; built against `docs/design-direction.md`'s contract
-  ("The Corner's Stopwatch & Bell").
-  - [ ] `/impeccable audit`
+- [x] **6a. Main Timer screen, all states** — `code done, visual
+  verification outstanding` — new `src/features/session/` orchestration
+  layer (`sessionTick`, mirroring `tick()`'s pure-decision pattern —
+  see PROJECT_FACTS.md) wires `timer`+`comboEngine`+`defenseCues`+
+  `speech`+`audio` together, re-arming the combo-gap and defense-cue
+  timers that PROJECT_FACTS.md flagged as still missing after Phase 5.
+  `src/app/MainTimerScreen.tsx` covers Ready/Warmup/Work/Rest/Paused/
+  Finished plus the audio-init-error banner (`docs/user-flows.md`
+  Flow 2), built against `docs/design-direction.md`'s locked contract
+  (copied verbatim as the screen's opening comment, per Impeccable's
+  Step 5 format) — gunmetal/brass palette, Barlow Condensed/Inter
+  type, Reanimated-driven sweep-ring countdown and bell-strike pulse.
+  Navigation deliberately deferred (only one real screen exists yet —
+  see PROJECT_FACTS.md); settings gear is a no-op stub until Phase 8.
+  9 new tests for `sessionTick` (test-first, correctness-critical); the
+  screen/animation code itself is judgment/presentation, no tests, per
+  the usual split. All gates green (99/99 total).
+  - [ ] `/impeccable audit` — **not run**. This environment has no
+    device/simulator/screenshot capability at all (confirmed while
+    building this sub-phase) — the actual visual result has never been
+    seen, only reasoned through against the written contract. Run this
+    yourself once you can see the app rendered on a device or
+    simulator; treat the screen as unverified until then, the same
+    honesty standard already applied to bell/clapper sound quality
+    (4a) and TTS voice quality (5a/5c).
 
 ## Phase 7 — Background Audio + Onboarding
 
@@ -218,19 +239,21 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-Phases 2-5 (Timer Engine, Combo Engine, Audio Engine, Speech Pipeline —
-5a bundled lookup/playback, 5b pitch-preserving time-stretch revised to
-0.25x–4x, 5c live TTS fallback, 5d announce-style + defense cues) are
-all complete. Every engine/service is headless (no screen consumes any
-of it yet) — that's Phase 6's job. Next sub-phase to build is **6a**
-(Main Timer screen, all states) — the flagship first surface, wired to
-Phases 2-5, built against `docs/design-direction.md`'s locked contract
-("The Corner's Stopwatch & Bell"), ending with the Impeccable finish
-review and `DESIGN.md` written from the real result. This is also where
-the recurring combo-repeat loop (re-arming `comboGapMin`/`MaxSec` after
-each combo, and arming `defenseCues`' independent gap timer during Work
-phase) finally gets built — noted as still-missing during 5d, since it
-was never part of any headless sub-phase. Phase 10+ is planned and
-written down, but confirmed to build *after* Phase 9 ships. Run
-`/feature-planner` for 6a when ready. As each sub-phase completes, mark
-it `done` here and log the matching entry in `CHANGES.md`.
+Phases 2-5 (Timer Engine, Combo Engine, Audio Engine, Speech Pipeline)
+and 6a's code (Main Timer screen + the `session` orchestration layer
+that finally builds the recurring combo-repeat/defense-cue loop flagged
+missing after Phase 5) are done — 99/99 tests passing, all gates green.
+**What's genuinely outstanding: `/impeccable audit` has not run.** This
+environment has no device/simulator/screenshot capability at all — the
+screen has never actually been seen, only built against
+`docs/design-direction.md`'s written contract and reasoned through. Run
+the app yourself (`npx expo start`, real device or simulator — this
+project needs a dev-client build, not Expo Go, per the native modules
+already installed) and look at it before trusting the visual result;
+run `/impeccable audit` once you have. `DESIGN.md` still doesn't exist
+— per Impeccable's process it gets written *from* the real, inspected
+result, so it waits on that audit, not on this handoff. Once that's
+done, Phase 7 (Background Audio + Onboarding) is next. Phase 10+ is
+planned and written down, but confirmed to build *after* Phase 9 ships.
+As each sub-phase completes, mark it `done` here and log the matching
+entry in `CHANGES.md`.
