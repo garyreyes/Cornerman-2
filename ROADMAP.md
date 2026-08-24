@@ -150,9 +150,26 @@ from the real, shipped result)*
 
 ## Phase 7 — Background Audio + Onboarding
 
-- [ ] **7a. Native background session config** — `not started` — iOS
-  `UIBackgroundModes: audio`, Android foreground service; verified
-  against the already-working Phase 6 screen.
+- [x] **7a. Native background session config** — `done` — the
+  declarative half (iOS `UIBackgroundModes: audio`, Android foreground
+  service) was already free via `react-native-audio-api`'s own Expo
+  config plugin, defaulted on and already listed in `app.json` — no
+  changes needed there. Built the runtime half:
+  `src/lib/backgroundAudio.ts` activates the iOS audio session
+  (`playback` category) and turns on interruption event delivery; a new
+  pure `decideInterruptionAction` (`session/service.ts`, 6 tests,
+  test-first) is the actual pause/resume decision Phase 2b deferred —
+  auto-pauses on a call/audio-focus interruption and auto-resumes when
+  it ends, but never overrides a pause the user triggered manually.
+  Wired into `useSession.ts` against the already-tested
+  `pause`/`resume` timer functions. Also added a minimal "session
+  running" notification (`PlaybackNotificationManager`), confirmed
+  scope. 105/105 tests passing, all gates green.
+  - [ ] Real-device verification — **not run**. This environment has no
+    device/simulator at all (same gap as 6a's visual audit) — whether
+    audio genuinely survives a locked screen or a real phone call has
+    never been observed, only reasoned through against the library's
+    source. Verify once you can run this on a real device.
 - [ ] **7b. Onboarding/permission screen** — `not started` —
   first-launch only, per `docs/user-flows.md` Flow 1.
   - [ ] `/impeccable audit`
@@ -239,21 +256,22 @@ visual-system decisions. No re-polish-earlier-phases item is needed.
 
 ## Handoff
 
-Phases 2-5 (Timer Engine, Combo Engine, Audio Engine, Speech Pipeline)
-and 6a's code (Main Timer screen + the `session` orchestration layer
-that finally builds the recurring combo-repeat/defense-cue loop flagged
-missing after Phase 5) are done — 99/99 tests passing, all gates green.
-**What's genuinely outstanding: `/impeccable audit` has not run.** This
-environment has no device/simulator/screenshot capability at all — the
-screen has never actually been seen, only built against
-`docs/design-direction.md`'s written contract and reasoned through. Run
-the app yourself (`npx expo start`, real device or simulator — this
-project needs a dev-client build, not Expo Go, per the native modules
-already installed) and look at it before trusting the visual result;
-run `/impeccable audit` once you have. `DESIGN.md` still doesn't exist
-— per Impeccable's process it gets written *from* the real, inspected
-result, so it waits on that audit, not on this handoff. Once that's
-done, Phase 7 (Background Audio + Onboarding) is next. Phase 10+ is
-planned and written down, but confirmed to build *after* Phase 9 ships.
-As each sub-phase completes, mark it `done` here and log the matching
-entry in `CHANGES.md`.
+Phases 2-5 (Timer Engine, Combo Engine, Audio Engine, Speech Pipeline),
+6a (Main Timer screen + the `session` orchestration layer), and 7a
+(native background-audio session + interruption pause/resume) are done
+— 105/105 tests passing, all gates green. **What's genuinely
+outstanding, both requiring a real device/simulator this environment
+doesn't have:** `/impeccable audit` for 6a's screen (never actually
+seen rendered, only built against `docs/design-direction.md`'s written
+contract) and real-device verification for 7a (does audio genuinely
+keep playing through a locked screen or a phone call — reasoned through
+against the library's source, never observed). Run the app yourself
+(`npx expo start`, real device or simulator — this project needs a
+dev-client build, not Expo Go, per the native modules already
+installed), check both, then run `/impeccable audit`. `DESIGN.md` still
+doesn't exist — per Impeccable's process it gets written *from* the
+real, inspected result, so it waits on that audit, not on this handoff.
+Once that's done, Phase 7b (Onboarding/permission screen) is next.
+Phase 10+ is planned and written down, but confirmed to build *after*
+Phase 9 ships. As each sub-phase completes, mark it `done` here and log
+the matching entry in `CHANGES.md`.

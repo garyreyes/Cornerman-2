@@ -2,7 +2,7 @@ import { startTimer, tick } from "../timer/service";
 import type { TimerConfig } from "../timer/types";
 import { createDefaultSettings } from "../settings/service";
 import type { Punch, Settings } from "../settings/types";
-import { createSession, sessionTick } from "./service";
+import { createSession, decideInterruptionAction, sessionTick } from "./service";
 
 const config: TimerConfig = {
   totalRounds: 2,
@@ -131,6 +131,56 @@ describe("sessionTick -- defense cue scheduling", () => {
 
     expect(actions.some((a) => a.type === "speak-defense-cue")).toBe(true);
     expect(after.nextDefenseCueAt).toBe(dueAt + 15_000);
+  });
+});
+
+describe("decideInterruptionAction", () => {
+  test("began while running: pauses and marks the pause as ours", () => {
+    expect(decideInterruptionAction({ type: "began", shouldResume: false }, false, false)).toEqual({
+      shouldPause: true,
+      shouldResume: false,
+      pausedByInterruption: true,
+    });
+  });
+
+  test("began while already manually paused: no action, does not claim the pause", () => {
+    expect(decideInterruptionAction({ type: "began", shouldResume: false }, true, false)).toEqual({
+      shouldPause: false,
+      shouldResume: false,
+      pausedByInterruption: false,
+    });
+  });
+
+  test("began while already interruption-paused (overlapping interruption): no action, keeps the flag", () => {
+    expect(decideInterruptionAction({ type: "began", shouldResume: false }, true, true)).toEqual({
+      shouldPause: false,
+      shouldResume: false,
+      pausedByInterruption: true,
+    });
+  });
+
+  test("ended, shouldResume, and the pause was ours: resumes and clears the flag", () => {
+    expect(decideInterruptionAction({ type: "ended", shouldResume: true }, true, true)).toEqual({
+      shouldPause: false,
+      shouldResume: true,
+      pausedByInterruption: false,
+    });
+  });
+
+  test("ended but the system says not to resume: leaves it paused, clears the flag", () => {
+    expect(decideInterruptionAction({ type: "ended", shouldResume: false }, true, true)).toEqual({
+      shouldPause: false,
+      shouldResume: false,
+      pausedByInterruption: false,
+    });
+  });
+
+  test("ended but the pause was the user's, not ours: never auto-resumes a manual pause", () => {
+    expect(decideInterruptionAction({ type: "ended", shouldResume: true }, true, false)).toEqual({
+      shouldPause: false,
+      shouldResume: false,
+      pausedByInterruption: false,
+    });
   });
 });
 

@@ -3,7 +3,13 @@ import { nextDefenseCueFireTime, pickDefenseCue } from "../defenseCues/service";
 import { nextGapFireTime } from "../../lib/gapTiming";
 import type { Preset, Punch, Settings } from "../settings/types";
 import type { TimerState } from "../timer/types";
-import type { RandomFn, SessionAction, SessionState } from "./types";
+import type {
+  InterruptionDecision,
+  InterruptionEvent,
+  RandomFn,
+  SessionAction,
+  SessionState,
+} from "./types";
 
 export function createSession(): SessionState {
   return { nextComboAt: null, nextDefenseCueAt: null, currentCombo: null, comboCount: 0 };
@@ -72,4 +78,34 @@ export function sessionTick(
   }
 
   return { session: s, actions };
+}
+
+/**
+ * Decides how to react to a native audio-focus interruption (phone call,
+ * another app taking audio focus) -- Phase 2b's pause()/resume() only ever
+ * built the *mechanism*, not detection; this is that missing decision,
+ * wired to the real event by Phase 7a's useSession.ts.
+ *
+ * The one subtlety worth a named function for: an "ended, shouldResume"
+ * event must never auto-resume a timer the *user* paused manually before
+ * the interruption started -- only a pause this same function caused
+ * (tracked via the returned pausedByInterruption flag, round-tripped back
+ * in on the next call) is eligible to be auto-resumed.
+ */
+export function decideInterruptionAction(
+  event: InterruptionEvent,
+  isPaused: boolean,
+  pausedByInterruption: boolean,
+): InterruptionDecision {
+  if (event.type === "began") {
+    if (isPaused) {
+      return { shouldPause: false, shouldResume: false, pausedByInterruption };
+    }
+    return { shouldPause: true, shouldResume: false, pausedByInterruption: true };
+  }
+
+  if (pausedByInterruption && event.shouldResume) {
+    return { shouldPause: false, shouldResume: true, pausedByInterruption: false };
+  }
+  return { shouldPause: false, shouldResume: false, pausedByInterruption: false };
 }
