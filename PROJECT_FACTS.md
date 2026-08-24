@@ -377,3 +377,19 @@ made during feature work.
   since Phase 5b (`react-native-audio-api`'s WSOLA hard limit); the
   roadmap text just never got updated when that revision happened.
   `docs/PRD.md` was already correct (never hardcoded a number).
+- **`expo-router@57.0.15` pulls in a real `react-dom@19.2.8` conflict via
+  a transitive web-only chain** (`expo-router` → `@expo/ui` → `vaul` →
+  `@radix-ui/*`, unrelated to this mobile-only app), which needs
+  `react@^19.2.8` — conflicting with this project's pinned
+  `react@19.2.3`. `npm install` silently overrides the conflict with a
+  warning and succeeds locally, but `npm ci` (what CI actually runs)
+  refuses and fails hard — same failure *shape* as the earlier
+  `@emnapi` lockfile-drift issue (Phase 6a), though a genuinely
+  different root cause this time (a real version conflict, not
+  platform-conditional ambiguity). **Fixed** via a `package.json`
+  `overrides` entry pinning `react-dom` to `19.2.3` (confirmed to exist
+  on npm, matching the installed `react` version exactly — react/
+  react-dom are always released in lockstep), verified with a full
+  `rm -rf node_modules package-lock.json && npm install` + `npm ci`. If
+  a future `expo-router`/Expo SDK bump changes the pinned `react`
+  version, this override needs to move in lockstep with it.
