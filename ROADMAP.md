@@ -72,9 +72,13 @@ as each sub-phase completes — it should never drift out of sync with
   (`normalizeToKey`/`resolveBundledClip`, pure + tested) covering a
   33-word bank (numbers, 9 punches, 12 kicks, 6 defense words) generated
   by `scripts/generate_voice_bank.py` (Kokoro TTS, dev-machine only —
-  not run on-device). Committed WAVs are silent placeholders pending
-  that script actually being run (no Python in this environment, same
-  gap as Phase 4a's sound assets). 10 new tests (66/66 total).
+  not run on-device). 10 new tests (66/66 total).
+  - [x] **Voice bank actually generated** — `done`, 2026-08-24. All 33
+    clips are real Kokoro TTS output now, not silent placeholders —
+    verified non-silent via amplitude check. Three real Windows-specific
+    bugs fixed along the way (numpy source-build fallback, espeak-ng's
+    admin-only Windows install, a UTF-8 bug in kokoro's own package) —
+    see `PROJECT_FACTS.md` and the script's own docstring.
 - [x] **5b. Pitch-preserving time-stretch, 0.25x–4x** — `done` — range
   revised down from an originally-discussed 5x: `react-native-audio-api`
   has a genuine native WSOLA time-stretch built in
@@ -152,9 +156,22 @@ from the real, shipped result)*
     a dark-background/orange-accent world (Claude/VS Code register)
     with real light/dark mode support — see `docs/design-direction.md`'s
     redesign record and `PROJECT_FACTS.md`. The dial motifs (sweep-ring,
-    phase badge, lap-dial counter) are unchanged, only palette/type. The
-    `/impeccable audit` above still needs to happen against this new
-    palette, not the retired one.
+    phase badge, lap-dial counter) are unchanged, only palette/type.
+  - [x] **Native code-level `/impeccable audit`** — `done` (Main Timer +
+    Onboarding), 2026-08-24. Reads from source against the iOS/Android
+    platform references directly, no screenshot needed — unlike the
+    visual audit below, this one was genuinely runnable in this
+    environment. Scored 15/20. Fixed the top 3 findings immediately
+    (`userInterfaceStyle`, Reduce Motion, `AudioErrorBanner`'s missing
+    screen-reader announcement — see `PROJECT_FACTS.md`). **Still open**:
+    Android's `predictiveBackGestureEnabled: false`, `supportsTablet:
+    true` with no real tablet layout, and the countdown's missing
+    `accessibilityLabel` — deliberately deferred, not forgotten.
+  - [ ] **Genuine visual confirmation** — still `not started`. Needs
+    either a real screenshot batch from the user or their own on-device
+    look; this environment still has no simulator/screenshot capability
+    of its own. Covers both 6a/7b's original visual gap and confirming
+    the redesign actually looks right.
 
 ## Phase 7 — Background Audio + Onboarding
 
@@ -243,6 +260,12 @@ from the real, shipped result)*
   unmount, not the app's process lifetime — see `PROJECT_FACTS.md`).
   Judgment/presentation + untested native wiring, no new tests.
   109/109 tests passing, all gates green.
+  - *Addendum (2026-08-25, real-device feedback):* added delete-recovery
+    (Undo banner + "Restore defaults") and a per-row "random draws"
+    toggle reusing `randomPunchPool`; gave the name field a visible
+    bordered-box affordance since it already was editable but didn't
+    read as such. 7 new service tests. See `PROJECT_FACTS.md` for the
+    real forks decided here.
 - [x] **8c. Presets List + Preset Editor** — `done` — two screens,
   replacing the flat placeholder (`src/app/settings/presets.tsx`
   restructured into a `presets/` folder: `index.tsx` for the List,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { useTheme } from "../../../shared/theme/ThemeContext";
 import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
@@ -8,32 +8,56 @@ import type { Punch } from "../types";
 
 interface PunchRowProps {
   punch: Punch;
+  /** Whether `punch.num` is currently eligible for Random mode's draw --
+   * see settings/service.ts's isPunchIncludedInRandomPool. */
+  includedInRandomPool: boolean;
   onRename: (id: string, name: string) => void;
+  onRenumber: (id: string, num: number) => void;
   onDelete: (id: string) => void;
+  onToggleRandomPool: (num: number) => void;
 }
 
 const PREVIEW_ERROR_TIMEOUT_MS = 2500;
 
 /**
- * One punch: num badge + inline-editable name (commits on blur, matching
+ * One punch: inline-editable num + name (both commit on blur, matching
  * the range sliders' commit-on-release spirit rather than saving every
- * keystroke) + Preview (non-blocking live playback) + Delete. Renaming
- * only ever touches `name`, never `num` -- no num picker here, matching
- * how the old app's quick-fill dropdown only ever wrote the name field
- * (extraction doc §1.6).
+ * keystroke) + Preview (non-blocking live playback) + a "random draws"
+ * toggle + Delete. Numbers were originally fixed at creation (extraction
+ * doc §1.6), reversed 2026-08-25 after real use surfaced the actual need
+ * -- recreating a deleted punch at its original number, not just
+ * whatever's next-unused. `num` still isn't required to be unique (same
+ * as before); a Preset referencing a number that moves away from this
+ * punch degrades to `resolvePunchName`'s generic fallback rather than
+ * breaking (PROJECT_FACTS.md).
  */
-export function PunchRow({ punch, onRename, onDelete }: PunchRowProps) {
+export function PunchRow({
+  punch,
+  includedInRandomPool,
+  onRename,
+  onRenumber,
+  onDelete,
+  onToggleRandomPool,
+}: PunchRowProps) {
   const { colors, fonts } = useTheme();
   const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
-  // Resync the draft when `punch.name` changes from outside this row's own
-  // edit (e.g. the trimmed value committed on blur flowing back down as a
-  // new prop) -- adjusted during render per React's documented pattern for
-  // this, not via an effect (which would cost an extra render pass).
+  // Resync the draft when `punch.name`/`punch.num` change from outside this
+  // row's own edit (e.g. the trimmed value committed on blur flowing back
+  // down as a new prop) -- adjusted during render per React's documented
+  // pattern for this, not via an effect (which would cost an extra render
+  // pass).
   const [lastSyncedName, setLastSyncedName] = useState(punch.name);
   const [draftName, setDraftName] = useState(punch.name);
   if (punch.name !== lastSyncedName) {
     setLastSyncedName(punch.name);
     setDraftName(punch.name);
+  }
+
+  const [lastSyncedNum, setLastSyncedNum] = useState(punch.num);
+  const [draftNum, setDraftNum] = useState(String(punch.num));
+  if (punch.num !== lastSyncedNum) {
+    setLastSyncedNum(punch.num);
+    setDraftNum(String(punch.num));
   }
 
   const [previewFailed, setPreviewFailed] = useState(false);
@@ -56,6 +80,19 @@ export function PunchRow({ punch, onRename, onDelete }: PunchRowProps) {
     }
   }
 
+  function handleNumBlur() {
+    const parsed = Number.parseInt(draftNum, 10);
+    if (Number.isNaN(parsed)) {
+      setDraftNum(String(punch.num));
+      return;
+    }
+    if (parsed !== punch.num) {
+      onRenumber(punch.id, parsed);
+    } else {
+      setDraftNum(String(parsed));
+    }
+  }
+
   function handlePreview() {
     const trimmed = draftName.trim();
     if (trimmed === "") {
@@ -75,7 +112,16 @@ export function PunchRow({ punch, onRename, onDelete }: PunchRowProps) {
 
   return (
     <View style={styles.row}>
-      <Text style={styles.numBadge}>{punch.num}</Text>
+      <TextInput
+        style={styles.numInput}
+        value={draftNum}
+        onChangeText={setDraftNum}
+        onBlur={handleNumBlur}
+        keyboardType="number-pad"
+        placeholder="#"
+        placeholderTextColor={colors.textMuted}
+        accessibilityLabel={`Number for ${punch.name}`}
+      />
       <TextInput
         style={styles.nameInput}
         value={draftName}
@@ -83,6 +129,13 @@ export function PunchRow({ punch, onRename, onDelete }: PunchRowProps) {
         onBlur={handleBlur}
         placeholder="Punch name"
         placeholderTextColor={colors.textMuted}
+      />
+      <Switch
+        value={includedInRandomPool}
+        onValueChange={() => onToggleRandomPool(punch.num)}
+        trackColor={{ false: colors.panelLine, true: colors.accentDim }}
+        thumbColor={includedInRandomPool ? colors.accent : colors.textMuted}
+        accessibilityLabel={`Include ${punch.name} in random draws`}
       />
       <Pressable
         onPress={handlePreview}
@@ -122,20 +175,33 @@ function createStyles(colors: ColorTokens, fonts: Fonts) {
       borderWidth: 1,
       borderColor: colors.panelLine,
     },
-    numBadge: {
+    numInput: {
+      width: 44,
       fontFamily: fonts.numericSemiBold,
       fontSize: 15,
       color: colors.accent,
-      minWidth: 20,
       textAlign: "center",
+      paddingVertical: 6,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+      borderRadius: 6,
+      backgroundColor: colors.background,
     },
     nameInput: {
       flex: 1,
       fontFamily: fonts.body,
       fontSize: 15,
       color: colors.textPrimary,
-      paddingVertical: 4,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
       minWidth: 100,
+      // Bordered box, matching AddPunchRow's "New punch name" field --
+      // plain unbordered text here read as static/non-interactive
+      // (user feedback 2026-08-25: "entries are not editable").
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+      borderRadius: 6,
+      backgroundColor: colors.background,
     },
     iconButton: {
       width: 32,

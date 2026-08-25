@@ -1,3 +1,4 @@
+import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { createAudioEngine } from "../audio/service";
@@ -15,7 +16,7 @@ import { getPresets, getPunches, getSettings } from "../settings/service";
 import type { Preset, Punch, Settings } from "../settings/types";
 import { pause as pauseTimer, resume as resumeTimer, startTimer, tick } from "../timer/service";
 import type { TimerConfig, TimerState } from "../timer/types";
-import { createSession, decideInterruptionAction, sessionTick } from "./service";
+import { createSession, decideInterruptionAction, sessionTick, shiftSessionForResume } from "./service";
 import type { SessionState } from "./types";
 
 const TICK_INTERVAL_MS = 200;
@@ -46,15 +47,37 @@ export interface UseSessionResult {
  * tested (see PROJECT_FACTS.md); sessionTick and tick() carry the real
  * test coverage.
  *
- * Reads settings/punches/presets once on mount -- there's no Settings
- * screen yet (Phase 8) to edit them mid-session, so this is intentionally
- * read-only for now.
+ * settings/punches/presets are re-synced from storage whenever this
+ * screen regains focus -- e.g. returning from Settings/Punches after a
+ * change -- so that change reaches an already-running session instead of
+ * only the next one (fixed 2026-08-25 after the user found a disabled
+ * punch still getting called out; see PROJECT_FACTS.md). This is
+ * sufficient, not a compromise: settings can only change via navigating
+ * to Settings/Punches and back, which is exactly a focus transition, so
+ * there's no real case this misses. An earlier version of this fix
+ * polled storage every 200ms tick instead -- that forced a background
+ * re-render of this hook's whole subtree 5x/sec for the app's entire
+ * lifetime (even idle, even while a totally different screen had focus,
+ * since Main Timer stays mounted underneath), which starved the JS
+ * thread enough to make the Settings screen's pure-JS scroll wheels
+ * unresponsive. Reverted for that reason -- see PROJECT_FACTS.md. The
+ * tick loop itself reads punches/presets from refs (updated only on
+ * focus), not state, so it never needs `[punches, presets]` in its
+ * effect deps and never re-subscribes its interval.
+ *
+ * Round *structure* (rounds/work/rest/warmup duration) is the one
+ * exception to "live": snapshotted into `configRef` once, when `start()`
+ * is called, and held fixed for that session -- changing it mid-round
+ * would require re-deriving `phaseEndAt`/`firstComboAt` from a moving
+ * target, which nobody asked for and risks genuinely undefined timer
+ * states.
  */
 export function useSession(): UseSessionResult {
-  const [settings] = useState<Settings>(() => getSettings());
-  const [punches] = useState<Punch[]>(() => getPunches());
-  const [presets] = useState<Preset[]>(() => getPresets());
-  const configRef = useRef<TimerConfig>(toTimerConfig(settings));
+  const [settings, setSettings] = useState<Settings>(() => getSettings());
+  const settingsRef = useRef<Settings>(settings);
+  const punchesRef = useRef<Punch[]>(getPunches());
+  const presetsRef = useRef<Preset[]>(getPresets());
+  const configRef = useRef<TimerConfig>(toTimerConfig(getSettings()));
 
   const [timerState, setTimerState] = useState<TimerState | null>(null);
   const [session, setSession] = useState<SessionState>(() => createSession());
@@ -64,24 +87,74 @@ export function useSession(): UseSessionResult {
   const speechEngineRef = useRef<SpeechEngine | null>(null);
   const pausedByInterruptionRef = useRef(false);
 
+  // Cue/bell playback (bell, clapper, countdown tick) never depends on
+  // voice -- built once and left alone for the hook's lifetime, same as
+  // before this change.
   useEffect(() => {
-    const initEngines = () => {
+    const initAudioEngine = () => {
       try {
-        const audioEngine = createAudioEngine();
-        const speechEngine = createSpeechEngine();
-        audioEngine.setVolume(settings.appVolume);
-        speechEngine.setVolume(settings.appVolume);
-        speechEngine.setRate(settings.speechRate);
-        audioEngineRef.current = audioEngine;
-        speechEngineRef.current = speechEngine;
+        audioEngineRef.current = createAudioEngine();
       } catch {
         // "The timer still runs visually ... with a small persistent banner"
         // -- docs/user-flows.md's proposed default for this edge case.
         setAudioError(true);
       }
     };
-    initEngines();
-  }, [settings]);
+    initAudioEngine();
+  }, []);
+
+  // Rebuilds the speech engine only when the *voice itself* changes, not
+  // on every settings tick -- `settings.ttsVoice` is a primitive dep, so
+  // this only re-fires on a real value change even though `settings` gets
+  // a new object identity every tick. appVolume/speechRate don't need a
+  // rebuild; they're applied live in the tick loop below via
+  // setVolume/setRate. Builds the replacement before touching the ref, and
+  // only closes the previous engine once the new one is confirmed working
+  // -- a failed voice *switch* keeps the old (working) engine rather than
+  // leaving playback broken or surfacing the "sound unavailable" banner
+  // for a problem that isn't "sound is unavailable".
+  useEffect(() => {
+    const rebuildSpeechEngine = () => {
+      let nextEngine: SpeechEngine;
+      try {
+        nextEngine = createSpeechEngine(settings.ttsVoice);
+      } catch {
+        if (speechEngineRef.current === null) {
+          // Initial construction genuinely failed -- sound really is
+          // unavailable, unlike a failed later voice *switch* (which just
+          // keeps whatever engine was already working).
+          setAudioError(true);
+        }
+        return;
+      }
+      const previous = speechEngineRef.current;
+      speechEngineRef.current = nextEngine;
+      if (previous !== null) {
+        void previous.close();
+      }
+    };
+    rebuildSpeechEngine();
+  }, [settings.ttsVoice]);
+
+  // Fires on mount (this screen is already focused then) and again every
+  // time it regains focus -- e.g. returning from Settings/Punches. Updates
+  // both the ref (what the tick loop below actually reads) and the state
+  // (what triggers the ttsVoice-rebuild effect above and what's returned
+  // to the UI) together. Declared after the engine-construction effects
+  // above so on mount, by the time volume/rate get applied, the engines
+  // those calls target already exist.
+  useFocusEffect(
+    useCallback(() => {
+      const freshSettings = getSettings();
+      settingsRef.current = freshSettings;
+      setSettings(freshSettings);
+      punchesRef.current = getPunches();
+      presetsRef.current = getPresets();
+      audioEngineRef.current?.setVolume(freshSettings.appVolume);
+      speechEngineRef.current?.setVolume(freshSettings.appVolume);
+      speechEngineRef.current?.setRate(freshSettings.speechRate);
+    }, []),
+  );
 
   useEffect(() => {
     initBackgroundAudioSession();
@@ -100,6 +173,10 @@ export function useSession(): UseSessionResult {
         }
         if (decision.shouldResume) {
           showSessionNotification("playing");
+          if (prev.pausedAt !== null) {
+            const pausedDurationMs = now - prev.pausedAt;
+            setSession((prevSession) => shiftSessionForResume(prevSession, pausedDurationMs));
+          }
           return resumeTimer(prev, now);
         }
         return prev;
@@ -130,16 +207,17 @@ export function useSession(): UseSessionResult {
           const { session: nextSession, actions } = sessionTick(
             prevSession,
             nextTimerState,
-            settings,
-            punches,
-            presets,
+            settingsRef.current,
+            punchesRef.current,
+            presetsRef.current,
             now,
           );
           actions.forEach((action) => {
             if (action.type === "speak-combo") {
-              action.combo.forEach((punch) => {
-                speechEngineRef.current?.playWord(resolveAnnounceText(punch, settings.announceStyle));
-              });
+              const words = action.combo.map((punch) =>
+                resolveAnnounceText(punch, settingsRef.current.announceStyle),
+              );
+              speechEngineRef.current?.playCombo(words);
             } else {
               speechEngineRef.current?.playWord(action.cue);
             }
@@ -152,10 +230,17 @@ export function useSession(): UseSessionResult {
     }, TICK_INTERVAL_MS);
 
     return () => clearInterval(intervalId);
-  }, [settings, punches, presets]);
+  }, []);
 
   const start = useCallback(() => {
     pausedByInterruptionRef.current = false;
+    // Snapshot round *structure* fresh, at the moment Start is pressed --
+    // not whatever was true when this hook first mounted (previously
+    // frozen forever via configRef's initial value, since Main Timer is
+    // the app's one long-lived screen and this ref was never
+    // re-derived). Held fixed for the rest of this session once started --
+    // see this hook's own doc comment for why.
+    configRef.current = toTimerConfig(getSettings());
     setTimerState(startTimer(configRef.current, Date.now()));
     setSession(createSession());
     showSessionNotification("playing");
@@ -170,6 +255,10 @@ export function useSession(): UseSessionResult {
       const now = Date.now();
       if (prev.isPaused) {
         showSessionNotification("playing");
+        if (prev.pausedAt !== null) {
+          const pausedDurationMs = now - prev.pausedAt;
+          setSession((prevSession) => shiftSessionForResume(prevSession, pausedDurationMs));
+        }
         return resumeTimer(prev, now);
       }
       showSessionNotification("paused");

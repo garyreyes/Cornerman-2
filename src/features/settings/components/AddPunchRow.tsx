@@ -5,26 +5,51 @@ import { useTheme } from "../../../shared/theme/ThemeContext";
 import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 
 interface AddPunchRowProps {
-  onAdd: (name: string) => void;
+  /** Suggested next-unused number, shown pre-filled but editable -- the
+   * user can override it (e.g. to recreate a deleted punch at its
+   * original number) rather than always taking whatever's next
+   * (2026-08-25 feedback: "jab becoming 1" instead of just landing at 8). */
+  defaultNum: number;
+  onAdd: (name: string, num: number) => void;
 }
 
 /** "Saved immediately -- no generation step" (docs/user-flows.md Flow 4). */
-export function AddPunchRow({ onAdd }: AddPunchRowProps) {
+export function AddPunchRow({ defaultNum, onAdd }: AddPunchRowProps) {
   const { colors, fonts } = useTheme();
   const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const [name, setName] = useState("");
+  const [numDraft, setNumDraft] = useState(String(defaultNum));
+
+  // Resync the suggested number when it advances from outside (e.g. right
+  // after adding a punch, the parent recomputes the next suggestion) --
+  // same adjust-during-render pattern PunchRow uses for its own drafts.
+  const [lastSyncedDefault, setLastSyncedDefault] = useState(defaultNum);
+  if (defaultNum !== lastSyncedDefault) {
+    setLastSyncedDefault(defaultNum);
+    setNumDraft(String(defaultNum));
+  }
 
   function handleAdd() {
     const trimmed = name.trim();
     if (trimmed === "") {
       return;
     }
-    onAdd(trimmed);
+    const parsedNum = Number.parseInt(numDraft, 10);
+    onAdd(trimmed, Number.isNaN(parsedNum) ? defaultNum : parsedNum);
     setName("");
   }
 
   return (
     <View style={styles.row}>
+      <TextInput
+        style={styles.numInput}
+        value={numDraft}
+        onChangeText={setNumDraft}
+        keyboardType="number-pad"
+        placeholder="#"
+        placeholderTextColor={colors.textMuted}
+        accessibilityLabel="Number for the new punch"
+      />
       <TextInput
         style={styles.input}
         value={name}
@@ -57,6 +82,18 @@ function createStyles(colors: ColorTokens, fonts: Fonts) {
       flexDirection: "row",
       alignItems: "center",
       gap: 10,
+    },
+    numInput: {
+      width: 44,
+      fontFamily: fonts.numericSemiBold,
+      fontSize: 15,
+      color: colors.accent,
+      textAlign: "center",
+      paddingVertical: 10,
+      borderRadius: 6,
+      backgroundColor: colors.panel,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
     },
     input: {
       flex: 1,

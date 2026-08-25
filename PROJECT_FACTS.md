@@ -91,14 +91,81 @@ made during feature work.
   via the existing Punches screen if wanted, at which point the name
   resolves to a bundled clip instead of on-device TTS. Confirmed
   decision, not scope creep left unstated.
-- **This environment has no Python installed at all** (no `python`,
-  `python3`, or `pip` — only the Windows Store alias stub) — confirmed
-  while building 5a. `scripts/generate_voice_bank.py` (Kokoro TTS) is
-  written but never executed here; it needs to be run on a machine with
-  a real Python install, same shape as Phase 4a's audio-asset-sourcing
-  gap. Its Kokoro API calls (`KPipeline`, `am_fenrir` voice) are written
-  from training-data knowledge, not verified against a live run or
-  current docs — check them if generation fails.
+- **STALE, corrected 2026-08-24: this environment now has a real Python
+  install (3.13.3, via the `py` launcher, not the `python`/`pip` PATH
+  aliases which still stub out to the Windows Store).** The original
+  "no Python installed at all" note (Phase 5a) was accurate at the time
+  but no longer is — someone installed it since (exact session unknown).
+  Use `py` / `py -m pip`, not `python`, when starting from a fresh
+  shell on this machine.
+- **`scripts/generate_voice_bank.py` has now actually been run
+  end to end and works (2026-08-24)** — the 33 clips committed under
+  `assets/audio/voice/` are real Kokoro TTS output, not placeholders,
+  verified non-silent (RMS ~0.1, real peaks, not near-zero) via
+  `soundfile`. Three real bugs were hit and fixed getting there, all
+  explained in the script's own docstring now:
+  1. **`pip install kokoro soundfile numpy` alone builds numpy from
+     source on Windows and fails.** A brand-new Python patch version
+     (3.13.3) can resolve to a numpy version with no prebuilt Windows
+     wheel yet, and numpy's from-source build needs a real MSVC
+     toolchain this machine doesn't have (the MinGW `cc`/`c++` it falls
+     back to fails at the link step, `ld returned 116 exit status`).
+     Fixed by installing with `--only-binary=:all:`, which forces pip to
+     pick a version that actually has a matching wheel instead of
+     silently degrading to a doomed source build.
+  2. **espeak-ng (Kokoro's phonemization backend) has no non-admin
+     Windows install path at all.** Its only official Windows
+     distribution is an admin-elevated MSI installer — no portable zip
+     build exists in its GitHub releases. In a non-interactive session
+     this means a UAC prompt sits forever with no one to click it; even
+     Scoop's `espeak-ng` package is just a thin wrapper around the same
+     MSI, so it doesn't help either. **Real fix**: the `espeakng-loader`
+     PyPI package (`pip install espeakng-loader`) bundles a real
+     espeak-ng shared library + data files as pip-installable wheel
+     data — no system install, no admin rights. Wired in via
+     `phonemizer.backend.espeak.wrapper.EspeakWrapper.set_library()`/
+     `.set_data_path()`, added near the top of
+     `generate_voice_bank.py` (guarded by a `try`/`except ImportError`
+     so a real system espeak-ng still works if one exists). If this
+     script is ever run on a machine with a working system espeak-ng
+     already, `espeakng-loader` isn't required — but there's no harm in
+     leaving it installed either.
+  3. **`kokoro/pipeline.py` has a real bug on Windows**: it opens its
+     own config JSON with no explicit `encoding="utf-8"`, so Python
+     falls back to the OS locale encoding (cp1252 on this machine) and
+     crashes with `UnicodeDecodeError` on a non-ASCII byte in that
+     config. This is a bug in kokoro's own package, not anything in this
+     repo. Fixed by running with `PYTHONUTF8=1` (Python's global UTF-8
+     mode), which changes `open()`'s default encoding process-wide
+     without touching the installed package. Check whether a newer
+     kokoro release has fixed this upstream before assuming the env var
+     is still needed on a future run.
+  Total real setup cost worth knowing for next time: the plain
+  `pip install kokoro soundfile numpy` (~1GB, torch/spacy/transformers
+  pulled in transitively) took roughly 30 minutes on this machine,
+  dominated by Windows Defender's real-time scanning of the very large
+  number of small files `transformers`/`spacy` install — not a network
+  or CPU bottleneck. A Defender exclusion for the venv folder would
+  speed this up significantly if this needs to be re-run.
+- **The Freesound-CC0 sourcing pass for bell/clapper/countdown-tick
+  (2026-08-24) found real candidates but no perfect match yet, and
+  confirmed a hard constraint**: Freesound requires a logged-in account
+  for any actual file download (anonymous `curl` redirects straight to
+  their login page) — candidates can be found and their licenses
+  verified from outside a session, but the actual `.wav` download needs
+  a human with a Freesound account. Best candidates found: clapper --
+  [uEffects' Clapboard sound](https://freesound.org/people/uEffects/sounds/207867/)
+  (CC0, 380ms, a real film clapperboard crack, close to a perfect spec
+  match); countdown-tick --
+  [Sadiquecat's Metronome click](https://freesound.org/people/Sadiquecat/sounds/793346/)
+  (CC0, 531ms, tagged one-shot/short). Bell has no clean single-strike
+  CC0 match: Benboncan's classic "Boxing Bell.wav" is actually CC-BY 4.0
+  (needs attribution) and a 3-strike ~8s sequence, not a single strike;
+  craigsmith's CC0 candidate has crowd noise mixed into the same clip;
+  Mateusz_Chenc's CC0 candidate is made from an edited bicycle bell, not
+  a real struck-metal ring bell. None of these were actually downloaded
+  or heard — this needs a human with Freesound access and ears before
+  any of them gets dropped into `assets/audio/`.
 - **`VoiceClip` is keyed by normalized text, not `Punch.id`** (revised
   from the original design in `ARCHITECTURE.md` during 5a) — numbers and
   defense/movement words need clips with no owning `Punch`, so
@@ -662,3 +729,233 @@ made during feature work.
   notice new props -- the only way to get it to actually pick up new
   colors. Any future themed prop passed into this library needs the same
   treatment, not just `itemTextStyle`/`selectedIndicatorStyle`.
+- **Ran the native code-level `/impeccable audit` for the first time
+  (2026-08-24, Main Timer + Onboarding).** Unlike web `/impeccable audit`,
+  the native version reads straight from source against the iOS/Android
+  platform references -- no screenshot needed. Scored 15/20 (Good).
+  Fixed the three highest-value findings immediately:
+  1. `app.json`'s `userInterfaceStyle` was `"light"`, fighting the redesign's
+     new dark appearances at the native-container level (permission
+     dialogs, keyboard, system chrome would render light even in
+     System/Dark) -- changed to `"automatic"`.
+  2. `CountdownRing`/`PhaseBadge`'s Reanimated animations never checked
+     Reduce Motion -- now call `useReducedMotion()` and, when true,
+     `CountdownRing` steps `progress.value` directly every 200ms instead
+     of `withTiming`, and `PhaseBadge` skips its scale pulse entirely.
+  3. `AudioErrorBanner` (mid-session, sound-just-broke banner) had no
+     screen-reader announcement -- added `accessibilityRole="alert"` +
+     `accessibilityLiveRegion="assertive"` (Android/TalkBack) and an
+     `AccessibilityInfo.announceForAccessibility` call on mount (iOS/
+     VoiceOver, which has no live-region prop equivalent).
+  **Not yet fixed, deliberately deferred**: Android's
+  `predictiveBackGestureEnabled: false` in `app.json` (P1 -- worth
+  checking whether it's still needed before flipping it, since disabling
+  a system gesture is the kind of thing that might have a real reason
+  behind it), `supportsTablet: true` declared with no actual size-class
+  handling in these layouts (P2), and the countdown ring's numeral having
+  no explicit `accessibilityLabel` (P3). Revisit these before considering
+  6a/7b's audit fully closed.
+- **`useReducedMotion` needed its own Jest mock, and the fix took two
+  attempts to find the real cause (2026-08-24).** First attempt: a
+  top-level `__mocks__/react-native-reanimated.ts` patching in
+  `useReducedMotion: () => false` on top of `jest.requireActual(...)` --
+  worked in an isolated diagnostic test but NOT in the three router-
+  integration tests. Root cause, traced by reading
+  `node_modules/expo-router/build/testing-library/mocks.js`:
+  `expo-router/testing-library` registers its **own**
+  `jest.mock('react-native-reanimated', ...)` factory the moment a test
+  file imports it (`require('react-native-reanimated/mock')` under the
+  hood, unpatched) -- that registration always wins over this project's
+  top-level manual mock in any test that imports
+  `expo-router/testing-library`, regardless of where a competing
+  `jest.mock()`/`jest.doMock()` call is placed (hoisting only reorders
+  within one file; the import that triggers expo-router's internal call
+  still executes before the render). **Real fix**: a *second* manual
+  mock at the subpath both paths actually share --
+  `__mocks__/react-native-reanimated/mock.ts` -- patching
+  `useReducedMotion` there instead. Jest's `__mocks__` convention does
+  support mocking a package subpath this way (mirroring the specifier's
+  path under `__mocks__/`), confirmed working. If a future Reanimated
+  API gap surfaces only in router-integration tests again, patch it at
+  this subpath, not the top-level mock.
+- **The combo voice bank ships two voices now, not one (confirmed
+  2026-08-25).** The user listened to samples of all 9 of Kokoro's
+  American-male voices (am_adam, am_echo, am_eric, am_fenrir, am_liam,
+  am_michael, am_onyx -- am_puck/am_santa weren't sampled, judged
+  unlikely fits by name before spending generation time) and picked
+  Michael + Eric. This isn't a "final pick, ship one voice" decision --
+  the user explicitly asked for the app to keep offering a real choice,
+  not just default to whichever one voice got picked. `am_michael` is
+  the default (`Settings.ttsVoice`'s default value and
+  `speech/types.ts`'s `DEFAULT_VOICE`) -- no strong reason for Michael
+  over Eric as default beyond being asked about first; revisit if that
+  turns out to matter. Adding a third voice later needs three things to
+  agree: `speech/types.ts`'s `TtsVoice` union + `VOICE_OPTIONS`,
+  `scripts/generate_voice_bank.py`'s `VOICES` list, and a new
+  `assets/audio/voice/<voice>/` subfolder generated by running that
+  script again.
+- **A real corner clapper is three fast claps ("pak pak pak"), not one
+  ("pak") -- caught by the user actually hearing the sourced single-clap
+  sample in place (2026-08-25).** Rather than needing a pre-mixed 3-clap
+  sample (harder to source, impossible to retime), `audio/service.ts`'s
+  `playCue` schedules the clapper buffer 3 times through the
+  AudioContext's own sample-accurate clock (`CLAPPER_REPEAT_COUNT = 3`,
+  `CLAPPER_GAP_SEC = 0.15`), not via JS timers. Every other cue
+  (bell/countdownTick/finalBell) still plays exactly once -- this repeat
+  behavior is specific to `"clapper"`, not a general multi-play feature.
+- **`clapper.wav` and `countdown-tick.wav` are real sourced audio now
+  (2026-08-25)** -- uEffects' Clapboard sound and Sadiquecat's Metronome
+  click, both CC0, per the Freesound candidates found earlier. Verified
+  via `soundfile.info()`: `clapper.wav` is 44.1kHz/mono/16-bit, matching
+  `SOURCING.md`'s spec exactly; `countdown-tick.wav` is real audio too
+  but recorded at 192kHz/24-bit rather than the spec's 44.1kHz -- not a
+  functional problem (the native decoder resamples automatically), just
+  a larger file than necessary (~307KB for 0.53s). `bell.wav` is still
+  the untouched silent placeholder -- no clean single-strike CC0 bell was
+  ever found (see the earlier Freesound-sourcing fact above); still
+  open.
+- **Metro's persisted haste-map cache can go stale across a folder
+  restructure, not just an edited file's contents (found 2026-08-25).**
+  After the voice-bank restructure (deleting flat `assets/audio/voice/
+  *.wav` files, replacing with `am_michael/`/`am_eric/` subfolders), a
+  running Metro instance -- and even a plain restart of it -- kept
+  failing to resolve the new nested paths with "Unable to resolve
+  module", even though the files genuinely existed on disk with correct
+  names. Root cause: Metro's file-map cache persists to disk
+  (`%LOCALAPPDATA%/Temp/metro-file-map-*`, `.expo/cache`) across
+  restarts and doesn't reliably reconcile a directory-shape change under
+  it. Fix: `expo start -c` (or manually delete `.expo/cache` and the
+  `metro-file-map-*`/`metro-cache` dirs under `%LOCALAPPDATA%/Temp`)
+  whenever a change deletes-and-recreates a nested asset directory, not
+  only when editing a file's contents in place.
+- **Combo call-outs were playing every word in a combo at the same
+  instant, not in sequence (found 2026-08-25 from the user's on-device
+  test -- "doesn't say the whole combo" + "sometimes distorted voice").**
+  `useSession.ts` called `SpeechEngine.playWord()` once per punch in a
+  tight synchronous `forEach`, and `playWord`'s underlying
+  `AudioBufferSourceNode.start()` had no time offset, so every word
+  started at `context.currentTime` -- overlapping buffers summed into
+  garbled, sometimes clipped/distorted audio. Fixed with a new
+  `SpeechEngine.playCombo(texts)` that schedules bundled clips
+  sequentially on the AudioContext's own clock (`WORD_GAP_SEC = 0.12`
+  between words, same pattern as the clapper's `CLAPPER_GAP_SEC`), and
+  for a word with no bundled clip (e.g. a custom punch name -- falls to
+  on-device TTS, a separate audio pipeline with no shared clock to
+  schedule against) genuinely awaits `expo-speech`'s `onDone` callback
+  before continuing. Not related to the migration doc's item 7 (combo-
+  gap floor of 0.5s intentionally allowing the *next* combo to cancel/
+  overlap the *previous* one's speech at Blitz settings) -- that's
+  between separate combos and was left as-is; this fix is about words
+  *within* one combo, which should never have overlapped at any gap
+  setting.
+- **Punches screen: "disable" means excluded from Random mode's draw,
+  reusing `randomPunchPool` -- not a new `enabled` field on `Punch`
+  (decided 2026-08-25).** User explicitly chose this over a dedicated
+  on/off field: Settings > Combinations already owns a "Restrict punch
+  pool" switch + chip picker writing the same `settings.randomPunchPool:
+  number[] | null` field; the Punches screen's per-row Switch
+  (`toggleRandomPoolMembership()`) is a second entry point onto that
+  same field, not a parallel mechanism. Consequence carried over from the
+  existing mechanism, not introduced by this change: once the pool is
+  non-null (any punch has been excluded), a punch added afterward isn't
+  automatically included -- it must be explicitly toggled on, same as
+  the Combinations chip picker already behaved.
+- **Deleting a punch is recoverable two ways (decided 2026-08-25, user
+  chose "both" over picking just one): a 5s Undo banner, and a "Restore
+  defaults" button.** Undo (`restorePunch()`) re-inserts the exact
+  deleted `Punch` object (same `id`) at its original list index --
+  scoped to only the most recent delete, cleared on any subsequent
+  delete/restore. "Restore defaults" (`restoreDefaultPunches()`) is the
+  general-case escape hatch once Undo's window has passed; it wipes
+  every custom punch back to the factory 7, confirmed via `Alert.alert`
+  first since CLAUDE.md treats this as a real destructive action.
+- **Punch numbers ARE editable now -- reversed same-day (2026-08-25).**
+  First asked explicitly whether to add a number editor and the user said
+  keep numbers fixed (matching extraction doc §1.6); after actually using
+  the app, hit the real gap that decision missed -- deleting "Jab" (num 1)
+  and adding a replacement always landed it at the next-unused number
+  (e.g. 8), with no way to put it back at 1. Reversed: `PunchRow`'s num
+  badge is now an editable `TextInput` (`renumberPunch(id, num)` in
+  settings/service.ts, same commit-on-blur pattern as the name field),
+  and `AddPunchRow` gained a matching number field pre-filled with the
+  next-unused suggestion but overridable. `num` still isn't required to
+  be unique (unchanged design decision) -- a Preset referencing a number
+  that moves away from this punch degrades to `resolvePunchName`'s
+  existing generic `"Punch " + num` fallback rather than breaking; no
+  special Preset-side handling was added, since that fallback already
+  covered this gracefully. Lesson: a "confirmed" decision from a
+  same-day question can still get reversed by the very next round of
+  real usage -- don't treat an earlier answer in this same file as
+  necessarily still current without checking the date.
+- **Pausing never actually stopped combo/defense-cue generation, only the
+  visible countdown (found 2026-08-25 from the user watching "combos
+  called" climb while paused).** `sessionTick()` gates on
+  `timerState.phase !== "work"` only; pausing doesn't change `phase`
+  (`tick()` just freezes and returns the same state unchanged while
+  `isPaused`), so `sessionTick` kept comparing real wall-clock `now`
+  against the already-armed `nextComboAt`/`nextDefenseCueAt` the entire
+  time a session was "paused" -- new combos/cues kept firing and
+  `comboCount` kept incrementing, invisibly, underneath the frozen ring.
+  Fixed: `sessionTick` now short-circuits to zero actions when
+  `timerState.isPaused`, leaving `nextComboAt`/`nextDefenseCueAt`
+  untouched (not reset) so the exact remaining gap survives -- a new
+  `shiftSessionForResume(session, pausedDurationMs)` shifts them forward
+  by the paused duration on resume, the SessionState counterpart to
+  `timer/service.ts`'s own `resume()` (which already did this for
+  `phaseEndAt`/`firstComboAt`, extraction doc §1.3). Wired into both of
+  `useSession.ts`'s resume paths -- the manual pause button and the
+  audio-interruption auto-resume handler -- so a phone call mid-session
+  gets the same fidelity as a manual pause, not just one of the two
+  paths. This bug predates today; it's been present since Phase 7a first
+  connected pause/resume to a running session and was never caught until
+  real on-device use surfaced it.
+- **`useSession.ts` re-syncs `settings`/`punches`/`presets` from storage
+  on focus-regain, not once at mount (fixed 2026-08-25, same day as
+  found; mechanism corrected same day too -- read on).** User chose
+  "fully live, including voice" over two more conservative options when
+  asked. First implementation polled `getSettings()`/`getPunches()`/
+  `getPresets()` from MMKV every 200ms tick and called `setSettings()`
+  unconditionally with the fresh (always-new-reference) result -- this
+  forced a real React re-render of Main Timer's whole subtree 5x/sec for
+  the app's entire lifetime, including while idle and while a completely
+  different screen had focus (Main Timer stays mounted underneath per
+  its "one long-lived screen" design). That background render storm
+  starved the JS thread badly enough that the Settings screen's pure-JS
+  `react-native-wheely` scroll wheels became unresponsive -- the very
+  next thing the user reported ("now I cant adjust time durations").
+  **Corrected same day** to `useFocusEffect` instead (the exact pattern
+  `app/settings/index.tsx` already used for its own Punches/Presets
+  re-sync) -- settings can only change via navigating to Settings/
+  Punches and back, which is exactly a focus transition, so this is
+  fully sufficient, not a lesser compromise. The tick loop reads from
+  `settingsRef`/`punchesRef`/`presetsRef` (updated only by the focus
+  effect), never from state, so the interval effect stays `[]`-deps and
+  never re-subscribes. **Lesson for next time:** "poll storage every
+  tick" sounds cheap because the read itself is cheap, but pairing it
+  with an unconditional `setState` of a freshly-parsed object turns a
+  cheap read into a mandatory full re-render at that same cadence --
+  check whether something already re-renders that often before adding a
+  poll loop, and prefer syncing on the actual trigger event (here: a
+  focus transition) over polling on a fixed clock when nothing requires
+  that granularity. appVolume/speechRate are applied live via
+  setVolume/setRate, same focus-triggered cadence. `ttsVoice` is the one
+  that needed real care:
+  a separate effect keyed on the primitive `settings.ttsVoice` (not the
+  whole `settings` object, which gets a new reference every tick) rebuilds
+  the native speech AudioContext only when the voice value actually
+  changes -- builds the replacement first, only closes the previous
+  engine once the new one is confirmed working, and on a failed *switch*
+  keeps the old (working) engine rather than surfacing the "sound
+  unavailable" banner for a problem that isn't that. The one thing that
+  deliberately stayed snapshot-once: round *structure*
+  (rounds/work/rest/warmup duration) is captured into `configRef` fresh
+  each time `start()` is pressed (itself a fix -- it was previously frozen
+  at whatever settings existed when the app first launched, forever) but
+  held fixed for that session once running, since retroactively resizing
+  a moving round would require re-deriving `phaseEndAt`/`firstComboAt`
+  from underneath an in-progress timer -- nobody asked for that and it
+  risks genuinely undefined timer states. Matches this project's existing
+  precedent of leaving native-wiring hooks like this one untested (see
+  the doc comment at the top of `useSession.ts`); the underlying pure
+  logic it calls (`sessionTick`, `tick`) still carries the real test
+  coverage.

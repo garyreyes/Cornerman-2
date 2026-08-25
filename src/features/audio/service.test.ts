@@ -82,7 +82,37 @@ describe("createAudioEngine", () => {
     startSpy.mockRestore();
   });
 
-  test("handleTimerEvent dispatches through mapEventToCue and plays the mapped cue", async () => {
+  test("clapper plays 3 fast claps, not 1 -- a real corner clapper is 'pak pak pak'", async () => {
+    const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
+
+    const engine = createAudioEngine();
+    await engine.playCue("clapper");
+
+    expect(startSpy).toHaveBeenCalledTimes(3);
+    // Each clap is scheduled via the AudioContext's own clock, not fired
+    // simultaneously (which would just sound like one louder clap) or via
+    // JS timers (imprecise) -- `when` strictly increases by the same gap.
+    const whens = startSpy.mock.calls.map((call) => call[0]);
+    expect(whens[1]! - whens[0]!).toBeCloseTo(0.15);
+    expect(whens[2]! - whens[1]!).toBeCloseTo(0.15);
+
+    startSpy.mockRestore();
+  });
+
+  test("every other cue still plays exactly once, not repeated like the clapper", async () => {
+    const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
+
+    const engine = createAudioEngine();
+    await engine.playCue("bell");
+    await engine.playCue("countdownTick");
+    await engine.playCue("finalBell");
+
+    expect(startSpy).toHaveBeenCalledTimes(3);
+
+    startSpy.mockRestore();
+  });
+
+  test("handleTimerEvent dispatches through mapEventToCue and plays the mapped cue's full repeat count", async () => {
     const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
 
     const engine = createAudioEngine();
@@ -91,7 +121,9 @@ describe("createAudioEngine", () => {
     // microtask queue before asserting.
     await Promise.resolve();
 
-    expect(startSpy).toHaveBeenCalledTimes(1);
+    // work-warning maps to "clapper", which plays 3 times (see the
+    // dedicated clapper test above) -- not 1.
+    expect(startSpy).toHaveBeenCalledTimes(3);
 
     startSpy.mockRestore();
   });

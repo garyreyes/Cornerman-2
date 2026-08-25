@@ -25,7 +25,7 @@ export function initPreviewEngine(): void {
     return;
   }
   try {
-    engine = createSpeechEngine();
+    engine = createSpeechEngine(getSettings().ttsVoice);
   } catch {
     engineInitFailed = true;
   }
@@ -42,7 +42,12 @@ export function disposePreviewEngine(): void {
 /**
  * Rate/volume are re-read from Settings on every call rather than cached
  * at init, since the user may have just changed them on the Settings
- * screen one tap ago. Returns false if the engine failed to initialize
+ * screen one tap ago. Voice is the one exception -- it's baked into the
+ * engine at construction (a different underlying buffer set per voice,
+ * not a live-adjustable param like rate/volume), so changing it on the
+ * Voice picker only takes effect the next time this screen mounts, same
+ * tier as useSession.ts's own engine. Returns false if the engine failed
+ * to initialize
  * (playWord's own contract already guards against blank text before this
  * is ever reached -- see PunchRow.tsx) -- this can't currently detect a
  * genuine single-word playback failure, only a total engine-init failure,

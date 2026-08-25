@@ -471,3 +471,155 @@ Dated log of shipped changes, appended to as features complete.
   stuck on whatever color they first mounted with. Fixed by keying
   `<Wheely>` on the theme mode to force a remount on change. 109/109
   tests still pass, lint/typecheck clean.
+- 2026-08-24: Ran the native code-level `/impeccable audit` for the first
+  time (Main Timer + Onboarding) — reads straight from source against
+  the iOS/Android platform references, no screenshot needed. Scored
+  15/20. Fixed the top 3 findings: `app.json`'s `userInterfaceStyle`
+  changed from `"light"` to `"automatic"` (it was fighting the new dark
+  appearances at the native-container level); `CountdownRing`/
+  `PhaseBadge`'s animations now check `useReducedMotion()` and go
+  stepped/skip-the-pulse when it's on; `AudioErrorBanner` now announces
+  itself to screen readers on mount. Also needed a real Jest fix along
+  the way — `expo-router/testing-library` registers its own
+  `jest.mock('react-native-reanimated', ...)` that overrides this
+  project's own mock in every router-integration test, so
+  `useReducedMotion` had to be patched at the shared
+  `react-native-reanimated/mock` subpath instead (new
+  `__mocks__/react-native-reanimated/mock.ts`) — see `PROJECT_FACTS.md`
+  for the full trace. Deliberately not fixed yet: Android's
+  `predictiveBackGestureEnabled: false`, `supportsTablet: true` with no
+  real tablet layout, and the countdown's missing `accessibilityLabel`.
+  109/109 tests still pass, lint/typecheck clean.
+- 2026-08-24: The voice bank is real now — all 33 clips under
+  `assets/audio/voice/` are genuine Kokoro TTS output (am_fenrir voice),
+  not the silent placeholders committed since Phase 5a. Turns out Python
+  is actually installed on this machine (the earlier "no Python at all"
+  fact was stale), so `scripts/generate_voice_bank.py` finally got a
+  real run. Three real bugs fixed along the way: `pip install` needed
+  `--only-binary=:all:` to stop numpy from trying (and failing) to build
+  from source; espeak-ng has no non-admin Windows install path at all
+  (its only distribution is an admin-elevated MSI, no portable build),
+  worked around with the `espeakng-loader` PyPI package instead of a
+  system install; and a real Windows-only bug in kokoro's own package
+  (opens its config JSON without UTF-8 encoding, crashes on the system's
+  cp1252 locale) needed `PYTHONUTF8=1`. Full detail in `PROJECT_FACTS.md`
+  and the script's own updated docstring. Verified non-silent via a real
+  amplitude check (not just file size). Bell/clapper/countdown-tick are
+  still placeholders — Freesound candidates were found and vetted
+  (license-checked) but Freesound requires a login to actually download,
+  so that step needs a human with an account and ears.
+- 2026-08-25: Voice selection — the bundled combo voice bank now ships
+  two real voices (Michael, Eric) instead of one, with a new Settings >
+  Combo Timing picker to choose between them. `BUNDLED_CLIPS` in
+  `speech/service.ts` is now voice-keyed
+  (`Record<TtsVoice, Record<string, number>>`); `createSpeechEngine`/
+  `resolveBundledClip` take an optional voice param defaulting to
+  Michael. Voice is fixed per engine instance (not live-switchable
+  mid-utterance, same tier as changing Mode) -- a change takes effect on
+  the next session/screen mount. New `Settings.ttsVoice` field, zero-
+  migration default. `scripts/generate_voice_bank.py` now loops over a
+  `VOICES` list and writes each into its own `assets/audio/voice/<voice>/`
+  subfolder — adding a third voice later is just appending to that list
+  and re-running the script, no architecture change. Also fixed a real
+  UX gap the user caught by ear: the clapper (10s work warning) played
+  its single "pak" sample once, but a real corner clapper is three fast
+  claps — `audio/service.ts`'s `playCue` now schedules the clapper's
+  buffer 3 times, 150ms apart, through the AudioContext's own clock. Both
+  voices' full 33-word banks generated and verified non-silent. 114/114
+  tests pass (2 new clapper tests + speech test updates for the
+  voice-keyed signature), lint/typecheck clean.
+- 2026-08-25: Fixed combo call-outs playing garbled and sometimes
+  distorted -- the user tested on-device and reported combos not saying
+  the whole thing, with occasional distortion. Root cause: `useSession.ts`
+  fired `playWord()` once per punch in a combo with zero delay between
+  calls, so every word in e.g. "Jab, Cross, Lead Hook" started playing at
+  the exact same instant -- the overlapping buffers summed into
+  unintelligible/clipped audio. `speech/service.ts` gained
+  `playCombo(texts)`, which schedules bundled clips sequentially on the
+  AudioContext's own clock (~120ms gap between words, same pattern as the
+  clapper's repeat scheduling) and, for any word with no bundled clip
+  (e.g. a custom punch name falling to on-device TTS), genuinely awaits
+  its `onDone` callback before continuing so the sequence still can't
+  overlap itself. `useSession.ts` now calls `playCombo` once per combo
+  instead of looping `playWord`. 3 new tests, 117/117 pass, lint/typecheck
+  clean.
+- 2026-08-25: Punches screen -- delete recovery + a per-punch "random
+  draws" toggle, from the same round of on-device feedback. Deleting a
+  punch now shows an "X deleted - Undo" banner for 5s (`UndoBanner.tsx`,
+  `restorePunch()` re-inserts at the original position); a "Restore
+  defaults" button (confirmed via Alert first, since it's destructive to
+  custom punches) resets the whole list back to the factory 7 via
+  `restoreDefaultPunches()`. Each row also gets a Switch reflecting/
+  toggling whether that punch is drawn in Random mode -- this reuses
+  `settings.randomPunchPool` (the field Settings > Combinations' existing
+  "Restrict punch pool" switch + chip picker already own), just exposed
+  as a second, more direct entry point via `toggleRandomPoolMembership()`
+  -- not a parallel enable/disable field. Punch numbers stay
+  intentionally uneditable, reconfirmed rather than changed (Presets
+  reference punches by number). Also gave the name field a visible
+  bordered-box style matching `AddPunchRow`'s -- it was already editable
+  (tap, commits on blur) but looked like static text, which is what the
+  user actually meant by "not editable". 7 new service tests (124/124
+  total), lint/typecheck clean.
+- 2026-08-25: Punch numbers are now editable, reversing the same-day
+  decision above -- the user tried recreating a deleted "Jab" (num 1)
+  and found it always landed at the next-unused number instead, with no
+  way to put it back at 1. `PunchRow`'s num badge is now an editable
+  field (`renumberPunch()`, same commit-on-blur pattern as the name
+  field), and `AddPunchRow` gained a matching number field pre-filled
+  with the next-unused suggestion but overridable, so adding a punch now
+  lets you set both name and number instead of only name. `num` still
+  isn't required to be unique. 2 new service tests (126/126 total),
+  lint/typecheck clean.
+- 2026-08-25: Fixed pause not actually pausing combo/defense-cue
+  generation -- the user caught this by watching the combo counter climb
+  while the timer showed "PAUSED". Root cause: `sessionTick()` only
+  checked `timerState.phase !== "work"`, never `timerState.isPaused`;
+  since pausing never changes `phase` (only `tick()` freezes, per
+  `timer/service.ts`), the session's own combo/defense-cue scheduling
+  kept firing against real wall-clock time for the entire pause, using
+  whatever `nextComboAt`/`nextDefenseCueAt` had already been armed.
+  `sessionTick` now returns no actions at all while paused, and --
+  matching how `timer/service.ts`'s `resume()` already preserves
+  `phaseEndAt`/`firstComboAt` exactly -- leaves those timestamps
+  untouched rather than resetting them, so a new `shiftSessionForResume()`
+  can shift them forward by the exact paused duration on resume (wired
+  into both `useSession.ts`'s manual `togglePause` and its
+  interruption-recovery resume path). Test-first per this project's
+  correctness-critical rule for pause/resume math: 6 new tests written
+  first and confirmed failing, then fixed. 132/132 tests pass,
+  lint/typecheck clean.
+- 2026-08-25: Settings/Punches changes now reach an already-running
+  session live, not just the next one -- the user's disabled-punch test
+  ("everything except jab, still called out others") traced back to
+  `useSession.ts` reading settings/punches/presets once at mount and
+  never again, a stale leftover from before Settings/Punches existed.
+  Chose the fully-live option (including voice) over two more
+  conservative ones when asked. `useSession.ts` now re-reads from
+  storage every 200ms tick and applies volume/rate live; `ttsVoice`
+  changes rebuild the native speech engine (new engine built and
+  confirmed working before the old one is closed, so a failed switch
+  can't leave playback broken). Round structure (rounds/durations) stays
+  snapshotted per session once started -- retroactively resizing a live
+  round wasn't asked for and risks undefined timer states -- but that
+  snapshot is now taken fresh at `start()` instead of frozen at app
+  launch forever, which was a separate bug this touched in passing.
+  Untested by design, matching this hook's existing native-wiring
+  precedent (the pure logic it calls already has full coverage).
+  132/132 tests pass, lint/typecheck clean.
+- 2026-08-25: Fixed a regression from the live-settings change above --
+  the user reported total audio silence, then (after a full reload)
+  unresponsive Work/Rest/Warmup wheel pickers on the Settings screen.
+  Root cause: polling storage every 200ms tick and calling `setSettings`
+  unconditionally with the fresh (always-new-object-reference) result
+  forced Main Timer to re-render 5x/sec for the app's entire lifetime --
+  including while idle and while the Settings screen had focus, since
+  Main Timer stays mounted underneath it -- which starved the JS thread
+  enough to make the pure-JS scroll wheels unresponsive. Replaced the
+  poll loop with `useFocusEffect` (the same pattern
+  `app/settings/index.tsx` already uses for its own re-sync): settings
+  can only change via navigating to Settings/Punches and back, which is
+  exactly a focus transition, so this loses no coverage while doing zero
+  background work the rest of the time. `useSession.ts`'s tick loop now
+  reads settings/punches/presets from refs updated only on focus, not
+  from polled state. 132/132 tests pass, lint/typecheck clean.

@@ -1,3 +1,5 @@
+import type { TtsVoice } from "../speech/types";
+
 export type ComboMode = "random" | "preset";
 
 /** Whether combo speech announces a punch's name ("Lead Hook") or its number ("three"). */
@@ -25,6 +27,8 @@ export interface Settings {
   /** 0-1, this app's own output only, independent of device media volume */
   appVolume: number;
   announceStyle: AnnounceStyle;
+  /** Which of the bundled Kokoro voices calls out combos -- see speech/types.ts's TtsVoice. */
+  ttsVoice: TtsVoice;
   /** Whether the defense/movement cue layer (roll/slip/duck/...) fires at all during Work phase */
   defenseCuesEnabled: boolean;
   defenseCueGapMinSec: number;
