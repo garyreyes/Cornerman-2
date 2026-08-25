@@ -89,7 +89,10 @@ function createStyles(colors: ColorTokens, fonts: Fonts) {
       fontSize: 15,
       color: colors.accent,
       textAlign: "center",
-      paddingVertical: 10,
+      // paddingVertical raised from 10 -- combined with the 18px numeral
+      // line height, 10 measured out to ~38px, under the 44pt touch-target
+      // minimum (found 2026-08-25 via /impeccable critique).
+      paddingVertical: 13,
       borderRadius: 6,
       backgroundColor: colors.panel,
       borderWidth: 1,

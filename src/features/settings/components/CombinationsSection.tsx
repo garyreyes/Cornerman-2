@@ -79,6 +79,7 @@ export function CombinationsSection({ settings, punches, presets, onChange, onOp
           onValueChange={handleTogglePool}
           trackColor={{ false: colors.panelLine, true: colors.accentDim }}
           thumbColor={restrictPool ? colors.accent : colors.textMuted}
+          accessibilityLabel="Restrict punch pool"
         />
       </View>
       {restrictPool ? (

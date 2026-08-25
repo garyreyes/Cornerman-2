@@ -623,3 +623,98 @@ Dated log of shipped changes, appended to as features complete.
   background work the rest of the time. `useSession.ts`'s tick loop now
   reads settings/punches/presets from refs updated only on focus, not
   from polled state. 132/132 tests pass, lint/typecheck clean.
+- 2026-08-25: Closed 2 of the 3 audit findings deferred from the native
+  `/impeccable audit` pass. `predictiveBackGestureEnabled` flipped
+  `false` -> `true` in `app.json` -- checked first (per the audit's own
+  flag that disabling a system gesture might have a real reason behind
+  it) and confirmed via Expo's versioned SDK 57 docs that `false` is
+  just Expo's own scaffold default, not a project-specific decision;
+  nothing in this app's navigation avoids it. `supportsTablet` flipped
+  `true` -> `false` -- the finding was that it claimed tablet support
+  with zero actual size-class handling in any screen; the honest fix is
+  matching the declaration to reality, not retrofitting tablet layouts
+  onto a portrait-locked phone timer app. Countdown ring gained a real
+  `accessibilityLabel` (`CountdownRing.tsx`) -- the ring/numeral were
+  previously either unlabeled or read digit-by-digit ("2:49"); now the
+  whole ring is one `accessible` unit announcing e.g. "2 minutes 49
+  seconds remaining". `bell.wav` sourcing (the third open item) is
+  separate -- see the next entry. 132/132 tests pass, lint/typecheck
+  clean.
+- 2026-08-25: `bell.wav` is real audio at last -- closes Phase 4a's
+  original audio-sourcing gap. User downloaded Mateusz_Chenc's CC0
+  "Boxing Bell Signals" from Freesound, but the raw file is a 32.8s
+  compilation of 5 separate bell-strike signals concatenated together
+  (confirmed via RMS envelope peak-picking), not a single usable cue --
+  dropping it in as-is would have played all 5 through every phase
+  transition. Trimmed to just the first strike plus its full natural
+  decay tail (0-4.0s, decays below audible by ~3.4s) and wrote that as
+  `assets/audio/bell.wav`, 44.1kHz/stereo/16-bit, healthy amplitude
+  (~0.6 peak, not clipped). Raw source file left in place
+  (`520998__mateusz_chenc__boxing-bell-signals.wav`) in case a different
+  one of its other 4 signals is wanted later. Needs the user's own ears
+  to confirm it actually sounds right on a real device -- same standing
+  verification gap as every other sourced audio asset.
+- 2026-08-25: Fixed the bell not ringing at Round 1's start -- a real,
+  longstanding gap the user caught by ear immediately after finally
+  getting a real bell.wav in place, not a regression from anything
+  touched today. `startTimer()` computes the very first `TimerState`
+  directly rather than deriving it from `tick()` (there's no prior state
+  to transition *from* yet), so it never produced a `TimerEvent` --
+  every later phase change fires one via the tick loop and rings the
+  bell correctly, but the first one never did, silently, whenever warmup
+  is off (the default: `warmupDurationSec: 0`). `useSession.ts`'s
+  `start()` now fires the same `"phase-changed"` event `tick()` would
+  have for that initial state, so `audioEngineRef`'s existing
+  `handleTimerEvent`/`mapEventToCue` mapping (bell on work/rest, nothing
+  on warmup/ready/finished) applies uniformly instead of needing special
+  first-round logic. 132/132 tests pass, lint/typecheck clean.
+- 2026-08-25: Closed Phase 8's close step -- ran a real `/impeccable
+  critique` (dual-agent: independent design review + detector/evidence
+  pass, screenshots captured directly from a running emulator via adb)
+  against the whole app, scoring 30/40, then a full `/impeccable polish`
+  pass fixing everything it found:
+  - **`accentDim` failed WCAG's 3:1 UI-contrast minimum in all three
+    themes** (computed, not estimated) everywhere it carried real
+    meaning -- the wheel-picker selection border, active-chip
+    differentiator, combo-card separator. Raised in `tokens.ts`
+    (system/dark/light all now clear 3:1+ against both `background` and
+    `panel`). `danger`-on-`panel` also fixed (was failing 4.5:1 text
+    contrast in system/dark).
+  - **Preset deletion had no undo or confirmation**, unlike Punches'
+    own 5s Undo banner -- added the identical pattern
+    (`restorePreset()`, reusing `UndoBanner.tsx`).
+  - **A real nested-VirtualizedList bug was visibly breaking the
+    Settings screen** -- `react-native-wheely` (FlatList-based) nested
+    inside Settings' own ScrollView. Removed the dependency entirely;
+    `WheelPicker.tsx` now implements its own scroll/snap/fade logic on
+    Reanimated's `Animated.ScrollView`, matching this codebase's existing
+    Reanimated usage. Two real bugs were caught and fixed only by
+    swiping the rebuilt picker on a real device in both directions
+    (typecheck/lint/tests all stayed green through both): a z-index
+    inversion that hid the selected value, and a `contentOffset` prop
+    fighting the scroll state on every re-render, silently breaking
+    scroll-down specifically while scroll-up worked by coincidence.
+  - **`CountdownRing` was hardcoded at 260dp**, undershooting
+    `docs/design-direction.md`'s own ~40-50%-of-vertical-space target
+    (measured ~28% on a typical device) -- now derived from
+    `useWindowDimensions()`, clamped by width so it can't overflow on a
+    narrow device. Confirmed visibly larger/more dominant on-device.
+  - **Punches list rendered unsorted** (num 1/"jab" buried at the
+    bottom) and a user-typed custom name stayed lowercase next to
+    Title Case defaults -- sorted by `num` for display, and
+    `createPunch`/`renamePunch` now capitalize each word on save.
+  - Minor observations also addressed: 4 touch targets under the 44/48pt
+    minimum (`SegmentedControl`, two chip components, punch-number
+    inputs), an overlapping-`hitSlop` mis-tap risk between Preset
+    Editor's move-up/down/remove buttons, and missing
+    `accessibilityLabel`s on 2 `Switch` controls plus the app's two most-
+    used custom inputs (`WheelPicker`, `LabeledSlider` -- the latter via
+    a proper `accessibilityRole="adjustable"` + increment/decrement
+    pattern for the wheel, matching how `@react-native-community/slider`
+    itself handles this). Deliberately deferred: swapping unicode-glyph
+    icons (⚙▶✕· etc.) for a real icon system -- a new dependency is a
+    bigger decision than a polish-pass minor fix, flagged as a follow-up
+    rather than installed unprompted.
+  136/136 tests pass, lint/typecheck clean. Full critique persisted at
+  `.impeccable/critique/2026-08-25T01-26-46Z__cornerman-app-main-timer-
+  settings-stack.md`.

@@ -81,14 +81,33 @@ function savePunches(punches: Punch[]): void {
   setItem(PUNCHES_KEY, punches);
 }
 
+/**
+ * Capitalizes the first letter of each word without touching the rest --
+ * "jab" -> "Jab", "lead hook" -> "Lead Hook", and an already-capitalized
+ * acronym like "MMA style" is left alone rather than being forced through
+ * a full lowercase-then-titlecase pass. Applied on every punch save
+ * (create + rename) so a user-typed name matches the seeded defaults'
+ * Title Case convention instead of looking inconsistent next to them --
+ * found 2026-08-25 via /impeccable critique (a custom "jab" entry stayed
+ * lowercase forever, next to "Cross", "Lead Hook", etc.).
+ */
+function normalizePunchName(name: string): string {
+  return name
+    .trim()
+    .split(" ")
+    .map((word) => (word.length > 0 ? word[0]!.toUpperCase() + word.slice(1) : word))
+    .join(" ");
+}
+
 export function createPunch(name: string, num: number): Punch {
-  const punch: Punch = { id: Crypto.randomUUID(), num, name };
+  const punch: Punch = { id: Crypto.randomUUID(), num, name: normalizePunchName(name) };
   savePunches([...getPunches(), punch]);
   return punch;
 }
 
 export function renamePunch(id: string, name: string): void {
-  savePunches(getPunches().map((p) => (p.id === id ? { ...p, name } : p)));
+  const normalized = normalizePunchName(name);
+  savePunches(getPunches().map((p) => (p.id === id ? { ...p, name: normalized } : p)));
 }
 
 /**
@@ -189,4 +208,18 @@ export function updatePreset(id: string, name: string, sequence: number[]): void
 
 export function deletePreset(id: string): void {
   savePresets(getPresets().filter((p) => p.id !== id));
+}
+
+/**
+ * Re-inserts a just-deleted preset at (roughly) its original position --
+ * backs the Presets List screen's "Undo" banner (confirmed 2026-08-25 via
+ * /impeccable critique: Presets deletion had no recovery path at all,
+ * unlike Punches' own Undo banner added the same day for the same
+ * reason). Mirrors restorePunch's exact shape/reasoning.
+ */
+export function restorePreset(preset: Preset, index: number): void {
+  const presets = getPresets();
+  const next = [...presets];
+  next.splice(Math.min(index, next.length), 0, preset);
+  savePresets(next);
 }

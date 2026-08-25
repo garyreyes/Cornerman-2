@@ -241,7 +241,18 @@ export function useSession(): UseSessionResult {
     // re-derived). Held fixed for the rest of this session once started --
     // see this hook's own doc comment for why.
     configRef.current = toTimerConfig(getSettings());
-    setTimerState(startTimer(configRef.current, Date.now()));
+    const initial = startTimer(configRef.current, Date.now());
+    // startTimer computes the first TimerState directly rather than going
+    // through tick() (there's no prior state to transition from), so it
+    // never emits a TimerEvent -- every later phase change fires one via
+    // the tick loop below, but this very first one otherwise wouldn't,
+    // meaning the bell would silently skip Round 1's start whenever
+    // warmup is off (the default) and Start goes straight to Work. Fire
+    // the same "phase-changed" event here that tick() would have, so
+    // audioEngineRef's handleTimerEvent/mapEventToCue (bell on work/rest,
+    // nothing on warmup/ready/finished) applies uniformly.
+    audioEngineRef.current?.handleTimerEvent({ type: "phase-changed", phase: initial.phase, round: initial.round });
+    setTimerState(initial);
     setSession(createSession());
     showSessionNotification("playing");
   }, []);

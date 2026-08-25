@@ -55,11 +55,15 @@ as each sub-phase completes — it should never drift out of sync with
   `react-native-audio-api` gain → WaveShaper limiter → destination
   chain (this library has no `DynamicsCompressorNode` yet — see
   `PROJECT_FACTS.md`), wired to timer phase events via
-  `mapEventToCue`. Bell/clapper/countdown-tick assets are silent
-  placeholders pending manual sourcing — see
-  `assets/audio/SOURCING.md`; the actual gain/limiter tuning also
-  awaits a real by-ear pass once real assets + a device are in hand.
+  `mapEventToCue`. Bell/clapper/countdown-tick assets were silent
+  placeholders pending manual sourcing — see `assets/audio/SOURCING.md`.
   13 tests passing (56/56 total).
+  - **All three sourced, 2026-08-25**: `clapper.wav`/`countdown-tick.wav`
+    (real CC0 Freesound recordings) and `bell.wav` (trimmed from a real
+    CC0 Freesound recording — see `PROJECT_FACTS.md` for both). The
+    actual gain/limiter tuning by-ear pass, and confirming all three
+    genuinely sound right, still needs the user's own ears on a real
+    device.
 
 ## Phase 5 — Speech Pipeline
 
@@ -163,10 +167,12 @@ from the real, shipped result)*
     visual audit below, this one was genuinely runnable in this
     environment. Scored 15/20. Fixed the top 3 findings immediately
     (`userInterfaceStyle`, Reduce Motion, `AudioErrorBanner`'s missing
-    screen-reader announcement — see `PROJECT_FACTS.md`). **Still open**:
-    Android's `predictiveBackGestureEnabled: false`, `supportsTablet:
-    true` with no real tablet layout, and the countdown's missing
-    `accessibilityLabel` — deliberately deferred, not forgotten.
+    screen-reader announcement — see `PROJECT_FACTS.md`). **All 3
+    remaining findings closed 2026-08-25**: `predictiveBackGestureEnabled`
+    flipped to `true` (confirmed it was just Expo's scaffold default, not
+    a project reason), `supportsTablet` flipped to `false` (honest fix —
+    no tablet layouts exist), countdown ring gained a real
+    `accessibilityLabel` — see `CHANGES.md`/`PROJECT_FACTS.md`.
   - [ ] **Genuine visual confirmation** — still `not started`. Needs
     either a real screenshot batch from the user or their own on-device
     look; this environment still has no simulator/screenshot capability
@@ -281,17 +287,23 @@ from the real, shipped result)*
   "save" as its own step and autosaving a new preset's draft would
   persist abandoned entries. Judgment/presentation, no new tests.
   109/109 tests passing, all gates green.
-- [ ] **Phase close: `/impeccable critique` + `/impeccable polish`** —
-  `not started` — all three screens judged together for visual
-  consistency, not one at a time. One known, deliberately-deferred item
-  for this pass: Punches' last-punch-delete guard uses a native
-  `Alert.alert` (the app's only native dialog so far, everywhere else is
-  a themed inline banner) — flagged in `PROJECT_FACTS.md` as a candidate
-  for reconciling here rather than fixed piecemeal. **Also now covers**
-  the new Appearance section (System/Light/Dark toggle, added
-  2026-08-24) and the dark/orange redesign applied across all three
-  screens — this pass should judge the new palette, not the retired
-  gunmetal/brass one.
+- [x] **Phase close: `/impeccable critique` + `/impeccable polish`** —
+  `done`, 2026-08-25 — Main Timer + full Settings stack judged together
+  (dual-agent critique, 30/40, real screenshots from a running emulator),
+  then polished. Fixed: `accentDim`/`danger` WCAG contrast failures,
+  unconfirmed/unrecoverable preset deletion, a real nested-VirtualizedList
+  bug that removed `react-native-wheely` entirely (hand-built on
+  Reanimated instead), `CountdownRing` undershooting its own
+  design-contract sizing target, an unsorted Punches list + inconsistent
+  name casing, four sub-44pt touch targets, an overlapping-hitSlop
+  mis-tap risk, and several missing `accessibilityLabel`s. Full report
+  in `CHANGES.md` and `.impeccable/critique/`. 136/136 tests passing.
+  **Deliberately deferred, not forgotten**: Punches' last-punch-delete
+  guard still uses a native `Alert.alert` (the app's only native dialog,
+  everywhere else is a themed inline banner) — flagged in
+  `PROJECT_FACTS.md`; swapping unicode-glyph icons (⚙▶✕ etc.) for a real
+  icon system — a new dependency, judged too big a decision for this
+  pass, needs its own follow-up.
 
 ## Phase 9 — Platform Builds & Ship Readiness
 

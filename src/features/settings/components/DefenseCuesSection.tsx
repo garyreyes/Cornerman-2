@@ -31,6 +31,7 @@ export function DefenseCuesSection({ settings, onChange }: DefenseCuesSectionPro
           onValueChange={(defenseCuesEnabled) => onChange({ defenseCuesEnabled })}
           trackColor={{ false: colors.panelLine, true: colors.accentDim }}
           thumbColor={settings.defenseCuesEnabled ? colors.accent : colors.textMuted}
+          accessibilityLabel="Defense cues enabled"
         />
       </View>
       {settings.defenseCuesEnabled ? (

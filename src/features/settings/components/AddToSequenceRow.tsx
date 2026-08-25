@@ -27,6 +27,11 @@ export function AddToSequenceRow({ punches, onAdd }: AddToSequenceRowProps) {
           key={punch.id}
           onPress={() => onAdd(punch.num)}
           style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
+          // Visual height (~28px) is under the 44/48pt touch-target
+          // minimum -- found 2026-08-25 via /impeccable critique. Kept
+          // small and paired with the wrap's widened gap below, since
+          // these chips can wrap onto multiple rows.
+          hitSlop={4}
           accessibilityRole="button"
           accessibilityLabel={`Add ${punch.name} to sequence`}
         >
@@ -42,10 +47,12 @@ function createStyles(colors: ColorTokens, fonts: Fonts) {
     wrap: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: 8,
+      // Widened from 8 -- the chip hitSlop (4) needs at least its own
+      // value of clearance from a wrapped neighbor to never overlap.
+      gap: 10,
     },
     chip: {
-      paddingVertical: 6,
+      paddingVertical: 10,
       paddingHorizontal: 12,
       borderRadius: 14,
       borderWidth: 1,

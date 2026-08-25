@@ -61,6 +61,8 @@ export function LabeledSlider({
         thumbTintColor={colors.accent}
         onValueChange={handleValueChange}
         onSlidingComplete={onChange}
+        accessibilityLabel={label}
+        accessibilityValue={{ text: formatValue(displayValue) }}
       />
     </View>
   );

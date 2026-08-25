@@ -11,8 +11,10 @@ import {
   isPunchIncludedInRandomPool,
   LastPunchError,
   markOnboardingComplete,
+  renamePunch,
   renumberPunch,
   restoreDefaultPunches,
+  restorePreset,
   restorePunch,
   saveSettings,
   toggleRandomPoolMembership,
@@ -155,6 +157,22 @@ describe("punches", () => {
     expect(first.id).not.toBe(second.id);
   });
 
+  test("createPunch capitalizes each word of the name, matching the seeded defaults' Title Case", () => {
+    expect(createPunch("jab", 99).name).toBe("Jab");
+    expect(createPunch("lead hook", 99).name).toBe("Lead Hook");
+    expect(createPunch("  crescent kick  ", 99).name).toBe("Crescent Kick");
+  });
+
+  test("createPunch leaves an already-uppercase word's own casing alone -- only the first letter is forced, never lowercased", () => {
+    expect(createPunch("MMA style", 99).name).toBe("MMA Style");
+  });
+
+  test("renamePunch capitalizes the new name the same way createPunch does", () => {
+    const punch = createPunch("Jab", 1);
+    renamePunch(punch.id, "superman punch");
+    expect(getPunches().find((p) => p.id === punch.id)?.name).toBe("Superman Punch");
+  });
+
   test("refuses to delete the last remaining punch", () => {
     getPunches().forEach((p, i) => {
       if (i > 0) deletePunch(p.id);
@@ -262,5 +280,17 @@ describe("presets", () => {
 
     deletePreset(preset.id);
     expect(getPresets()).toEqual([]);
+  });
+
+  test("restorePreset brings a deleted preset back at its original position", () => {
+    const first = createPreset("Combo A", [1, 2]);
+    const second = createPreset("Combo B", [3, 4]);
+    const before = getPresets();
+
+    deletePreset(first.id);
+    expect(getPresets()).toEqual([second]);
+
+    restorePreset(first, 0);
+    expect(getPresets()).toEqual(before);
   });
 });

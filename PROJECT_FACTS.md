@@ -449,6 +449,11 @@ made during feature work.
   Rest/Warmup duration wheels — user explicitly chose "add a library"
   over hand-building a scroll-wheel, and this one avoids a native
   rebuild dependency a heavier wheel-picker library would need.
+  (Superseded 2026-08-25 -- the library itself was removed and its scroll
+  wheel hand-built directly on Reanimated, see the dedicated fact further
+  down; "avoid hand-building" was the right call at the time given what
+  was known then, but a real nested-VirtualizedList bug it carried
+  changed that.)
   `@react-native-community/slider` — a real native view, needs a
   dev-client rebuild like every other native dependency already in this
   project — used for every slider-shaped control (volume, speech rate,
@@ -714,21 +719,41 @@ made during feature work.
   from a `theme` module directly instead of `useTheme()`, it will not
   respond to a theme-mode change; there is no compatibility shim, the old
   module is deleted.
-- **`react-native-wheely`'s `WheelPickerItem` is wrapped in
-  `React.memo(..., () => true)` -- a comparator that always returns
-  `true`, meaning it deliberately never re-renders after its first mount
-  (confirmed 2026-08-24 reading `node_modules/react-native-wheely/lib/
-  WheelPickerItem.js`).** A `textStyle`/`selectedIndicatorStyle` color
-  change (e.g. switching Appearance mode) is silently ignored by
-  already-mounted wheel items -- the numerals stay whatever color they
-  first rendered with, which is how Dark mode shipped with invisible
-  wheel-picker numbers (stuck on their original color, now indistinguishable
-  from the new background). Fixed by keying the `<Wheely>` element itself
-  on `mode` (`src/shared/components/WheelPicker.tsx`) so an Appearance
-  change forces a full remount instead of relying on the library to
-  notice new props -- the only way to get it to actually pick up new
-  colors. Any future themed prop passed into this library needs the same
-  treatment, not just `itemTextStyle`/`selectedIndicatorStyle`.
+- **`react-native-wheely` is no longer a dependency of this project --
+  removed entirely 2026-08-25 via /impeccable critique/polish.** It was
+  `Animated.FlatList` under the hood (a VirtualizedList), nested inside
+  Settings' own page-level ScrollView, which triggered a real "should
+  never be nested" RN warning that was also visibly obstructing the
+  Settings screen in every scrolled screenshot -- not just a console
+  warning, a genuine architecture bug. `src/shared/components/
+  WheelPicker.tsx` now implements its own scroll/snap/fade logic directly
+  on Reanimated's `Animated.ScrollView` (matching CountdownRing/
+  PhaseBadge's existing Reanimated usage in this codebase, not React
+  Native's legacy Animated API), rendering all rows un-virtualized -- these
+  lists are always small (max ~121 for Work duration), so virtualization
+  bought nothing worth the nesting problem. This also fully retires the
+  `React.memo(..., () => true)`-never-re-renders bug documented below
+  (confirmed 2026-08-24) and its `key={mode}`-forced-remount workaround --
+  rows in the new implementation are normal React components with no such
+  restriction, so that workaround is gone too, not just papered over.
+  Two real bugs were caught and fixed *while verifying this rewrite
+  on-device* (not just via typecheck/lint/tests, which don't render UI):
+  (1) the selected-row indicator initially had a higher `zIndex` than the
+  scrolling text, opaquely covering the selected value -- backwards from
+  the original library's own stacking order, where option rows had
+  `zIndex: 100` and the indicator had none; (2) the wheel and Settings'
+  own outer ScrollView are both vertical scrollables, and without
+  `nestedScrollEnabled` (Android-only), a swipe starting on the wheel got
+  claimed by the outer page instead of scrolling the wheel -- and
+  separately, an unconditionally-recomputed `contentOffset` prop (a new
+  object every render) was fighting the ScrollView's own scroll state
+  on every re-render, breaking scroll-down specifically (scroll-up
+  happened to still work by coincidence, which is exactly the kind of
+  directional bug a purely-static check would never catch). **Lesson:**
+  typecheck/lint/tests all passing does not mean a scroll/gesture-driven
+  rewrite actually works -- this one needed a real swipe on a real
+  device in both directions before it could be trusted, and the first
+  "it looks right" screenshot was hiding two separate functional bugs.
 - **Ran the native code-level `/impeccable audit` for the first time
   (2026-08-24, Main Timer + Onboarding).** Unlike web `/impeccable audit`,
   the native version reads straight from source against the iOS/Android
@@ -747,14 +772,38 @@ made during feature work.
      `accessibilityLiveRegion="assertive"` (Android/TalkBack) and an
      `AccessibilityInfo.announceForAccessibility` call on mount (iOS/
      VoiceOver, which has no live-region prop equivalent).
-  **Not yet fixed, deliberately deferred**: Android's
-  `predictiveBackGestureEnabled: false` in `app.json` (P1 -- worth
-  checking whether it's still needed before flipping it, since disabling
-  a system gesture is the kind of thing that might have a real reason
-  behind it), `supportsTablet: true` declared with no actual size-class
-  handling in these layouts (P2), and the countdown ring's numeral having
-  no explicit `accessibilityLabel` (P3). Revisit these before considering
-  6a/7b's audit fully closed.
+  **All 3 deferred findings closed 2026-08-25:**
+  1. `predictiveBackGestureEnabled` (P1) -- checked before flipping, per
+     this finding's own flag. Expo's versioned SDK 57 docs confirm
+     `false` is just the scaffold's own default value, not a
+     project-specific decision recorded anywhere -- flipped to `true`.
+     Safe for this app: it's on `expo-router`/React Navigation's stack
+     navigator throughout, nothing exotic that would fight the
+     predictive-back preview animation. Native `android/` is gitignored
+     (CNG/managed workflow, confirmed via `git check-ignore`), so the
+     next build regenerates `AndroidManifest.xml`'s
+     `enableOnBackInvokedCallback` automatically -- no manual native
+     edit needed. **Still genuinely unverified on-device** -- same
+     standing gap as every other visual/interaction claim in this
+     project; watch for any predictive-back preview glitch the first
+     time this is actually run.
+  2. `supportsTablet` (P2) -- flipped `true` -> `false` rather than
+     building real tablet layouts, which the finding never asked for
+     (its complaint was the *dishonest declaration*, not "no tablet
+     support" itself). This app is portrait-locked
+     (`orientation: "portrait"`) with fixed-width components (WheelPicker
+     etc.) -- real tablet/size-class support would be a genuine feature,
+     not a one-line audit fix. Revisit if tablet support is ever
+     actually wanted.
+  3. Countdown ring's missing `accessibilityLabel` (P3) -- fixed in
+     `CountdownRing.tsx`: the whole ring is now one `accessible={true}`
+     unit with a natural-language label (`formatRemainingForScreenReader`,
+     e.g. "2 minutes 49 seconds remaining") instead of relying on the
+     numeral text being read digit-by-digit or the ring/label being
+     separately-focusable, confusingly unlabeled children. No live-region
+     announcement added deliberately -- a countdown updating every 200ms
+     would spam a screen reader user constantly; the label is read only
+     when they explicitly navigate to it, same as any on-demand value.
 - **`useReducedMotion` needed its own Jest mock, and the fix took two
   attempts to find the real cause (2026-08-24).** First attempt: a
   top-level `__mocks__/react-native-reanimated.ts` patching in
@@ -811,9 +860,9 @@ made during feature work.
   but recorded at 192kHz/24-bit rather than the spec's 44.1kHz -- not a
   functional problem (the native decoder resamples automatically), just
   a larger file than necessary (~307KB for 0.53s). `bell.wav` is still
-  the untouched silent placeholder -- no clean single-strike CC0 bell was
-  ever found (see the earlier Freesound-sourcing fact above); still
-  open.
+  the untouched silent placeholder as of this note -- a real CC0
+  candidate was found 2026-08-25 (see the dedicated fact below) and
+  handed to the user to download; not dropped into `assets/audio/` yet.
 - **Metro's persisted haste-map cache can go stale across a folder
   restructure, not just an edited file's contents (found 2026-08-25).**
   After the voice-bank restructure (deleting flat `assets/audio/voice/
@@ -959,3 +1008,66 @@ made during feature work.
   the doc comment at the top of `useSession.ts`); the underlying pure
   logic it calls (`sessionTick`, `tick`) still carries the real test
   coverage.
+- **`bell.wav` sourced and placed (2026-08-25): user chose Mateusz_Chenc's
+  "Boxing Bell Signals" over the recommended craigsmith candidate.**
+  Recommended craigsmith's "G39-09-Boxing Fight Bell.wav"
+  (freesound.org/people/craigsmith/sounds/438626/, CC0, genuine archival
+  Hollywood optical-effects recording, single clang) as the top pick, and
+  flagged Mateusz_Chenc's "Boxing Bell Signals" (sounds/520998/) as a
+  rejected runner-up -- CC0 but made from an edited bicycle bell, risking
+  the old app's #1 documented complaint ("doesn't even sound like a
+  boxing ring"). User downloaded the Mateusz_Chenc one anyway ("I added a
+  better one"). Its raw file turned out to be a 32.8s compilation of 5
+  separate bell-strike signals concatenated together (confirmed via RMS
+  envelope peak-picking: strikes at ~0.1s, ~9.3-9.85s, ~17.85-18.4s), not
+  a single usable cue -- trimmed to just the first strike + its full
+  natural decay tail (0-4.0s) and wrote that as `assets/audio/bell.wav`.
+  Raw source left in place at
+  `assets/audio/520998__mateusz_chenc__boxing-bell-signals.wav` in case a
+  different one of its other signals is wanted later (e.g. the ~9.3s or
+  ~17.85s clusters, which sound like double-strike patterns). Whether a
+  bicycle-bell-derived sound actually reads as authentic in practice is
+  still an open, real question -- confirmed CC0 and confirmed non-silent,
+  but not confirmed to sound right; needs the user's own ears on a real
+  device, same as every other sourced cue.
+- **The bell never rang at Round 1's start -- a real gap present since
+  Phase 2a, only surfaced 2026-08-25 once bell.wav was finally real
+  audio instead of a silent placeholder (silence had been masking it the
+  whole time).** `startTimer()` builds the first `TimerState` directly
+  (`beginWork()`/the warmup branch), not via `tick()`, so it never
+  produced a `TimerEvent` for anything to react to -- every subsequent
+  phase change (work<->rest, warmup->work) goes through `tick()` and
+  correctly emits `phase-changed`, ringing the bell as expected, but the
+  very first entry into Work never did when warmup is off (the default).
+  Fixed in `useSession.ts`'s `start()`: fires the same `"phase-changed"`
+  event `tick()` would have for the initial state, reusing
+  `audio/service.ts`'s existing `mapEventToCue` mapping rather than
+  adding special first-round logic. Worth remembering: a silent
+  placeholder asset can hide a real logic bug for a long time -- this
+  bug was there through the entire audio-sourcing arc of this session
+  and only became audible once real audio actually existed to reveal it.
+- **A session-resets-itself anomaly (paused -> silently back to Ready,
+  no user action) turned out to be a dev-workflow artifact, not a code
+  bug -- investigated and closed 2026-08-25.** Observed once while
+  screenshotting the app via adb on the emulator: after manually
+  pausing, the native `MediaSessionService` cycled paused -> playing ->
+  paused -> destroyed over ~66s with zero taps, and the app landed back
+  on Ready. Investigated with temporary `console.log` diagnostics added
+  to every state-mutating path in `useSession.ts` (start/togglePause/
+  reset/interruption-handling), plus a `useRef`-based render-instance-id
+  to catch a silent remount. Root-caused via a clean, controlled repro:
+  force-stopped and relaunched the app (guaranteeing a fresh JS bundle,
+  not whatever Fast Refresh had accumulated), then ran Start -> Pause ->
+  5 minutes fully untouched while live-tailing logcat. Zero anomalies --
+  the session stayed correctly paused, timestamp and combo count frozen
+  exactly. Conclusion: the original occurrence happened on an app
+  instance that had been Fast-Refreshed across dozens of file edits over
+  a very long single dev session (matches the exact same root-cause
+  class as the earlier "total audio silence" bug from the live-settings
+  regression, also fixed by a fresh relaunch) -- not a defect a real user
+  would ever hit on a normal cold-started build. **Lesson: when a
+  runtime anomaly shows up mid-session after a long stretch of hot
+  reloads, always re-test against a fresh force-stop + relaunch before
+  spending time treating it as a logic bug** -- it may just be
+  accumulated Fast Refresh drift. All temporary diagnostic logging was
+  removed afterward; 132/132 tests pass, lint/typecheck clean.
