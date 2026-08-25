@@ -173,11 +173,13 @@ from the real, shipped result)*
     a project reason), `supportsTablet` flipped to `false` (honest fix —
     no tablet layouts exist), countdown ring gained a real
     `accessibilityLabel` — see `CHANGES.md`/`PROJECT_FACTS.md`.
-  - [ ] **Genuine visual confirmation** — still `not started`. Needs
-    either a real screenshot batch from the user or their own on-device
-    look; this environment still has no simulator/screenshot capability
-    of its own. Covers both 6a/7b's original visual gap and confirming
-    the redesign actually looks right.
+  - [x] **Genuine visual confirmation** — `done`, 2026-08-25. Real
+    screenshots captured and reviewed for all four phase states (Ready,
+    Work, Rest, Finished — Rest/Finished were the two never actually
+    seen before). Found and fixed a real bug in the process (see Phase
+    8 close's `WheelPicker` addendum below) — a fresh cold launch showed
+    Settings' Round/Work/Rest wheels stuck on their first list item
+    regardless of actual stored value.
 
 ## Phase 7 — Background Audio + Onboarding
 
@@ -217,8 +219,15 @@ from the real, shipped result)*
   back-navigation need, unlike Phase 8's Settings/Punches/Presets stack,
   which is still the real trigger for adding a router. 108/108 tests
   passing, all gates green.
-  - [ ] `/impeccable audit` — **not run**, same standing gap as 6a (no
-    device/simulator/screenshot capability in this environment).
+  - [x] **Visual confirmation** — `done`, 2026-08-25. Real screenshot of
+    the intro step ("THE BELL KEEPS RINGING") captured and reviewed; the
+    second step ("ONE MORE THING", battery-optimization tip) shares
+    100% of its layout/type styles with the captured step (one
+    `createStyles` call for both), confirmed via source rather than a
+    second screenshot after repeated synthetic-touch timing issues in
+    this environment made it hard to land on that exact step. No issues
+    found — matches the app's dark/orange world, single obvious primary
+    action per screen, correct accessibility labels on both buttons.
 
 ## Phase 8 — Settings + Punches + Presets
 
@@ -304,6 +313,13 @@ from the real, shipped result)*
   `PROJECT_FACTS.md`; swapping unicode-glyph icons (⚙▶✕ etc.) for a real
   icon system — a new dependency, judged too big a decision for this
   pass, needs its own follow-up.
+  - *Addendum (2026-08-25, closing 6a/7b's visual-confirmation gap):*
+    a second real `WheelPicker` bug found on a genuinely fresh app
+    launch — Round/Work/Rest wheels showed the first list item instead
+    of the actual stored value. Fixed (frozen initial `contentOffset`
+    instead of a mount-time `scrollTo`, which was racing the native
+    view's first layout and losing). See `PROJECT_FACTS.md` for the
+    full trace. 136/136 tests still pass.
 
 ## Phase 9 — Platform Builds & Ship Readiness
 
@@ -435,11 +451,15 @@ the full token map and reasoning. **This redesign has not yet been seen
 on a real device either** — same standing verification gap as
 everything else in this environment.
 
-**What's next:** run `/impeccable audit` now that a device is
-genuinely available, covering 6a/7b's outstanding audit **against the
-new dark/orange palette** and the Phase 8 close step (`/impeccable
-critique` + `/impeccable polish` across all three Settings-stack
-screens, including the new Appearance section, judged together). **9a's
+**Update, 2026-08-25:** the Phase 8 close `/impeccable critique` +
+`/impeccable polish` pass described as "what's next" above is now done
+(see Phase 8's close entry), and so is 6a/7b's outstanding visual
+confirmation gap — real screenshots of every Main Timer phase state and
+the Onboarding intro were captured and reviewed against the new
+dark/orange palette, closing a second real `WheelPicker` bug in the
+process (see the Phase 8 close addendum). **What's actually next:** 7a's
+real-device background-audio survival test (locked screen / phone call)
+is still the one standing verification gap nothing has closed yet. **9a's
 `eas.json` is written** (build profiles for a dev-client build), but
 actually linking an EAS project (`eas login`, `eas build:configure`)
 and triggering a real build is still the user's own action. Phase 10+

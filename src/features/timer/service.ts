@@ -92,7 +92,7 @@ export function tick(
     }
   }
 
-  if (s.phase === "work" && !s.tenWarned) {
+  if (s.phase === "work" && !s.tenWarned && config.workDurationMs > WORK_WARNING_THRESHOLD_MS) {
     const remainingMs = s.phaseEndAt - now;
     if (remainingMs <= WORK_WARNING_THRESHOLD_MS) {
       s = { ...s, tenWarned: true };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import Animated, {
   Extrapolation,
@@ -113,10 +113,38 @@ export function WheelPicker({ label, value, values, formatValue = (v) => String(
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollY = useSharedValue(selectedIndex * ITEM_HEIGHT);
 
+  // `scrollTo` on mount races the native ScrollView's own first layout pass
+  // (confirmed 2026-08-25 on a real device: the mount-only effect below
+  // fired with the correct target offset every time, but the screen still
+  // rendered scrolled to index 0 -- `scrollTo` is a no-op if the native
+  // view hasn't measured its content yet). `contentOffset` is read once by
+  // the native view during its own initial layout, so it lands reliably;
+  // frozen via `useState`'s lazy initializer (never recomputed after
+  // mount) specifically to avoid reintroducing the *other* on-device bug
+  // this same component already fixed once, where recomputing
+  // `contentOffset` on every render fought the user's own active scroll.
+  const [initialOffset] = useState(() => selectedIndex * ITEM_HEIGHT);
+  // A fresh `{x, y}` object literal on every render is a *new reference*
+  // even when `initialOffset` itself never changes -- and passing a new
+  // object to `contentOffset` on every render is exactly the failure mode
+  // already fixed once before in this component (see the note above): RN
+  // re-applies it as a fresh repositioning command each time, which can
+  // fight the user's own in-progress scroll on any parent re-render (e.g.
+  // a sibling wheel's onChange updating shared `settings` state re-renders
+  // this whole row). Memoized so the object reference is as stable as the
+  // value it carries.
+  const contentOffset = useMemo(() => ({ x: 0, y: initialOffset }), [initialOffset]);
+  const isMounted = useRef(false);
+
   // If selectedIndex changes from outside (not via this component's own
-  // scroll), scroll to match -- what the user sees as selected must always
-  // correspond to the actual stored value.
+  // scroll) *after* mount, scroll to match -- what the user sees as
+  // selected must always correspond to the actual stored value. Skipped on
+  // the mount run itself since `contentOffset` above already places it.
   useEffect(() => {
+    if (!isMounted.current) {
+      isMounted.current = true;
+      return;
+    }
     scrollY.set(selectedIndex * ITEM_HEIGHT);
     scrollTo(scrollRef, 0, selectedIndex * ITEM_HEIGHT, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,6 +205,7 @@ export function WheelPicker({ label, value, values, formatValue = (v) => String(
           onMomentumScrollEnd={handleMomentumScrollEnd}
           snapToInterval={ITEM_HEIGHT}
           decelerationRate="fast"
+          contentOffset={contentOffset}
           contentContainerStyle={{ paddingVertical: VISIBLE_REST * ITEM_HEIGHT }}
           // Both this wheel and the Settings screen's own outer ScrollView
           // are vertical -- without this (Android-only) prop, a swipe
