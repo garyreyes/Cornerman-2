@@ -87,6 +87,34 @@ describe("the 10-second work-warning latch (extraction doc §1.1)", () => {
     const { events } = advanceTicks(state, baseConfig, now, now + 4_800);
     expect(events.filter((e) => e.type === "work-warning")).toHaveLength(0);
   });
+
+  test("never fires when the whole work round is 10 seconds or shorter -- there's no meaningful '10 seconds left' moment separate from the round just starting", () => {
+    const now = 1_000_000;
+    const shortConfig: TimerConfig = { ...baseConfig, workDurationMs: 8_000 };
+    const state = startTimer(shortConfig, now);
+    const { events } = advanceTicks(state, shortConfig, now, now + 8_000);
+    expect(events.filter((e) => e.type === "work-warning")).toHaveLength(0);
+  });
+
+  test("still fires normally right at the 10-second boundary when the round is longer than 10 seconds", () => {
+    const now = 1_000_000;
+    const exactConfig: TimerConfig = { ...baseConfig, workDurationMs: 10_000 };
+    const state = startTimer(exactConfig, now);
+    const { events } = advanceTicks(state, exactConfig, now, now + 200);
+    // workDurationMs === WORK_WARNING_THRESHOLD_MS: the "10s left" moment
+    // and the round's start are the same instant, so this is really the
+    // same "too short to mean anything" case as the test above, not a
+    // separate boundary worth warning at.
+    expect(events.filter((e) => e.type === "work-warning")).toHaveLength(0);
+  });
+
+  test("fires normally for a round just over the threshold", () => {
+    const now = 1_000_000;
+    const config: TimerConfig = { ...baseConfig, workDurationMs: 10_200 };
+    const state = startTimer(config, now);
+    const { events } = advanceTicks(state, config, now, now + 400);
+    expect(events.filter((e) => e.type === "work-warning")).toHaveLength(1);
+  });
 });
 
 describe("the rest-phase 3-2-1 countdown latch (extraction doc §1.1)", () => {

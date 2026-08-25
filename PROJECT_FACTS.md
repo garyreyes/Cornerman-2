@@ -1071,3 +1071,102 @@ made during feature work.
   spending time treating it as a logic bug** -- it may just be
   accumulated Fast Refresh drift. All temporary diagnostic logging was
   removed afterward; 132/132 tests pass, lint/typecheck clean.
+- **`WheelPicker`'s mount-time `scrollTo` was a silent no-op -- a second
+  real bug in the same component, found 2026-08-25 closing out 6a/7b's
+  visual-confirmation gap.** Settings' Round/Work/Rest wheels displayed
+  the *first* item in their list (e.g. "Rounds: 1") regardless of the
+  actual stored value (e.g. `9`) on every genuinely fresh app launch --
+  reproduced repeatedly with force-stop + relaunch, so not the Fast
+  Refresh artifact class described just above. Confirmed via temporary
+  `console.log` in the mount `useEffect` that `selectedIndex` was always
+  correct at the moment `scrollTo(scrollRef, 0, target, false)` fired --
+  the call itself just didn't take, most likely racing the native
+  `ScrollView`'s own first layout pass (it has nothing to scroll *to*
+  yet when called this early). Reanimated's `scrollTo` has no built-in
+  retry for this. Fixed by reintroducing a `contentOffset` prop for the
+  *initial* position only -- frozen via `useState`'s lazy initializer so
+  it's computed exactly once and never recomputed on re-render, which is
+  what makes this safe against the *other* `contentOffset` bug this same
+  component already fixed once (recomputing it every render fights the
+  user's own active scroll, 2026-08-25 earlier the same day). The mount
+  `useEffect` still handles `selectedIndex` changing *after* mount
+  (e.g. a value edited elsewhere), just skips its own first run since
+  `contentOffset` already placed it. **Lesson for any future
+  scroll-to-initial-position need on this codebase's Reanimated
+  `Animated.ScrollView`s: don't rely on an imperative `scrollTo` call in
+  a bare mount effect -- it can silently lose the race against the
+  view's first layout. `contentOffset`, frozen at mount, is the reliable
+  primitive; `scrollTo` is only reliable for a *later* change.** Verified
+  by tapping through Settings on a fresh force-stopped relaunch (not
+  Fast Refresh) before and after the fix; screenshots before showed the
+  bug, after showed correct values. 136/136 tests pass, lint/typecheck
+  clean.
+- **Closed 6a's "genuine visual confirmation" gap and 7b's onboarding
+  audit gap, 2026-08-25**, now that a real emulator is available for
+  more than ad hoc troubleshooting. Captured real screenshots of all
+  four Main Timer phase states (Ready, Work, Rest, Finished -- Rest and
+  Finished were the two states never actually seen before, only reasoned
+  through) and the Onboarding intro screen ("THE BELL KEEPS RINGING").
+  The sweep-ring's fill direction was double-checked against the
+  screenshots and confirmed correct, not a bug: `progress = 1 -
+  remaining/duration`, so the ring starts *full* (an intact circle,
+  matching a full block of time available) and drains toward empty as
+  the phase elapses -- Work's screenshot at 0:05 remaining (just
+  started) showed a nearly-full ring, Rest's at 0:03 remaining
+  (near end) showed a nearly-drained one, which is the intended reading,
+  not inverted. Onboarding's second step ("ONE MORE THING", the
+  battery-optimization tip) was not separately screenshotted -- it kept
+  timing out to a skip via this environment's tap-delivery flakiness on
+  synthetic touches -- but shares 100% of its layout/type styles with
+  the captured intro step (`OnboardingScreen.tsx`'s single `createStyles`
+  call), so it's covered by source review rather than a second
+  screenshot. To get short-enough round/work/rest durations to actually
+  reach Rest and Finished without a multi-minute wait, `createDefaultSettings()`
+  was temporarily edited to short test values and reverted immediately
+  after capturing the needed screens (paired with `pm clear` so the new
+  defaults actually took effect on a truly fresh MMKV store) -- this
+  round-trip is not itself a durable fact, just noted here so a future
+  session isn't surprised to see it in `git log` as a transient step
+  inside the same commit as the real `WheelPicker` fix.
+- **The 10-second work-warning clapper had no lower bound on the round's
+  own length, fixed 2026-08-25.** User report: a work round under 10
+  seconds shouldn't play a clapper at all. Root cause matched exactly --
+  `tick()` armed the "10 seconds remaining" check purely off
+  `phaseEndAt - now <= 10_000ms`, with no check that the round was ever
+  longer than 10s to begin with, so for a short round that threshold was
+  already crossed the instant work began -- the clapper fired at the
+  same moment as the bell. Fixed with `config.workDurationMs > 10_000`
+  gating whether the warning arms at all (an exactly-10s round doesn't
+  fire either, same reasoning: the "10s left" moment and the round's
+  start are the same instant there, not a separate boundary). Test-first,
+  3 new tests in `timer/service.test.ts`.
+- **Warmup silently never took effect -- a second, subtler instance of
+  the same-day `WheelPicker` `contentOffset` bug, fixed 2026-08-25.**
+  User report: "the warmup doesn't appear... when users start warmup
+  should appear on the very 1st time only" -- confirmed the *second*
+  half was already correct (`startTimer`/`tick` only ever enter
+  `"warmup"` once, at session start; there is no code path that
+  re-enters it), so the real bug was that a configured Warmup value
+  never actually reached a running session. Traced to `WheelPicker.tsx`:
+  the fix earlier that day added `contentOffset={{ x: 0, y: initialOffset }}`
+  as an inline object literal -- `initialOffset` itself was correctly
+  frozen via `useState`'s lazy initializer, but the `{x, y}` *wrapper
+  object* was still a fresh reference on every render. React Native
+  re-applies `contentOffset` as a live repositioning command on each
+  prop pass, not just at mount, so any re-render of the row (a sibling
+  wheel's `onChange` updates shared `settings` state, which re-renders
+  every `WheelPicker` in that `RoundSection` together) could yank the
+  Warmup wheel back to its stale initial position mid-drag or right
+  after release, before `handleMomentumScrollEnd` had a chance to commit
+  the user's actual choice. **Lesson, sharpening the one already
+  recorded for this component: it's not enough to freeze the *value*
+  passed into a native repositioning prop -- the *object* carrying that
+  value needs its own stable reference (`useMemo`), or RN treats every
+  render as a fresh command to reposition.** Fixed with
+  `useMemo(() => ({ x: 0, y: initialOffset }), [initialOffset])`.
+  Verified end-to-end on a real device, not just by reasoning about the
+  diff: set Warmup via the wheel, confirmed the value survived
+  navigating away and back *and* a full `force-stop` + cold relaunch
+  (genuine MMKV disk persistence), then pressed Start and watched the
+  "WARMUP" phase badge actually appear and count down from the set
+  value. 139/139 tests pass, lint/typecheck clean.

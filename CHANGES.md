@@ -718,3 +718,52 @@ Dated log of shipped changes, appended to as features complete.
   136/136 tests pass, lint/typecheck clean. Full critique persisted at
   `.impeccable/critique/2026-08-25T01-26-46Z__cornerman-app-main-timer-
   settings-stack.md`.
+- 2026-08-25: Closed 6a's outstanding "genuine visual confirmation" gap
+  and 7b's onboarding audit gap, now that a real emulator is available
+  for deliberate verification rather than ad hoc troubleshooting.
+  Captured and reviewed real screenshots of all four Main Timer phase
+  states (Ready, Work, Rest, Finished) and the Onboarding intro screen --
+  Rest and Finished had never actually been seen before this. Along the
+  way, found and fixed a second real `WheelPicker` bug: Settings'
+  Round/Work/Rest wheels displayed the *first* list item (e.g.
+  "Rounds: 1") on load regardless of the actual stored value (e.g. `9`),
+  reproduced on repeated genuinely-fresh (force-stopped, not
+  Fast-Refreshed) launches. Root cause: the mount-time `scrollTo` call
+  was racing the native `ScrollView`'s own first layout pass and losing
+  silently, with no retry. Fixed by adding a `contentOffset` prop for
+  the initial position, frozen via `useState`'s lazy initializer so it's
+  computed once and never refought against the user's own later
+  scrolling (the exact bug this component already fixed once before).
+  Verified fixed via before/after screenshots on fresh relaunches. See
+  `PROJECT_FACTS.md` for the full trace and the durable lesson about
+  `scrollTo` vs `contentOffset` on this codebase's Reanimated
+  `ScrollView`s. 136/136 tests pass, lint/typecheck clean.
+- 2026-08-25: Two more real bugs the user found by ear/eye on-device,
+  both fixed:
+  - **The 10-second work-warning clapper fired at the very start of any
+    work round 10 seconds or shorter**, instead of only ever meaning
+    "10 seconds left." `tick()`'s warning check had no lower bound on
+    the round's own length, so for e.g. a 5-second work round the
+    "10 seconds remaining" threshold was already crossed the instant
+    the round began. Fixed by only arming the warning at all when
+    `config.workDurationMs > 10_000` -- test-first, 3 new tests
+    (never fires for an exactly-10s or shorter round; still fires
+    normally just above the threshold).
+  - **Warmup silently never took effect, no matter what value was set
+    for it** -- the actual root cause of "warmup doesn't appear."
+    Traced to a second, subtler version of the exact `WheelPicker` bug
+    fixed earlier the same day: the `contentOffset` prop added as that
+    fix's initial-position mechanism was a fresh `{x, y}` object literal
+    on every render, and RN was re-applying it as a fresh repositioning
+    command on any re-render of the row -- e.g. a sibling wheel's
+    `onChange` updating shared `settings` state re-rendered every
+    `WheelPicker` in that section, fighting/aborting the Warmup wheel's
+    own in-progress or just-completed drag before it could commit.
+    Fixed by memoizing the `contentOffset` object itself (`useMemo`),
+    not just the numeric value inside it. Verified end-to-end on a real
+    device: set Warmup via the wheel, confirmed it survived navigating
+    away and back *and* a full app force-stop + cold relaunch (genuine
+    disk persistence, not just in-memory state), then pressed Start and
+    watched the "WARMUP" phase badge actually appear and count down --
+    closing the loop the user reported broken. 139/139 tests pass,
+    lint/typecheck clean.
