@@ -1,8 +1,8 @@
-import { startTimer, tick } from "../timer/service";
+import { pause as pauseTimer, startTimer, tick } from "../timer/service";
 import type { TimerConfig } from "../timer/types";
 import { createDefaultSettings } from "../settings/service";
 import type { Punch, Settings } from "../settings/types";
-import { createSession, decideInterruptionAction, sessionTick } from "./service";
+import { createSession, decideInterruptionAction, sessionTick, shiftSessionForResume } from "./service";
 
 const config: TimerConfig = {
   totalRounds: 2,
@@ -94,6 +94,78 @@ describe("sessionTick -- combo scheduling", () => {
     expect(after.nextComboAt).toBeNull();
     expect(after.currentCombo).toEqual(session.currentCombo); // last combo stays visible into Rest
     expect(actions).toEqual([]);
+  });
+});
+
+describe("sessionTick -- respects isPaused", () => {
+  test("fires no actions and leaves nextComboAt untouched while paused, even long after it was due", () => {
+    const now = 1_000_000;
+    const timerState = startTimer(config, now, () => 0);
+    let session = createSession();
+    ({ session } = sessionTick(session, timerState, settings, punches, [], now));
+    const armedAt = session.nextComboAt;
+
+    const pausedState = pauseTimer(timerState, now + 200);
+    // Real time keeps advancing well past the armed combo time and several
+    // gap cycles beyond it -- this is the exact bug report: "paused" but
+    // combos kept getting called out (comboCount climbing) the whole time.
+    const farFuture = timerState.firstComboAt! + 60_000;
+    const { session: after, actions } = sessionTick(session, pausedState, settings, punches, [], farFuture, () => 0);
+
+    expect(actions).toEqual([]);
+    expect(after.nextComboAt).toBe(armedAt);
+    expect(after.comboCount).toBe(0);
+  });
+
+  test("defense cues are equally silent while paused", () => {
+    const enabled: Settings = { ...settings, defenseCuesEnabled: true, defenseCueGapMinSec: 15, defenseCueGapMaxSec: 30 };
+    const now = 1_000_000;
+    const timerState = startTimer(config, now, () => 0);
+    let session = createSession();
+    ({ session } = sessionTick(session, timerState, enabled, punches, [], now, () => 0));
+    const armedAt = session.nextDefenseCueAt;
+
+    const pausedState = pauseTimer(timerState, now + 200);
+    const { session: after, actions } = sessionTick(session, pausedState, enabled, punches, [], now + 999_999, () => 0);
+
+    expect(actions).toEqual([]);
+    expect(after.nextDefenseCueAt).toBe(armedAt);
+  });
+
+  test("resuming right where it left off: not-yet-due does not fire immediately", () => {
+    const now = 1_000_000;
+    const timerState = startTimer(config, now, () => 0); // firstComboAt = now + 500
+    let session = createSession();
+    ({ session } = sessionTick(session, timerState, settings, punches, [], now));
+
+    const pausedState = pauseTimer(timerState, now + 100);
+    // Paused before the combo was due -- while paused, real time blows past
+    // it, but sessionTick must not fire until an actual (resumed) tick says
+    // it's due.
+    ({ session } = sessionTick(session, pausedState, settings, punches, [], now + 5_000, () => 0));
+    expect(session.nextComboAt).toBe(timerState.firstComboAt);
+  });
+});
+
+describe("shiftSessionForResume", () => {
+  test("shifts non-null nextComboAt/nextDefenseCueAt forward by the paused duration, same fidelity as timer/service.ts's resume()", () => {
+    const session = { nextComboAt: 1_000, nextDefenseCueAt: 2_000, currentCombo: null, comboCount: 3 };
+
+    const shifted = shiftSessionForResume(session, 500);
+
+    expect(shifted).toEqual({ nextComboAt: 1_500, nextDefenseCueAt: 2_500, currentCombo: null, comboCount: 3 });
+  });
+
+  test("leaves null timestamps null (e.g. defense cues disabled, or not in Work phase)", () => {
+    const session = { nextComboAt: null, nextDefenseCueAt: null, currentCombo: null, comboCount: 0 };
+
+    expect(shiftSessionForResume(session, 500)).toEqual(session);
+  });
+
+  test("a zero paused duration is a no-op", () => {
+    const session = { nextComboAt: 1_000, nextDefenseCueAt: null, currentCombo: null, comboCount: 1 };
+
+    expect(shiftSessionForResume(session, 0)).toEqual(session);
   });
 });
 

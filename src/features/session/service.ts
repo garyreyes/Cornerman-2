@@ -16,6 +16,24 @@ export function createSession(): SessionState {
 }
 
 /**
+ * Shifts `nextComboAt`/`nextDefenseCueAt` forward by the exact paused
+ * duration on resume -- the SessionState counterpart to
+ * timer/service.ts's `resume()`, which does the same for
+ * `phaseEndAt`/`firstComboAt` (extraction doc §1.3's exact-remaining-time
+ * fidelity). Without this, a combo/cue that was armed for some point
+ * during the pause would fire the instant the session resumes instead of
+ * waiting out whatever gap actually remained when it was paused. Leaves
+ * null timestamps null (not in Work phase, or defense cues disabled).
+ */
+export function shiftSessionForResume(session: SessionState, pausedDurationMs: number): SessionState {
+  return {
+    ...session,
+    nextComboAt: session.nextComboAt !== null ? session.nextComboAt + pausedDurationMs : null,
+    nextDefenseCueAt: session.nextDefenseCueAt !== null ? session.nextDefenseCueAt + pausedDurationMs : null,
+  };
+}
+
+/**
  * The recurring "what should fire now" decision, mirroring timer/service.ts's
  * tick(): a pure function returning descriptive actions rather than calling
  * speech/audio directly, so the decision logic is testable and the actual
@@ -44,6 +62,21 @@ export function sessionTick(
 ): { session: SessionState; actions: SessionAction[] } {
   const actions: SessionAction[] = [];
   let s = session;
+
+  // A paused TimerState never advances phase (tick() returns its input
+  // state unchanged while isPaused -- see timer/service.ts), so without
+  // this check `now` keeps racing ahead of `nextComboAt`/`nextDefenseCueAt`
+  // in the background: combos and defense cues kept firing (and comboCount
+  // kept climbing) for the whole duration of a "paused" session, which is
+  // exactly the bug the user found by watching the combo counter climb
+  // while paused. Left untouched (not reset to null, unlike the
+  // leaving-Work-phase branch below) so the exact remaining gap survives a
+  // resume -- see useSession.ts's togglePause, which shifts these forward
+  // by the paused duration via shiftSessionForResume, mirroring how
+  // timer/service.ts's own resume() preserves phaseEndAt/firstComboAt.
+  if (timerState.isPaused) {
+    return { session: s, actions };
+  }
 
   if (timerState.phase !== "work") {
     if (s.nextComboAt !== null || s.nextDefenseCueAt !== null) {

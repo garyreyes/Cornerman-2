@@ -8,9 +8,14 @@ import {
   getPresets,
   getPunches,
   getSettings,
+  isPunchIncludedInRandomPool,
   LastPunchError,
   markOnboardingComplete,
+  renumberPunch,
+  restoreDefaultPunches,
+  restorePunch,
   saveSettings,
+  toggleRandomPoolMembership,
 } from "./service";
 
 beforeEach(() => {
@@ -157,6 +162,92 @@ describe("punches", () => {
     const [last] = getPunches();
     expect(() => deletePunch(last.id)).toThrow(LastPunchError);
     expect(getPunches()).toHaveLength(1);
+  });
+
+  test("renumberPunch changes num and persists, leaving name/id untouched", () => {
+    const [first] = getPunches();
+
+    renumberPunch(first!.id, 42);
+
+    const updated = getPunches().find((p) => p.id === first!.id);
+    expect(updated?.num).toBe(42);
+    expect(updated?.name).toBe(first!.name);
+    expect(updated?.id).toBe(first!.id);
+  });
+
+  test("renumberPunch allows colliding with another punch's number -- num was never required to be unique", () => {
+    const [first, second] = getPunches();
+
+    renumberPunch(second!.id, first!.num);
+
+    const nums = getPunches().map((p) => p.num);
+    expect(nums.filter((n) => n === first!.num)).toHaveLength(2);
+  });
+
+  test("restorePunch brings a deleted punch back at its original position", () => {
+    const before = getPunches();
+    const target = before[2]!; // "Lead Hook"
+
+    deletePunch(target.id);
+    expect(getPunches().map((p) => p.id)).not.toContain(target.id);
+
+    restorePunch(target, 2);
+    expect(getPunches()).toEqual(before);
+  });
+
+  test("restoreDefaultPunches discards custom punches and resets to the factory 7", () => {
+    createPunch("Superman Punch", 99);
+    deletePunch(getPunches()[0]!.id);
+
+    const restored = restoreDefaultPunches();
+
+    expect(restored.map((p) => [p.num, p.name])).toEqual([
+      [1, "Jab"],
+      [2, "Cross"],
+      [3, "Lead Hook"],
+      [4, "Rear Hook"],
+      [5, "Lead Uppercut"],
+      [6, "Rear Uppercut"],
+      [7, "Body Hook"],
+    ]);
+    expect(getPunches()).toEqual(restored);
+  });
+
+  test("isPunchIncludedInRandomPool: a null pool includes every number", () => {
+    expect(isPunchIncludedInRandomPool(null, 1)).toBe(true);
+    expect(isPunchIncludedInRandomPool(null, 999)).toBe(true);
+  });
+
+  test("isPunchIncludedInRandomPool: a set pool only includes listed numbers", () => {
+    expect(isPunchIncludedInRandomPool([1, 2], 1)).toBe(true);
+    expect(isPunchIncludedInRandomPool([1, 2], 3)).toBe(false);
+  });
+
+  test("toggleRandomPoolMembership: excluding one punch from an unrestricted (null) pool materializes everyone else", () => {
+    const nums = getPunches().map((p) => p.num); // [1..7]
+
+    toggleRandomPoolMembership(1);
+
+    expect(getSettings().randomPunchPool).toEqual(nums.filter((n) => n !== 1));
+  });
+
+  test("toggleRandomPoolMembership: re-including the last excluded punch collapses back to null", () => {
+    toggleRandomPoolMembership(1); // exclude
+    expect(getSettings().randomPunchPool).not.toBeNull();
+
+    toggleRandomPoolMembership(1); // re-include
+
+    expect(getSettings().randomPunchPool).toBeNull();
+  });
+
+  test("toggleRandomPoolMembership only ever affects the toggled number, not its siblings", () => {
+    toggleRandomPoolMembership(1);
+    toggleRandomPoolMembership(2);
+
+    const pool = getSettings().randomPunchPool!;
+    expect(pool).not.toContain(1);
+    expect(pool).not.toContain(2);
+    expect(pool).toContain(3);
   });
 });
 

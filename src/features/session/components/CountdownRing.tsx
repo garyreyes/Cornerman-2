@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import Animated, { Easing, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  useAnimatedProps,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { Circle, Svg } from "react-native-svg";
 
 import { useTheme } from "../../../shared/theme/ThemeContext";
@@ -35,10 +41,16 @@ interface CountdownRingProps {
  * independent of the numeral label's own 200ms refresh -- matching the
  * timer engine's real poll cadence (extraction doc §1.1) without making
  * the ring itself look stepped.
+ *
+ * With Reduce Motion on, that continuous sweep is exactly the kind of
+ * motion it exists to suppress -- `progress` jumps straight to its target
+ * instead of animating there, and updates in the same discrete 200ms
+ * steps as the numeral label rather than a separate `withTiming` call.
  */
 export function CountdownRing({ phaseEndAt, phaseDurationMs, isPaused }: CountdownRingProps) {
   const { colors, fonts } = useTheme();
   const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
+  const reducedMotion = useReducedMotion();
   const progress = useSharedValue(0);
   const [remainingMs, setRemainingMs] = useState(() =>
     phaseEndAt === null ? phaseDurationMs : Math.max(0, phaseEndAt - Date.now()),
@@ -56,9 +68,22 @@ export function CountdownRing({ phaseEndAt, phaseDurationMs, isPaused }: Countdo
     const remaining = Math.max(0, phaseEndAt - now);
     const startProgress = 1 - remaining / phaseDurationMs;
     progress.value = startProgress;
+
+    if (reducedMotion) {
+      // Step to the correct position every 200ms (the same cadence as
+      // the numeral label below) instead of animating there -- keeps
+      // `progress.value`'s only mutation site inside this one effect,
+      // rather than adding a second write from the label-refresh effect.
+      const intervalId = setInterval(() => {
+        const stepRemaining = Math.max(0, phaseEndAt - Date.now());
+        progress.value = 1 - stepRemaining / phaseDurationMs;
+      }, LABEL_REFRESH_MS);
+      return () => clearInterval(intervalId);
+    }
+
     progress.value = withTiming(1, { duration: remaining, easing: Easing.linear });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phaseEndAt, phaseDurationMs, isPaused]);
+  }, [phaseEndAt, phaseDurationMs, isPaused, reducedMotion]);
 
   useEffect(() => {
     const update = () => {

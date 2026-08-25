@@ -29,6 +29,19 @@ const CUE_ASSETS: Record<CueName, number> = {
 const MAKEUP_GAIN = 1.0;
 const LIMITER_DRIVE = 1.5;
 
+/**
+ * A real corner clapper is three fast, distinct claps -- "pak pak pak,"
+ * not one "pak" -- confirmed explicitly after hearing the sourced
+ * single-clap sample in place (extraction doc §1.12's authenticity bar
+ * again). Rather than needing a pre-mixed 3-clap sample (harder to
+ * source, impossible to retime), the single clap is scheduled 3 times
+ * through the AudioContext's own sample-accurate clock -- the same
+ * approach any real Web Audio API app uses for a rhythmic hit, not
+ * three independent playCue calls from the caller.
+ */
+const CLAPPER_REPEAT_COUNT = 3;
+const CLAPPER_GAP_SEC = 0.15;
+
 function buildLimiterCurve(): Float32Array {
   const samples = 1024;
   const curve = new Float32Array(samples);
@@ -86,10 +99,13 @@ export function createAudioEngine(): AudioEngine {
 
   async function playCue(cue: CueName): Promise<void> {
     const buffer = await buffers[cue];
-    const source = context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(volumeGain);
-    source.start();
+    const repeatCount = cue === "clapper" ? CLAPPER_REPEAT_COUNT : 1;
+    for (let i = 0; i < repeatCount; i++) {
+      const source = context.createBufferSource();
+      source.buffer = buffer;
+      source.connect(volumeGain);
+      source.start(context.currentTime + i * CLAPPER_GAP_SEC);
+    }
   }
 
   function handleTimerEvent(event: TimerEvent): void {

@@ -1,6 +1,7 @@
 import * as Crypto from "expo-crypto";
 
 import { getItem, setItem } from "../../lib/storage";
+import { DEFAULT_VOICE } from "../speech/types";
 import type { Preset, Punch, Settings } from "./types";
 
 const SETTINGS_KEY = "settings";
@@ -30,6 +31,7 @@ export function createDefaultSettings(): Settings {
     defenseCueGapMaxSec: 30,
     hasCompletedOnboarding: false,
     themeMode: "system",
+    ttsVoice: DEFAULT_VOICE,
   };
 }
 
@@ -89,12 +91,80 @@ export function renamePunch(id: string, name: string): void {
   savePunches(getPunches().map((p) => (p.id === id ? { ...p, name } : p)));
 }
 
+/**
+ * Reverses the earlier "numbers stay fixed" decision (extraction doc
+ * §1.6) after real on-device use surfaced the actual need: recreating a
+ * deleted punch at its original number (e.g. "Jab" back at 1), not just
+ * whatever number happens to be next-unused. No uniqueness/positivity
+ * check -- `num` was already explicitly allowed to be non-unique and
+ * decoupled from name; a Preset referencing a number that moves away from
+ * this punch just degrades to `resolvePunchName`'s existing generic
+ * `"Punch " + num` fallback rather than breaking.
+ */
+export function renumberPunch(id: string, num: number): void {
+  savePunches(getPunches().map((p) => (p.id === id ? { ...p, num } : p)));
+}
+
 export function deletePunch(id: string): void {
   const punches = getPunches();
   if (punches.length <= 1) {
     throw new LastPunchError("At least one punch is required");
   }
   savePunches(punches.filter((p) => p.id !== id));
+}
+
+/**
+ * Re-inserts a just-deleted punch at (roughly) its original position --
+ * backs the Punches screen's "Undo" banner (docs feedback 2026-08-25: a
+ * deleted punch previously had no way back). Takes the full punch object
+ * rather than reconstructing it, so the restored punch keeps its original
+ * `id` -- no functional difference (Presets resolve by `num`, not `id`,
+ * per the migration doc), but avoids the appearance of a "new" punch.
+ */
+export function restorePunch(punch: Punch, index: number): void {
+  const punches = getPunches();
+  const next = [...punches];
+  next.splice(Math.min(index, next.length), 0, punch);
+  savePunches(next);
+}
+
+/** Resets the punch list back to the 7 factory punches, discarding any
+ * custom ones -- the Punches screen's "Restore defaults" escape hatch,
+ * for when Undo's short window has already passed. Confirmed destructive
+ * via an Alert before this is ever called (see punches.tsx). */
+export function restoreDefaultPunches(): Punch[] {
+  const defaults = createDefaultPunches();
+  savePunches(defaults);
+  return defaults;
+}
+
+/** `null` means "every current punch is eligible" -- see
+ * toggleRandomPoolMembership. */
+export function isPunchIncludedInRandomPool(pool: number[] | null, num: number): boolean {
+  return pool === null || pool.includes(num);
+}
+
+/**
+ * Toggles whether `num` is drawn in Random mode. Extends the existing
+ * `randomPunchPool` field that Settings > Combinations' "Restrict punch
+ * pool" switch + chip picker already own -- a second entry point onto the
+ * same field (exposed directly on the Punches screen, confirmed
+ * 2026-08-25), not a parallel mechanism. `null` means "every current
+ * punch is eligible"; toggling one off for the first time materializes
+ * that into an explicit allow-list of everyone else, and toggling the
+ * last excluded punch back on collapses the list back to `null` rather
+ * than leaving a full-but-explicit array around.
+ */
+export function toggleRandomPoolMembership(num: number): void {
+  const settings = getSettings();
+  const punches = getPunches();
+  const allNums = Array.from(new Set(punches.map((p) => p.num)));
+  const currentPool = settings.randomPunchPool ?? allNums;
+  const nextPool = currentPool.includes(num)
+    ? currentPool.filter((n) => n !== num)
+    : Array.from(new Set([...currentPool, num]));
+  const isUnrestricted = allNums.every((n) => nextPool.includes(n));
+  saveSettings({ ...settings, randomPunchPool: isUnrestricted ? null : nextPool });
 }
 
 export function getPresets(): Preset[] {

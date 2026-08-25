@@ -2,6 +2,7 @@ import { LabeledSlider } from "../../../shared/components/LabeledSlider";
 import { RangeSliderPair } from "../../../shared/components/RangeSliderPair";
 import { SectionCard } from "../../../shared/components/SectionCard";
 import { SegmentedControl } from "../../../shared/components/SegmentedControl";
+import { VOICE_OPTIONS } from "../../speech/types";
 import type { AnnounceStyle, Settings } from "../types";
 
 interface ComboTimingSectionProps {
@@ -42,6 +43,12 @@ export function ComboTimingSection({ settings, onChange }: ComboTimingSectionPro
         step={0.05}
         formatValue={(v) => `${v.toFixed(2)}x`}
         onChange={(speechRate) => onChange({ speechRate })}
+      />
+
+      <SegmentedControl
+        options={VOICE_OPTIONS}
+        value={settings.ttsVoice}
+        onChange={(ttsVoice) => onChange({ ttsVoice })}
       />
 
       <SegmentedControl
