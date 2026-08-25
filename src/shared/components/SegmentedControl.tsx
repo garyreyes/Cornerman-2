@@ -23,6 +23,12 @@ export function SegmentedControl<T extends string>({ options, value, onChange }:
             key={option.value}
             onPress={() => onChange(option.value)}
             style={[styles.segment, active && styles.segmentActive]}
+            // Visual height (~32px) is under the 44/48pt touch-target
+            // minimum -- found 2026-08-25 via /impeccable critique.
+            // Top/bottom only: segments already sit edge-to-edge
+            // horizontally (3px gap), so any left/right hitSlop would
+            // overlap into the neighboring segment.
+            hitSlop={{ top: 9, bottom: 9 }}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
           >

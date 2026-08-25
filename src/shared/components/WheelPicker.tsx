@@ -1,6 +1,14 @@
-import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
-import Wheely from "react-native-wheely";
+import { useEffect, useMemo } from "react";
+import { StyleSheet, Text, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  scrollTo,
+  useAnimatedRef,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 
 import { useTheme } from "../theme/ThemeContext";
 import type { ColorTokens, Fonts } from "../theme/tokens";
@@ -13,15 +21,18 @@ interface WheelPickerProps {
   onChange: (value: number) => void;
 }
 
+const ITEM_HEIGHT = 32;
+const VISIBLE_REST = 1;
+const CONTAINER_HEIGHT = (1 + VISIBLE_REST * 2) * ITEM_HEIGHT;
+const FADE_RANGE = [-2 * ITEM_HEIGHT, -ITEM_HEIGHT, 0, ITEM_HEIGHT, 2 * ITEM_HEIGHT];
+
 /**
- * react-native-wheely itself hard-throws if selectedIndex is out of
- * [0, options.length-1] (its own useEffect guard), so an index must always
- * be returned -- but silently falling back to index 0 would make the wheel
- * display a value nothing like the actual stored one (e.g. a persisted
- * `workDurationSec` no longer on-grid after a range/step tweak). Snapping
- * to the closest selectable value instead is the same graceful-fallback
- * spirit as resolvePunchName/effectivePool elsewhere in this codebase --
- * degrade sensibly, don't degrade to zero.
+ * `value` must always resolve to some index -- but silently falling back
+ * to index 0 would make the wheel display a value nothing like the actual
+ * stored one (e.g. a persisted `workDurationSec` no longer on-grid after a
+ * range/step tweak). Snapping to the closest selectable value instead is
+ * the same graceful-fallback spirit as resolvePunchName/effectivePool
+ * elsewhere in this codebase -- degrade sensibly, don't degrade to zero.
  */
 function nearestIndex(values: number[], value: number): number {
   const exact = values.indexOf(value);
@@ -38,44 +49,148 @@ function nearestIndex(values: number[], value: number): number {
   return nearest;
 }
 
+interface WheelPickerRowProps {
+  option: string;
+  index: number;
+  scrollY: ReturnType<typeof useSharedValue<number>>;
+  textStyle: object;
+}
+
+/** Fades/shrinks rows the further they sit from the centered (selected)
+ * row -- `relative` is this row's own scroll-space position minus the
+ * current scroll offset, so it's 0 exactly when centered, negative above,
+ * positive below, regardless of which row index that happens to be. */
+function WheelPickerRow({ option, index, scrollY, textStyle }: WheelPickerRowProps) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const relative = index * ITEM_HEIGHT - scrollY.value;
+    return {
+      opacity: interpolate(relative, FADE_RANGE, [0.15, 0.35, 1, 0.35, 0.15], Extrapolation.CLAMP),
+      transform: [{ scale: interpolate(relative, FADE_RANGE, [0.8, 0.88, 1, 0.88, 0.8], Extrapolation.CLAMP) }],
+    };
+  });
+  return (
+    <Animated.View style={[rowStyles.row, animatedStyle]}>
+      <Text style={textStyle}>{option}</Text>
+    </Animated.View>
+  );
+}
+
+const rowStyles = StyleSheet.create({
+  row: {
+    height: ITEM_HEIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
+
 /**
- * Themed wrapper around react-native-wheely (pure-JS scroll wheel, no
- * native module) -- PRD's "iOS-style continuous scroll picker" for Round/
- * Work/Rest/Warmup duration, restyled to this app's own world instead of
- * a platform-default look. `values` is the ordered list of selectable
- * numbers; wheely itself only knows string options + an index, so the
- * index<->value mapping happens here.
+ * Themed scroll-wheel picker for Round/Work/Rest/Warmup duration --
+ * PRD's "iOS-style continuous scroll picker". `values` is the ordered
+ * list of selectable numbers; the index<->value mapping happens here.
+ *
+ * Renders its own scroll/snap logic directly on a Reanimated
+ * `Animated.ScrollView` rather than wrapping `react-native-wheely`
+ * (which is `Animated.FlatList` under the hood, a VirtualizedList) --
+ * fixed 2026-08-25 via /impeccable critique/polish, closing a real
+ * "VirtualizedLists should never be nested inside plain ScrollViews with
+ * the same orientation" bug that was visibly breaking the Settings screen
+ * (every Round/Work/Rest/Warmup picker sits inside Settings' own
+ * page-level ScrollView). These lists are always small (max ~121 rows for
+ * Work duration), so rendering all rows directly costs nothing
+ * virtualization would meaningfully save. Uses Reanimated (matching
+ * CountdownRing/PhaseBadge's existing pattern in this codebase) rather
+ * than React Native's legacy Animated API. This also removes the upstream
+ * library's own `React.memo(..., () => true)` bug that required a
+ * `key={mode}`-forced-remount workaround for theme-color changes -- rows
+ * here re-render normally.
  */
 export function WheelPicker({ label, value, values, formatValue = (v) => String(v), onChange }: WheelPickerProps) {
-  const { mode, colors, fonts } = useTheme();
+  const { colors, fonts } = useTheme();
   const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const options = values.map(formatValue);
   const selectedIndex = nearestIndex(values, value);
 
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollY = useSharedValue(selectedIndex * ITEM_HEIGHT);
+
+  // If selectedIndex changes from outside (not via this component's own
+  // scroll), scroll to match -- what the user sees as selected must always
+  // correspond to the actual stored value.
+  useEffect(() => {
+    scrollY.set(selectedIndex * ITEM_HEIGHT);
+    scrollTo(scrollRef, 0, selectedIndex * ITEM_HEIGHT, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIndex]);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.set(event.contentOffset.y);
+    },
+  });
+
+  function handleMomentumScrollEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    // Due to list bounciness at the start/end, the offset might be negative
+    // or past the last item -- clamp to the supported range.
+    const offsetY = Math.min(ITEM_HEIGHT * (values.length - 1), Math.max(event.nativeEvent.contentOffset.y, 0));
+    let index = Math.floor(offsetY / ITEM_HEIGHT);
+    const remainder = offsetY % ITEM_HEIGHT;
+    if (remainder > ITEM_HEIGHT / 2) {
+      index++;
+    }
+    if (index !== selectedIndex) {
+      onChange(values[index]!);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
-      {/* react-native-wheely's own item component is wrapped in
-          React.memo(..., () => true) -- it deliberately never re-renders
-          after its first mount, so a `textStyle`/`selectedIndicatorStyle`
-          color update (e.g. switching Appearance mode) is silently
-          ignored and the numerals stay whatever color they first
-          rendered with, invisible against a new background. Keying on
-          `mode` forces a full remount on a theme change instead, which
-          is the only way to get the library to actually pick up new
-          colors. */}
-      <Wheely
-        key={mode}
-        selectedIndex={selectedIndex}
-        options={options}
-        onChange={(index) => onChange(values[index]!)}
-        itemHeight={32}
-        visibleRest={1}
-        containerStyle={styles.wheel}
-        selectedIndicatorStyle={styles.indicator}
-        itemTextStyle={styles.itemText}
-        decelerationRate="fast"
-      />
+      <View
+        style={styles.wheel}
+        // A screen-reader user can't meaningfully operate a scroll
+        // gesture on a custom wheel -- "adjustable" + increment/decrement
+        // actions is the standard RN pattern for this (the same one
+        // @react-native-community/slider uses internally), swiped
+        // up/down via VoiceOver/TalkBack instead. Found 2026-08-25 via
+        // /impeccable critique: this was one of the app's primary
+        // Settings inputs (Round/Work/Rest/Warmup) with zero
+        // accessibility props at all.
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={label}
+        accessibilityValue={{ text: options[selectedIndex] }}
+        accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === "increment") {
+            onChange(values[Math.min(values.length - 1, selectedIndex + 1)]!);
+          } else if (event.nativeEvent.actionName === "decrement") {
+            onChange(values[Math.max(0, selectedIndex - 1)]!);
+          }
+        }}
+      >
+        <View style={styles.indicator} pointerEvents="none" />
+        <Animated.ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          snapToInterval={ITEM_HEIGHT}
+          decelerationRate="fast"
+          contentContainerStyle={{ paddingVertical: VISIBLE_REST * ITEM_HEIGHT }}
+          // Both this wheel and the Settings screen's own outer ScrollView
+          // are vertical -- without this (Android-only) prop, a swipe
+          // starting on the wheel got claimed by the outer page instead of
+          // scrolling the wheel itself, a real functional regression
+          // caught 2026-08-25 by actually swiping the rebuilt picker
+          // on-device rather than only checking its static render.
+          nestedScrollEnabled
+        >
+          {options.map((option, index) => (
+            <WheelPickerRow key={index} option={option} index={index} scrollY={scrollY} textStyle={styles.itemText} />
+          ))}
+        </Animated.ScrollView>
+      </View>
     </View>
   );
 }
@@ -94,12 +209,26 @@ function createStyles(colors: ColorTokens, fonts: Fonts) {
     },
     wheel: {
       width: "100%",
+      height: CONTAINER_HEIGHT,
+      position: "relative",
+      overflow: "hidden",
     },
     indicator: {
-      backgroundColor: colors.background,
+      position: "absolute",
+      width: "100%",
+      top: VISIBLE_REST * ITEM_HEIGHT,
+      height: ITEM_HEIGHT,
       borderTopWidth: 1,
       borderBottomWidth: 1,
       borderColor: colors.accentDim,
+      backgroundColor: colors.background,
+      // No zIndex (or a low one) -- this is declared before the
+      // ScrollView in JSX specifically so it paints *behind* the row
+      // text by default sibling order. A `zIndex` here previously
+      // inverted that, opaquely covering the selected row's own numeral
+      // (caught 2026-08-25 verifying on-device: the selected value was
+      // rendering invisible inside the indicator box).
+      zIndex: -1,
     },
     itemText: {
       fontFamily: fonts.numericSemiBold,

@@ -35,35 +35,46 @@ export function PresetSequenceEntry({
     <View style={styles.row}>
       <Text style={styles.position}>{position}</Text>
       <Text style={styles.label}>{label}</Text>
-      <Pressable
-        onPress={onMoveUp}
-        disabled={!canMoveUp}
-        hitSlop={8}
-        style={({ pressed }) => [styles.iconButton, pressed && styles.pressed, !canMoveUp && styles.disabled]}
-        accessibilityRole="button"
-        accessibilityLabel={`Move ${label} up`}
-      >
-        <Text style={styles.glyph}>▲</Text>
-      </Pressable>
-      <Pressable
-        onPress={onMoveDown}
-        disabled={!canMoveDown}
-        hitSlop={8}
-        style={({ pressed }) => [styles.iconButton, pressed && styles.pressed, !canMoveDown && styles.disabled]}
-        accessibilityRole="button"
-        accessibilityLabel={`Move ${label} down`}
-      >
-        <Text style={styles.glyph}>▼</Text>
-      </Pressable>
-      <Pressable
-        onPress={onRemove}
-        hitSlop={8}
-        style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-        accessibilityRole="button"
-        accessibilityLabel={`Remove ${label}`}
-      >
-        <Text style={styles.deleteGlyph}>✕</Text>
-      </Pressable>
+      {/* Own sub-row with a wider internal gap than `row`'s own 8 -- these
+          three buttons previously sat 28x28 + hitSlop 8 apart with only an
+          8px gap between them, so adjacent hitSlop zones overlapped
+          (found 2026-08-25 via /impeccable critique: a real mis-tap risk
+          between Move Up/Move Down/Remove, hitSlop doesn't check for
+          overlap with a neighboring view). Buttons grew to 32x32 (matching
+          PunchRow's own iconButton) to also clear the 44pt touch-target
+          minimum with hitSlop 6 (32+6+6=44), and the 16px gap here is
+          comfortably more than hitSlop's own 6+6=12 combined reach. */}
+      <View style={styles.iconGroup}>
+        <Pressable
+          onPress={onMoveUp}
+          disabled={!canMoveUp}
+          hitSlop={6}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed, !canMoveUp && styles.disabled]}
+          accessibilityRole="button"
+          accessibilityLabel={`Move ${label} up`}
+        >
+          <Text style={styles.glyph}>▲</Text>
+        </Pressable>
+        <Pressable
+          onPress={onMoveDown}
+          disabled={!canMoveDown}
+          hitSlop={6}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed, !canMoveDown && styles.disabled]}
+          accessibilityRole="button"
+          accessibilityLabel={`Move ${label} down`}
+        >
+          <Text style={styles.glyph}>▼</Text>
+        </Pressable>
+        <Pressable
+          onPress={onRemove}
+          hitSlop={6}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel={`Remove ${label}`}
+        >
+          <Text style={styles.deleteGlyph}>✕</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -91,9 +102,14 @@ function createStyles(colors: ColorTokens, fonts: Fonts) {
       fontSize: 14,
       color: colors.textPrimary,
     },
+    iconGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 16,
+    },
     iconButton: {
-      width: 28,
-      height: 28,
+      width: 32,
+      height: 32,
       alignItems: "center",
       justifyContent: "center",
     },

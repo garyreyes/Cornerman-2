@@ -148,11 +148,18 @@ export function PunchesScreen() {
   }
 
   const nextNum = punches.reduce((max, p) => Math.max(max, p.num), 0) + 1;
+  // Display order only -- `punches` itself stays in storage/insertion
+  // order (handleDelete/restorePunch's index math depends on that), this
+  // is purely how the list reads. Unsorted rendering buried the app's own
+  // most-fundamental punch (num 1) wherever it happened to land in edit
+  // history rather than at the top -- found 2026-08-25 via /impeccable
+  // critique ("recognition rather than recall").
+  const sortedPunches = [...punches].sort((a, b) => a.num - b.num);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
       <ScrollView contentContainerStyle={styles.content}>
-        {punches.map((punch) => (
+        {sortedPunches.map((punch) => (
           <PunchRow
             key={punch.id}
             punch={punch}

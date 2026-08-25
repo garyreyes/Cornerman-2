@@ -29,10 +29,19 @@ const systemColors: ColorTokens = {
   panel: "#1E1E1E",
   panelLine: "#2E2E2E",
   accent: "#EA580C",
-  accentDim: "#8A4C22",
+  // Was #8A4C22 (2.80:1 on background, 2.49:1 on panel -- fails the 3:1
+  // non-text UI minimum both places). #A85D2A clears 3:1 against both
+  // (3.81/3.39, WCAG relative-luminance) while staying a visibly dimmer,
+  // more muted tone than the full accent -- confirmed 2026-08-25 via
+  // /impeccable critique, this is the wheel-picker selection border and
+  // the active-punch-pool-chip differentiator, not decoration.
+  accentDim: "#A85D2A",
   textPrimary: "#F2F2F2",
   textMuted: "#9B9B9B",
-  danger: "#E5484D",
+  // Was #E5484D (4.79:1 on background, 4.26:1 on panel -- fails the
+  // 4.5:1 text minimum on panel). #EE565B clears 4.5:1 on panel (4.86:1)
+  // with margin, confirmed 2026-08-25.
+  danger: "#EE565B",
 };
 
 const darkColors: ColorTokens = {
@@ -40,10 +49,15 @@ const darkColors: ColorTokens = {
   panel: "#1E1E1E",
   panelLine: "#2E2E2E",
   accent: "#F2F2F2",
-  accentDim: "#4A4A4A",
+  // Was #4A4A4A (2.11:1 on background, 1.88:1 on panel -- fails 3:1).
+  // #6E6E6E clears 3:1 against both (3.68/3.27), same reasoning as
+  // systemColors.accentDim above.
+  accentDim: "#6E6E6E",
   textPrimary: "#F2F2F2",
   textMuted: "#9B9B9B",
-  danger: "#E5484D",
+  // Same fix as systemColors.danger above -- shares the same background/
+  // panel pair, so the same replacement clears the same 4.5:1 gap.
+  danger: "#EE565B",
 };
 
 const lightColors: ColorTokens = {
@@ -51,7 +65,12 @@ const lightColors: ColorTokens = {
   panel: "#F5F5F5",
   panelLine: "#E2E2E2",
   accent: "#171717",
-  accentDim: "#D4D4D4",
+  // Was #D4D4D4 (1.48:1 on background, 1.36:1 on panel -- fails 3:1,
+  // and was genuinely near-invisible on light backgrounds). #828282
+  // clears 3:1 against both (3.85/3.53) while staying lighter than
+  // textMuted (#6B6B6B), preserving the accent < textMuted < accentDim
+  // < panelLine step order.
+  accentDim: "#828282",
   textPrimary: "#171717",
   textMuted: "#6B6B6B",
   danger: "#C0292E",
