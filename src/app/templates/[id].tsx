@@ -38,7 +38,19 @@ export function TemplateEditorScreen() {
 
   const [punches] = useState(() => getPunches());
   const [presets] = useState(() => getPresets());
-  const [existing] = useState(() => (isNew ? undefined : getWorkoutTemplates().find((t) => t.id === id)));
+  // Narrowed to the boxing variant right here, not just looked up --
+  // this editor is boxing-only (Round Builder has no assault-bike
+  // equivalent yet), so a non-boxing match resolves to undefined exactly
+  // like a missing one, and the guard effect below redirects back either
+  // way (defense-in-depth: the Picker already prevents navigating here
+  // for a non-boxing template -- see templates/index.tsx's handleEdit).
+  const [existing] = useState(() => {
+    if (isNew) {
+      return undefined;
+    }
+    const found = getWorkoutTemplates().find((t) => t.id === id);
+    return found?.workoutType === "boxing" ? found : undefined;
+  });
 
   const [name, setName] = useState(existing?.name ?? "");
   const [baseWorkDurationSec, setBaseWorkDurationSec] = useState(existing?.config.baseWorkDurationSec ?? 180);

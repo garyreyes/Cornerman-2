@@ -8,6 +8,11 @@ interface TemplateRowProps {
   name: string;
   summary: string;
   isBuiltIn: boolean;
+  /** True for a workoutType with no session screen or editor built yet
+   * (assault-bike-cognitive until Phase 11b+) -- both actions render
+   * disabled with an honest "COMING SOON" tag instead of silently
+   * routing somewhere broken. */
+  comingSoon?: boolean;
   onPress: () => void;
   onEdit: () => void;
 }
@@ -18,20 +23,23 @@ interface TemplateRowProps {
  * per the one-obvious-primary-action rule") -- editing is the separate,
  * explicit action, on its own icon, not the other way around like Presets.
  */
-export function TemplateRow({ name, summary, isBuiltIn, onPress, onEdit }: TemplateRowProps) {
+export function TemplateRow({ name, summary, isBuiltIn, comingSoon = false, onPress, onEdit }: TemplateRowProps) {
   const { colors, fonts } = useTheme();
   const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   return (
     <View style={styles.row}>
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [styles.body, pressed && styles.pressed]}
+        disabled={comingSoon}
+        style={({ pressed }) => [styles.body, pressed && styles.pressed, comingSoon && styles.disabled]}
         accessibilityRole="button"
-        accessibilityLabel={`Start ${name}`}
+        accessibilityLabel={comingSoon ? `${name}, coming soon` : `Start ${name}`}
+        accessibilityState={{ disabled: comingSoon }}
       >
         <View style={styles.nameRow}>
           <Text style={styles.name}>{name}</Text>
           {isBuiltIn ? <Text style={styles.builtInTag}>BUILT-IN</Text> : null}
+          {comingSoon ? <Text style={styles.builtInTag}>COMING SOON</Text> : null}
         </View>
         <Text style={styles.summary} numberOfLines={1}>
           {summary}
@@ -40,10 +48,12 @@ export function TemplateRow({ name, summary, isBuiltIn, onPress, onEdit }: Templ
 
       <Pressable
         onPress={onEdit}
+        disabled={comingSoon}
         hitSlop={8}
-        style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.iconButton, pressed && styles.pressed, comingSoon && styles.disabled]}
         accessibilityRole="button"
         accessibilityLabel={`Edit ${name}`}
+        accessibilityState={{ disabled: comingSoon }}
       >
         <Text style={styles.editGlyph}>✎</Text>
       </Pressable>
@@ -101,6 +111,9 @@ function createStyles(colors: ColorTokens, fonts: Fonts) {
     },
     pressed: {
       opacity: 0.6,
+    },
+    disabled: {
+      opacity: 0.4,
     },
   });
 }

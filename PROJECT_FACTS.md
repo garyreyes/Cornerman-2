@@ -1238,3 +1238,34 @@ made during feature work.
   onPress/onStart/etc. that's assigned a function with a *newly
   added* parameter needs the same check -- wrap the call site
   (() => start()) rather than passing the function reference directly.
+- **AssaultBikeConfig deliberately drops ARCHITECTURE.md's flat `restSec`
+  field** -- the doc listed both `restSec` and `restPhases: {settleSec,
+  drillSec, resetSec}` with no stated purpose for `restSec` distinct
+  from the breakdown, and the actual Settle/Drill/Reset state machine
+  (Phase 11b+) only ever needs the three sub-durations. Carrying an
+  unused field that could silently drift out of sync with its own
+  breakdown was worse than just not having it. If a genuine need for a
+  single flat rest-total number ever appears, derive it
+  (`settleSec+drillSec+resetSec`) rather than reintroducing a
+  separately-stored field.
+- **Widening a discriminated union is a real way to find latent bugs, not
+  just a mechanical type change.** `WorkoutTemplate` went from a flat
+  boxing-only shape (Phase 10a's deliberate narrowing) to the real
+  `{workoutType: "boxing"} | {workoutType: "assault-bike-cognitive"}`
+  union in 11a, and the type checker immediately flagged
+  `updateWorkoutTemplate` as unsound: it merged a `BoxingConfig` into
+  whatever template matched by id with no `workoutType` guard, which
+  would have corrupted an assault-bike entry's shape if ever called with
+  its id. Nothing in the UI actually triggers this today (Round Builder
+  is guarded to boxing ids only), but the function itself wasn't
+  type-safe against the misuse -- worth remembering next time a
+  discriminated union gets widened: don't just chase the compiler
+  errors to green, read what each one is actually telling you first.
+- **`Extract<Union, {discriminantField: "value"}>` is this codebase's
+  pattern for a compile-time-enforced narrow parameter type** -- used on
+  `useSession`'s `start()` (Phase 11a) so passing a non-boxing
+  `WorkoutTemplate` is a type error at the call site, not just a
+  runtime no-op. Reach for this again anywhere a function is only ever
+  meant to accept one member of a wider union (e.g. once Phase 11b's
+  Assault-Bike session hook exists, it should likely narrow the other
+  way).

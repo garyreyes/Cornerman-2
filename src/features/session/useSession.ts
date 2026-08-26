@@ -72,7 +72,11 @@ export interface UseSessionResult {
    * `settings` directly (see this hook's own note on why): a template
    * round's own duration can differ from `settings.workDurationSec`. */
   phaseDurationMs: number | null;
-  start: (template?: WorkoutTemplate) => void;
+  /** Boxing only -- Main Timer has no Assault-Bike Session logic (that's
+   * Phase 11b+'s own screen, per docs/user-flows.md Flow 7). Narrowed at
+   * the type level, not just a runtime check, so passing the wrong
+   * workoutType is a compile error at the call site. */
+  start: (template?: Extract<WorkoutTemplate, { workoutType: "boxing" }>) => void;
   togglePause: () => void;
   reset: () => void;
 }
@@ -290,7 +294,7 @@ export function useSession(): UseSessionResult {
     return () => clearInterval(intervalId);
   }, []);
 
-  const start = useCallback((template?: WorkoutTemplate) => {
+  const start = useCallback((template?: Extract<WorkoutTemplate, { workoutType: "boxing" }>) => {
     pausedByInterruptionRef.current = false;
     // Snapshot round *structure* fresh, at the moment Start is pressed --
     // not whatever was true when this hook first mounted (previously
@@ -373,7 +377,10 @@ export function useSession(): UseSessionResult {
         return;
       }
       const template = getWorkoutTemplates().find((t) => t.id === pendingId);
-      if (template) {
+      // Belt-and-suspenders with the Picker's own guard (templates/index.tsx's
+      // handleStart) -- Main Timer must never attempt an assault-bike
+      // template regardless of what set the signal.
+      if (template?.workoutType === "boxing") {
         start(template);
       }
     }, [start]),

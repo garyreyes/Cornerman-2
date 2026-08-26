@@ -843,3 +843,21 @@ Dated log of shipped changes, appended to as features complete.
   "fixed-punch: Jab" test template correctly showed ROUND 1/1, skipped
   straight to Work (0 warmup), and called "JAB" repeatedly -- never
   falling back to random generation.
+- 2026-08-26: Sub-phase 11a -- AssaultBikeConfig data model + built-in
+  template. WorkoutTemplate widened from its Phase 10-only boxing shape
+  to the real discriminated union ARCHITECTURE.md always specified;
+  dropped the architecture doc's flat `restSec` field as redundant with
+  `restPhases`' own three sub-durations. The fourth built-in ("Assault
+  Bike Cognitive") seeds with real, spec-sourced figures from
+  docs/user-flows.md Flow 7 (10s work, 8+30+12=50s rest). Widening the
+  union surfaced and fixed a real bug via the type checker:
+  `updateWorkoutTemplate` blindly merged a BoxingConfig into whatever
+  template matched by id, which would have corrupted the assault-bike
+  entry if ever called with its id -- now guarded, with a regression
+  test. Templates Picker renders the assault-bike row visibly disabled
+  with a "COMING SOON" tag rather than routing to the boxing-only Round
+  Builder (which would crash on AssaultBikeConfig); Round Builder and
+  useSession.start() both narrow to boxing-only too, the latter as a
+  compile-time guarantee via `Extract<WorkoutTemplate, {workoutType:
+  "boxing"}>`. 167/167 tests, lint/typecheck clean. Visually confirmed
+  on the Android emulator.

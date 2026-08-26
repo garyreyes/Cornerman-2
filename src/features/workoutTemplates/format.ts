@@ -1,7 +1,7 @@
 import { resolvePunchName } from "../comboEngine/service";
 import { formatSeconds } from "../settings/format";
 import type { Preset, Punch } from "../settings/types";
-import type { BoxingConfig, ComboSource, RoundConfig } from "./types";
+import type { AssaultBikeConfig, BoxingConfig, ComboSource, RoundConfig } from "./types";
 
 /** "8 rounds · 3:00 work / 1:00 rest" summary line for a Templates Picker row. */
 export function summarizeBoxingConfig(config: BoxingConfig): string {
@@ -32,4 +32,14 @@ export function summarizeComboSource(source: ComboSource, punches: Punch[], pres
 /** "Round 3" fallback label, or the round's own label when set. */
 export function roundDisplayLabel(round: RoundConfig, index: number): string {
   return round.label && round.label.trim() !== "" ? round.label : `Round ${index + 1}`;
+}
+
+/** "8 rounds · 10s work / 50s rest · visual" summary line for a Templates
+ * Picker row -- total rest is the restPhases' own sum, not a separately
+ * tracked field (see types.ts's note on why `restSec` was dropped). */
+export function summarizeAssaultBikeConfig(config: AssaultBikeConfig): string {
+  const rounds = config.roundsTarget;
+  const roundsLabel = `${rounds} round${rounds === 1 ? "" : "s"}`;
+  const totalRestSec = config.restPhases.settleSec + config.restPhases.drillSec + config.restPhases.resetSec;
+  return `${roundsLabel} · ${config.workSec}s work / ${totalRestSec}s rest · ${config.drillMode}`;
 }
