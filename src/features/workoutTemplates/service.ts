@@ -1,5 +1,6 @@
 import * as Crypto from "expo-crypto";
 
+import type { BikeConfig } from "../assaultBike/types";
 import { generatePresetCombo, generateRandomCombo, resolvePunchName } from "../comboEngine/service";
 import type { Combo, RandomFn } from "../comboEngine/types";
 import { getItem, setItem } from "../../lib/storage";
@@ -202,5 +203,24 @@ export function toTimerConfig(config: BoxingConfig): TimerConfig {
     restDurationMs: config.baseRestDurationSec * 1000,
     warmupDurationMs: config.warmupDurationSec * 1000,
     roundOverrides,
+  };
+}
+
+/**
+ * Flattens AssaultBikeConfig's `restPhases` into assaultBike/service.ts's
+ * own BikeConfig shape (Phase 11b) -- the bike state machine stays
+ * decoupled from the template entity's exact field layout, same
+ * "purely additive, engine doesn't know about the template layer"
+ * boundary toTimerConfig above already keeps for the boxing timer.
+ * Both sides use seconds (unlike toTimerConfig's ms), so this is a
+ * plain reshape, no unit conversion.
+ */
+export function toBikeConfig(config: AssaultBikeConfig): BikeConfig {
+  return {
+    roundsTarget: config.roundsTarget,
+    workSec: config.workSec,
+    settleSec: config.restPhases.settleSec,
+    drillSec: config.restPhases.drillSec,
+    resetSec: config.restPhases.resetSec,
   };
 }

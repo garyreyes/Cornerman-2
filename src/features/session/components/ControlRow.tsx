@@ -5,7 +5,16 @@ import { useTheme } from "../../../shared/theme/ThemeContext";
 import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 
 interface ControlRowProps {
-  phase: string;
+  /** Which buttons show is the caller's own phase-set decision, not this
+   * component's -- kept generic (booleans, not a hardcoded phase-name
+   * comparison) so both Main Timer's boxing phases (ready/warmup/work/
+   * rest/finished) and the Assault-Bike Session's own, different phase
+   * set (work/settle/drill/reset/finished) can drive the same row
+   * correctly. Each caller computes these the same way this component
+   * itself used to, before Phase 11b generalized it. */
+  showStart: boolean;
+  showPauseToggle: boolean;
+  showReset: boolean;
   isPaused: boolean;
   onStart: () => void;
   onTogglePause: () => void;
@@ -18,12 +27,17 @@ interface ControlRowProps {
  * recedes" (docs/design-direction.md) -- Reset stays a quiet secondary
  * action, never competing with Start/Pause.
  */
-export function ControlRow({ phase, isPaused, onStart, onTogglePause, onReset }: ControlRowProps) {
+export function ControlRow({
+  showStart,
+  showPauseToggle,
+  showReset,
+  isPaused,
+  onStart,
+  onTogglePause,
+  onReset,
+}: ControlRowProps) {
   const { colors, fonts } = useTheme();
   const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
-  const showReset = phase === "finished";
-  const showStart = phase === "ready";
-  const showPauseToggle = phase === "warmup" || phase === "work" || phase === "rest";
 
   return (
     <View style={styles.row}>
