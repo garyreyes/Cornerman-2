@@ -53,6 +53,12 @@ export function useBikeSession(config: BikeConfig): UseBikeSessionResult {
   const [audioError, setAudioError] = useState(false);
   const audioEngineRef = useRef<AudioEngine | null>(null);
 
+  // Unlike Main Timer, this screen is pushed and popped -- so unlike
+  // useSession's engine, this one genuinely has to be released. Without
+  // the cleanup below it leaked a whole native AudioContext (plus its
+  // decoded cue buffers) on every visit, and those accumulated for the
+  // rest of the process. Found 2026-08-26 chasing a report of the bell
+  // arriving late in later rounds.
   useEffect(() => {
     const initAudioEngine = () => {
       try {
@@ -62,6 +68,10 @@ export function useBikeSession(config: BikeConfig): UseBikeSessionResult {
       }
     };
     initAudioEngine();
+    return () => {
+      void audioEngineRef.current?.close();
+      audioEngineRef.current = null;
+    };
   }, []);
 
   useEffect(() => {

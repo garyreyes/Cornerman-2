@@ -1,5 +1,5 @@
 import { AudioContext } from "react-native-audio-api";
-import type { AudioBuffer } from "react-native-audio-api";
+import type { AudioBuffer, AudioBufferSourceNode } from "react-native-audio-api";
 
 import type { TimerEvent } from "../timer/types";
 import type { AudioEngine, CueName } from "./types";
@@ -97,6 +97,34 @@ export function createAudioEngine(): AudioEngine {
   }
   setVolume(1.0);
 
+  /**
+   * Every cue source still connected to the bus. Sources used to be
+   * created, connected and started but never disconnected, so finished
+   * nodes stayed wired into `volumeGain` for the life of the context and
+   * the graph grew with every bell, clap and tick. Over a long session
+   * that showed up as steadily rising audio latency -- the "bell is
+   * delayed on later rounds" report (2026-08-26). Same fix as the speech
+   * engine's own source tracking.
+   */
+  const activeSources = new Set<AudioBufferSourceNode>();
+
+  function releaseSource(source: AudioBufferSourceNode): void {
+    activeSources.delete(source);
+    try {
+      source.disconnect();
+    } catch {
+      // Already torn down; the only goal is that it stops referencing
+      // the bus.
+    }
+  }
+
+  /**
+   * Cues deliberately do *not* stop one another, unlike the speech
+   * engine's replace-don't-layer rule: a bell landing over a still-ringing
+   * clapper is a real thing that happens at a round boundary, and the
+   * limiter above exists precisely so overlapping percussive cues don't
+   * clip. Only the graph bookkeeping changed here, not the mixing.
+   */
   async function playCue(cue: CueName): Promise<void> {
     const buffer = await buffers[cue];
     const repeatCount = cue === "clapper" ? CLAPPER_REPEAT_COUNT : 1;
@@ -104,6 +132,8 @@ export function createAudioEngine(): AudioEngine {
       const source = context.createBufferSource();
       source.buffer = buffer;
       source.connect(volumeGain);
+      source.onEnded = () => releaseSource(source);
+      activeSources.add(source);
       source.start(context.currentTime + i * CLAPPER_GAP_SEC);
     }
   }
@@ -115,5 +145,17 @@ export function createAudioEngine(): AudioEngine {
     }
   }
 
-  return { setVolume, playCue, handleTimerEvent };
+  function close(): Promise<void> {
+    for (const source of [...activeSources]) {
+      try {
+        source.stop();
+      } catch {
+        // Already ended; releasing it below is all that's left.
+      }
+      releaseSource(source);
+    }
+    return context.close();
+  }
+
+  return { setVolume, playCue, handleTimerEvent, close };
 }

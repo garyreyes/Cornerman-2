@@ -289,3 +289,125 @@ describe("createSpeechEngine (5a coverage)", () => {
     expect(() => engine.setVolume(-1)).not.toThrow();
   });
 });
+
+/**
+ * Both bugs here were reported from real use on a device (2026-08-26):
+ * voices sometimes echoed, and the bell arrived late in later rounds.
+ * They shared a root cause -- nothing ever stopped or disconnected a
+ * source node, so utterances layered on top of each other and finished
+ * nodes stayed wired into the output bus for the life of the context.
+ */
+describe("createSpeechEngine -- replace, don't layer (the echo fix)", () => {
+  async function flushMicrotasks(times = 8): Promise<void> {
+    for (let i = 0; i < times; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  test("a new word stops the word still playing instead of sounding over it", async () => {
+    const stopSpy = jest.spyOn(AudioBufferSourceNode.prototype, "stop");
+
+    const engine = createSpeechEngine();
+    engine.playWord("Jab");
+    await flushMicrotasks();
+    expect(stopSpy).not.toHaveBeenCalled();
+
+    engine.playWord("Cross");
+    await flushMicrotasks();
+
+    expect(stopSpy).toHaveBeenCalledTimes(1);
+
+    stopSpy.mockRestore();
+  });
+
+  test("a new combo supersedes one still being scheduled, rather than stacking underneath it", async () => {
+    const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
+
+    const engine = createSpeechEngine();
+    // The real trigger: Settings allows a 1s combo gap (the "Intense"
+    // built-in uses exactly that) while a 4-punch combo takes ~4s to
+    // speak, so the next combo begins long before the previous finishes.
+    engine.playCombo(["Jab", "Cross", "Lead Hook", "Rear Uppercut"]);
+    engine.playCombo(["Jab", "Cross"]);
+    await flushMicrotasks(12);
+
+    // Only the second combo's two words -- the first combo is abandoned
+    // mid-schedule rather than being laid down underneath.
+    expect(startSpy).toHaveBeenCalledTimes(2);
+
+    startSpy.mockRestore();
+  });
+
+  test("stop() silences what is sounding and abandons what was still queued", async () => {
+    const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
+    const stopSpy = jest.spyOn(AudioBufferSourceNode.prototype, "stop");
+
+    const engine = createSpeechEngine();
+    engine.playCombo(["Jab", "Cross", "Lead Hook"]);
+    await Promise.resolve();
+    engine.stop();
+    await flushMicrotasks(12);
+
+    expect(stopSpy.mock.calls.length).toBeGreaterThan(0);
+    // Whatever had been scheduled before the stop, nothing new followed it.
+    const afterStop = startSpy.mock.calls.length;
+    await flushMicrotasks(12);
+    expect(startSpy.mock.calls.length).toBe(afterStop);
+
+    startSpy.mockRestore();
+    stopSpy.mockRestore();
+  });
+
+  test("a blank word never cuts off speech that is legitimately still playing", async () => {
+    const stopSpy = jest.spyOn(AudioBufferSourceNode.prototype, "stop");
+
+    const engine = createSpeechEngine();
+    engine.playWord("Jab");
+    await flushMicrotasks();
+
+    expect(engine.playWord("   ")).toBe(false);
+    expect(stopSpy).not.toHaveBeenCalled();
+
+    stopSpy.mockRestore();
+  });
+
+  test("a finished word disconnects itself, so the graph doesn't grow with every utterance", async () => {
+    const connectSpy = jest.spyOn(AudioBufferSourceNode.prototype, "connect");
+    const disconnectSpy = jest.spyOn(AudioBufferSourceNode.prototype, "disconnect");
+
+    const engine = createSpeechEngine();
+    engine.playWord("Jab");
+    await flushMicrotasks();
+
+    const source = connectSpy.mock.instances[0] as unknown as AudioBufferSourceNode;
+    expect(disconnectSpy).not.toHaveBeenCalled();
+
+    // Exactly what the native layer does once the clip finishes playing.
+    // Before this fix nothing happened here at all, so every word spoken
+    // left another node wired into the output bus for the life of the
+    // context -- ~110 of them over a 12-round Color Call session.
+    source.onEnded?.({} as never);
+
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+
+    // And a later stop() must not double-disconnect one already released.
+    engine.stop();
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+
+    connectSpy.mockRestore();
+    disconnectSpy.mockRestore();
+  });
+
+  test("close() silences playback before releasing the context", async () => {
+    const stopSpy = jest.spyOn(AudioBufferSourceNode.prototype, "stop");
+
+    const engine = createSpeechEngine();
+    engine.playWord("Jab");
+    await flushMicrotasks();
+    await engine.close();
+
+    expect(stopSpy).toHaveBeenCalledTimes(1);
+
+    stopSpy.mockRestore();
+  });
+});
