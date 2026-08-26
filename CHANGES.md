@@ -886,3 +886,27 @@ Dated log of shipped changes, appended to as features complete.
   wasn't separately screenshotted (touch-input lag in this environment
   made timing a tap unreliable across several attempts) -- its logic is
   fully covered by unit tests instead.
+- 2026-08-26: Sub-phase 11d -- Corner Commands auditory drill, closing out
+  Phase 11 (Assault-Bike Cognitive Protocol) entirely. A real scope
+  discovery changed this sub-phase's shape before any code was written:
+  defenseCues' existing bundled vocabulary (roll/slip/duck/pivot/check/
+  clinch, built for Phase 5d's boxing defense cues) turned out to already
+  be exactly the word set this drill needed, so 11d reuses it directly --
+  zero new voice-bank generation. Confirmed with the user before building:
+  this drill is purely audio-paced, no tap -- the app has no way to see a
+  physical shadow-boxing response, so it speaks commands at a
+  difficulty-scaled gap and shows the word as text, full stop; "reaction
+  time shown live" applies to the visual drill (11c) only. New
+  `src/features/cornerCommands/` (test-first, 4 tests) -- the one
+  genuinely new piece of logic is a difficulty-scaled gap lookup over the
+  same `nextGapFireTime` primitive already shared by combo timing and
+  defenseCues itself. New `useCornerCommandsDrill` hook owns its own
+  short-lived SpeechEngine, same pattern `previewEngine.ts` already
+  established. `assault-bike.tsx` now branches Drill-phase rendering on
+  `config.drillMode`. Small cleanup alongside the build: centralized
+  `Difficulty` as a named export on `workoutTemplates/types.ts` instead
+  of `oddOneOut` owning its own copy. 185/185 tests, lint/typecheck
+  clean. Visually confirmed on the Android emulator (temporarily flipped
+  the built-in's drillMode to auditory, verified, reverted before
+  committing) -- Drill phase correctly showed a real spoken command
+  ("DUCK") as text, no errors.

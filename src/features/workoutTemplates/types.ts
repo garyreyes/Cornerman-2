@@ -57,6 +57,14 @@ export type DrillMode = "visual" | "auditory" | "mixed";
  * drills exist, one mode could offer a choice of several. */
 export type DrillType = "odd-one-out" | "corner-commands";
 
+/** "One fixed difficulty rather than the reference protocol's per-round
+ * auto-scaling" (ARCHITECTURE.md) -- the type stays the full range for
+ * whichever difficulty a template specifies. Named/exported here (the
+ * actual owner of AssaultBikeConfig.difficulty) rather than each drill
+ * declaring its own copy -- oddOneOut and cornerCommands both import
+ * this one. */
+export type Difficulty = "easy" | "medium" | "hard";
+
 /**
  * `{ roundsTarget, workSec, restPhases: {settleSec, drillSec, resetSec},
  * drillMode, drillType, difficulty }` -- ARCHITECTURE.md's original list
@@ -78,7 +86,7 @@ export interface AssaultBikeConfig {
   };
   drillMode: DrillMode;
   drillType: DrillType;
-  difficulty: "easy" | "medium" | "hard";
+  difficulty: Difficulty;
 }
 
 interface WorkoutTemplateBase {

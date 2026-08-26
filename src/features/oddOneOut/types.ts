@@ -1,9 +1,8 @@
-/** Phase 11c (docs/user-flows.md Flow 7's visual drill). Mirrors
- * ARCHITECTURE.md's AssaultBikeConfig.difficulty -- "one fixed difficulty
- * rather than the reference protocol's per-round auto-scaling" applies
- * here too, but the type stays the full range for whichever difficulty a
- * template actually specifies. */
-export type Difficulty = "easy" | "medium" | "hard";
+/** Re-exported, not redeclared -- workoutTemplates/types.ts is the actual
+ * owner of AssaultBikeConfig.difficulty (Phase 11d centralized this; both
+ * oddOneOut and cornerCommands import the same one instead of each
+ * declaring their own copy). */
+export type { Difficulty } from "../workoutTemplates/types";
 
 /** One drawn puzzle: a `gridSize`x`gridSize` grid of tiles, all identical
  * except the one at `oddIndex` (0-indexed, row-major). */
