@@ -801,3 +801,18 @@ Dated log of shipped changes, appended to as features complete.
   correctly, Onboarding rendering in the real dark/orange theme on a
   genuinely fresh install. iOS is explicitly deferred (Apple Developer
   Program cost), confirmed with the user -- Android-only for now.
+- 2026-08-26: Sub-phase 10c -- Round Builder / Template Editor screen
+  (`src/app/templates/[id].tsx`), mirroring Preset Editor's own
+  create/edit pattern (`id === "new"` sentinel, explicit Save). Name +
+  base pace at the top; an inline scrollable list of expandable
+  `RoundCard`s below (add/reorder/remove/edit in place, per
+  docs/user-flows.md Flow 6 -- never a per-round sub-screen). Each round
+  gets independently-toggleable work/rest and combo-gap overrides plus a
+  comboSource editor (random/fixed-punch/fixed-sequence/preset), reusing
+  Preset Editor's own sequence-builder components as-is rather than
+  duplicating them. The Templates Picker's "+ New Template" and Edit icon
+  now route here for real; tap-to-start stays stubbed until 10d wires the
+  timer engine to a roundPlan. Judgment/presentation, no new tests;
+  150/150 tests still pass, lint/typecheck clean. Visually confirmed
+  end-to-end on the Android emulator -- built and saved a real custom
+  template and confirmed it lists correctly afterward.

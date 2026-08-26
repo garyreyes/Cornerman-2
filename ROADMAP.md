@@ -385,9 +385,27 @@ visual-world decisions here (see risk check below).
   precedent); 150/150 tests still pass. Visually confirmed on the
   Android emulator: the screen renders all three built-ins with correct
   summaries and navigates correctly from Main Timer.
-- [ ] **10c. Round Builder / Template Editor screen** — `not started` —
-  inline expandable round cards (add/reorder/edit), not a per-round
-  sub-screen.
+- [x] **10c. Round Builder / Template Editor screen** — `done`,
+  2026-08-26 — `src/app/templates/[id].tsx` (`id === "new"` sentinel,
+  mirroring Preset Editor exactly: explicit Save, same
+  try/catch-into-generic-error pattern). Name + base pace (Work/Rest/
+  Warmup wheels + combo gap `RangeSliderPair`) at the top; an inline
+  scrollable list of expandable `RoundCard`s below (add/reorder/remove/
+  edit in place, never a per-round sub-screen, per Flow 6). Each round:
+  optional label/note, independently-toggleable work/rest and combo-gap
+  overrides (mirrors `CombinationsSection`'s "restrict pool" switch
+  pattern -- `undefined` means "use the template's base value"), and a
+  `comboSource` editor whose shape changes with the selected type
+  (`SegmentedControl`: RANDOM/FIXED/SEQUENCE/PRESET). Reuses
+  `PresetSequenceEntry`/`AddToSequenceRow` as-is for the sequence
+  builder -- they were already generic number-sequence primitives, not
+  Preset-specific, so no duplication needed. Templates Picker's "+ New
+  Template" and Edit icon now route here for real (tap-to-start stays
+  stubbed -- still needs 10d). Judgment/presentation, no new tests
+  (matches Preset Editor's own precedent); 150/150 tests still pass.
+  Visually confirmed end-to-end on the Android emulator: built a real
+  custom template (name, a sequence-type round with Jab), saved it, and
+  confirmed it appears correctly in the Templates Picker list.
 - [ ] **10d. Wire timer/combo engines to a `roundPlan`** — `not started`
   — Main Timer consumes per-round duration/gap/comboSource overrides
   when a template-driven session is active; existing Settings-driven

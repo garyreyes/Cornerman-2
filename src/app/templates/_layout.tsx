@@ -21,6 +21,10 @@ export default function TemplatesLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: "TEMPLATES" }} />
+      {/* Title is set dynamically from within the screen itself (NEW
+          TEMPLATE vs EDIT TEMPLATE, depending on the `id` param) -- see
+          [id].tsx, same pattern as Settings' preset editor. */}
+      <Stack.Screen name="[id]" options={{ title: "TEMPLATE" }} />
     </Stack>
   );
 }
