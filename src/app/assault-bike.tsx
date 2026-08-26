@@ -3,12 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { DrillFeedback } from "../features/assaultBike/components/DrillFeedback";
+import { DrillModePicker } from "../features/assaultBike/components/DrillModePicker";
 import { ScoreReadout } from "../features/assaultBike/components/ScoreReadout";
 import { SessionSummary } from "../features/assaultBike/components/SessionSummary";
 import { TrialTimerBar } from "../features/assaultBike/components/TrialTimerBar";
 import { useBikeSession } from "../features/assaultBike/useBikeSession";
 import { useDrillRun } from "../features/assaultBike/useDrillRun";
-import { DrillFeedback } from "../features/oddOneOut/components/DrillFeedback";
+import { ColorCallGrid } from "../features/colorCall/components/ColorCallGrid";
 import { OddOneOutGrid } from "../features/oddOneOut/components/OddOneOutGrid";
 import { AudioErrorBanner } from "../features/session/components/AudioErrorBanner";
 import { ControlRow } from "../features/session/components/ControlRow";
@@ -16,7 +18,7 @@ import { CountdownRing } from "../features/session/components/CountdownRing";
 import { PhaseBadge } from "../features/session/components/PhaseBadge";
 import { RoundCounter } from "../features/session/components/RoundCounter";
 import { getWorkoutTemplates, toBikeConfig } from "../features/workoutTemplates/service";
-import type { AssaultBikeConfig } from "../features/workoutTemplates/types";
+import type { AssaultBikeConfig, DrillMode } from "../features/workoutTemplates/types";
 import { useTheme } from "../shared/theme/ThemeContext";
 import type { ColorTokens } from "../shared/theme/tokens";
 
@@ -83,12 +85,20 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
   const drill = config.rest.kind === "drill" ? config.rest : null;
   const isDrilling = phase === "drill" && !isPaused && drill !== null;
 
+  // The template's drillMode is the default, not the verdict -- there is
+  // no bike template editor, so this is the only way Color Call is
+  // reachable at all (see DrillModePicker). Chosen per session and not
+  // persisted: which drill you feel like has nothing to do with which
+  // energy system the protocol trains.
+  const [drillMode, setDrillMode] = useState<DrillMode>(drill?.drillMode ?? "odd-one-out");
+
   // Called unconditionally (rules of hooks); `active` stays false whenever
   // this protocol isn't running its drill phase. Stats live here, above
   // the per-round activation, so score and the shrinking trial window
   // carry across all of the session's rounds.
   const { trial, lastResult, deadlineAt, windowMs, stats, summary, handleTap, resetStats } = useDrillRun(
-    isDrilling && drill?.drillMode === "odd-one-out",
+    isDrilling,
+    drillMode,
     drill?.difficulty ?? "medium",
   );
 
@@ -135,24 +145,34 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
 
         {phase === "finished" ? (
           <SessionSummary summary={summary} />
-        ) : phase === "drill" && drill?.drillMode === "odd-one-out" ? (
+        ) : phase === "drill" && drill !== null ? (
           <View style={styles.drill}>
             <TrialTimerBar deadlineAt={deadlineAt} windowMs={windowMs} />
             <ScoreReadout score={stats.score} windowMs={windowMs} />
             <DrillFeedback result={lastResult} />
-            {trial !== null ? (
+            {trial === null ? null : trial.mode === "odd-one-out" ? (
               <OddOneOutGrid
-                gridSize={trial.gridSize}
-                oddIndex={trial.oddIndex}
+                gridSize={trial.puzzle.gridSize}
+                oddIndex={trial.puzzle.oddIndex}
                 onTapTile={handleTap}
                 disabled={isPaused}
               />
-            ) : null}
+            ) : (
+              <ColorCallGrid choices={trial.puzzle.choices} onTapTile={handleTap} disabled={isPaused} />
+            )}
           </View>
         ) : (
           <CountdownRing phaseEndAt={bikeState?.phaseEndAt ?? null} phaseDurationMs={ringDurationMs} isPaused={isPaused} />
         )}
       </View>
+
+      {/* Only before the session starts, and only for a protocol that
+          actually runs a drill -- Lactic Capacity has nothing to pick. */}
+      {showStart && drill !== null ? (
+        <View style={styles.picker}>
+          <DrillModePicker value={drillMode} onChange={setDrillMode} />
+        </View>
+      ) : null}
 
       <View style={styles.bottom}>
         <ControlRow
@@ -197,6 +217,10 @@ function createStyles(colors: ColorTokens) {
       maxWidth: 340,
       alignItems: "center",
       gap: 12,
+    },
+    picker: {
+      paddingHorizontal: 24,
+      paddingBottom: 8,
     },
     bottom: {
       paddingHorizontal: 24,

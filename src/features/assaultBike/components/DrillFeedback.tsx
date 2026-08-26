@@ -3,17 +3,21 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { useTheme } from "../../../shared/theme/ThemeContext";
 import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
-import type { TrialResult } from "../types";
+import type { TrialOutcome } from "../../../lib/drillTrial";
 
 interface DrillFeedbackProps {
-  result: TrialResult | null;
+  result: TrialOutcome | null;
 }
 
 /** Live HIT/MISS + reaction-time readout shown in the brief pause between
- * Odd-One-Out trials -- never persisted, matches "reaction time/accuracy
- * display during a drill is live-only, never logged" (ARCHITECTURE.md).
- * Reserves its own height even with nothing to show yet, so the grid
- * below it doesn't jump the instant a trial starts. */
+ * trials -- never persisted, matches "reaction time/accuracy display
+ * during a drill is live-only, never logged" (ARCHITECTURE.md). Reserves
+ * its own height even with nothing to show yet, so the grid below it
+ * doesn't jump the instant a trial starts.
+ *
+ * Lives in assaultBike/ rather than a drill feature (Phase 12c): Odd One
+ * Out and Color Call both report the same TrialOutcome and both show this
+ * exact readout, so it belongs with the run, not with either puzzle. */
 export function DrillFeedback({ result }: DrillFeedbackProps) {
   const { colors, fonts } = useTheme();
   const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);

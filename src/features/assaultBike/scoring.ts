@@ -1,3 +1,4 @@
+import type { TrialOutcome } from "../../lib/drillTrial";
 import type { Difficulty } from "../workoutTemplates/types";
 
 /**
@@ -62,13 +63,12 @@ export interface DrillStats {
   totalHitReactionMs: number;
 }
 
-/** Matches oddOneOut's TrialResult shape exactly, so no adapter sits
- * between a drill and the tally. A timeout arrives as
+/** Re-exported so a caller tallying results doesn't need a second import
+ * for the shape those results already have. The canonical declaration is
+ * lib/drillTrial.ts -- see its note on why it sits there rather than in
+ * this file or in a drill feature. A timeout arrives as
  * `{correct: false, reactionMs: <the full window>}`. */
-export interface TrialOutcome {
-  correct: boolean;
-  reactionMs: number;
-}
+export type { TrialOutcome } from "../../lib/drillTrial";
 
 export function emptyDrillStats(): DrillStats {
   return { trials: 0, hits: 0, score: 0, totalHitReactionMs: 0 };
