@@ -767,3 +767,18 @@ Dated log of shipped changes, appended to as features complete.
     watched the "WARMUP" phase badge actually appear and count down --
     closing the loop the user reported broken. 139/139 tests pass,
     lint/typecheck clean.
+- 2026-08-26: Sub-phase 10a -- `WorkoutTemplate`/`RoundConfig`/`BoxingConfig`
+  data model + MMKV storage (`src/features/workoutTemplates/`), per
+  `ARCHITECTURE.md`'s Phase 10+ entities. `resolveRoundCombo` resolves a
+  round's `comboSource` (fixed-punch / fixed-sequence / preset / random)
+  to a `Combo` by calling `comboEngine`'s existing exported functions
+  rather than duplicating their logic -- kept as a sibling feature, same
+  pattern `defenseCues` already used to stay out of `comboEngine` itself.
+  Three built-in templates (Relax/Zone-2, Moderate, Intense) seed into
+  storage on first read, same as `getPunches`' default-seeding pattern;
+  the fourth built-in (Assault Bike Cognitive) is deferred to Phase 11a,
+  which is where `AssaultBikeConfig` actually gets built. No Undo/restore
+  for templates yet -- unlike Punches/Presets, there's no delete UI yet
+  to generate that need. Test-first (correctness-adjacent, extends
+  already-tested combo generation, per `ROADMAP.md`'s own note for this
+  sub-phase); 11 new tests, 150/150 total, lint/typecheck clean.

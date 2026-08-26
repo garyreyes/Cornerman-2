@@ -354,12 +354,16 @@ visual-world decisions here (see risk check below).
 
 ## Phase 10 — Workout Templates (boxing round-by-round programming)
 
-- [ ] **10a. `WorkoutTemplate`/`RoundConfig` data model + storage** —
-  `not started` — extends the Phase 1b settings feature; per-round
-  comboSource resolution (fixed-punch/fixed-sequence/preset/random)
-  follows the same resolve-at-call-time pattern as `Preset`.
-  Correctness-adjacent (extends already-tested combo
-  generation/resolution) — test-first.
+- [x] **10a. `WorkoutTemplate`/`RoundConfig` data model + storage** —
+  `done`, 2026-08-26 — `src/features/workoutTemplates/` (types + CRUD +
+  `resolveRoundCombo`), extending the Phase 1b settings feature; kept as
+  a sibling feature calling into `comboEngine`'s existing exported
+  functions rather than merging in, same pattern `defenseCues` already
+  used. Three built-in templates (Relax/Zone-2, Moderate, Intense) seed
+  on first read; the fourth (Assault Bike Cognitive) is deferred to
+  Phase 11a, which is where `AssaultBikeConfig` gets built — see
+  `PROJECT_FACTS.md`. Test-first per this item's own note; 11 new tests,
+  150/150 total, all gates green.
 - [ ] **10b. Templates Picker screen** — `not started` — built-ins +
   custom, start-directly-on-tap, edit as a separate action.
 - [ ] **10c. Round Builder / Template Editor screen** — `not started` —

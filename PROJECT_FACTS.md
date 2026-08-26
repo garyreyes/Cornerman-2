@@ -1170,3 +1170,17 @@ made during feature work.
   (genuine MMKV disk persistence), then pressed Start and watched the
   "WARMUP" phase badge actually appear and count down from the set
   value. 139/139 tests pass, lint/typecheck clean.
+- **Phase 10a's built-in workout template pace/round-count numbers are a
+  reasonable guess, not sourced from the PRD/ARCHITECTURE spec** (those
+  docs name the three templates -- Relax/Zone-2, Moderate, Intense -- but
+  never give numbers). Shipped as: Relax/Zone-2 = 6 rounds, 180s work/90s
+  rest, 3-5s combo gap; Moderate = 8 rounds, 180s/60s, 2-3.5s gap; Intense
+  = 12 rounds, 180s/45s, 1-2s gap. Retune once actually felt on a real
+  device, same spirit as 4a's placeholder-then-sourced audio.
+- **The fourth built-in workout template (Assault Bike Cognitive) is
+  deliberately not seeded by Phase 10a** -- it needs `AssaultBikeConfig`,
+  which doesn't exist until Phase 11a builds it. `WorkoutTemplate.workoutType`/
+  `config` are typed narrow (`"boxing"`/`BoxingConfig` only) for the
+  same reason; widen to the full discriminated union once 11a lands rather
+  than typing a wider union today that would let `"assault-bike-cognitive"`
+  type-check against a `BoxingConfig`.
