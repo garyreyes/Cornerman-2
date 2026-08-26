@@ -8,6 +8,8 @@ import { DrillModePicker } from "../features/assaultBike/components/DrillModePic
 import { ScoreReadout } from "../features/assaultBike/components/ScoreReadout";
 import { SessionSummary } from "../features/assaultBike/components/SessionSummary";
 import { TrialTimerBar } from "../features/assaultBike/components/TrialTimerBar";
+import { withoutDrill } from "../features/assaultBike/service";
+import type { DrillChoice } from "../features/assaultBike/types";
 import { useBikeSession } from "../features/assaultBike/useBikeSession";
 import { useDrillRun } from "../features/assaultBike/useDrillRun";
 import { ColorCallGrid } from "../features/colorCall/components/ColorCallGrid";
@@ -18,7 +20,7 @@ import { CountdownRing } from "../features/session/components/CountdownRing";
 import { PhaseBadge } from "../features/session/components/PhaseBadge";
 import { RoundCounter } from "../features/session/components/RoundCounter";
 import { getWorkoutTemplates, toBikeConfig } from "../features/workoutTemplates/service";
-import type { AssaultBikeConfig, DrillMode } from "../features/workoutTemplates/types";
+import type { AssaultBikeConfig } from "../features/workoutTemplates/types";
 import { useTheme } from "../shared/theme/ThemeContext";
 import type { ColorTokens } from "../shared/theme/tokens";
 
@@ -70,7 +72,35 @@ export default function AssaultBikeSessionRoute() {
 function AssaultBikeSessionScreen({ name, config }: { name: string; config: AssaultBikeConfig }) {
   const { colors, fonts } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [bikeConfig] = useState(() => toBikeConfig(config));
+  const [baseBikeConfig] = useState(() => toBikeConfig(config));
+
+  // A plain-rest protocol (Lactic Capacity) has no drill at all -- there
+  // is no drillMode/difficulty to read, and no picker to show. Distinct
+  // from `drillChoice` below: this is a property of the *protocol*
+  // (fixed in the template), that is a property of *this session*
+  // (ephemeral, chosen on the pre-start screen).
+  const templateDrill = config.rest.kind === "drill" ? config.rest : null;
+
+  // The template's drillMode is the default, not the verdict -- there is
+  // no bike template editor, so this picker is the only way to reach
+  // Color Call, or to skip the drill on a protocol that has one (see
+  // DrillModePicker). Chosen per session and not persisted: which drill
+  // you feel like today, or whether you want one at all, has nothing to
+  // do with which energy system the protocol trains.
+  const [drillChoice, setDrillChoice] = useState<DrillChoice>(templateDrill?.drillMode ?? "none");
+
+  // "none" collapses the session's own BikeConfig to plain rest of the
+  // same total duration (assaultBike/service.ts's withoutDrill) rather
+  // than threading a null case through the engine -- once collapsed, the
+  // state machine simply never enters "drill", so the phase badge reads
+  // one continuous REST instead of "PHONE UP" for a phone this session
+  // doesn't need. Recomputed only while no session is running (the
+  // picker is hidden once one starts), so this can't shift the shape of
+  // an in-flight session out from under it.
+  const bikeConfig = useMemo(
+    () => (drillChoice === "none" ? withoutDrill(baseBikeConfig) : baseBikeConfig),
+    [baseBikeConfig, drillChoice],
+  );
   const { bikeState, totalRounds, phaseDurationMs, audioError, start, togglePause, reset } = useBikeSession(bikeConfig);
 
   const phase = bikeState?.phase ?? "ready";
@@ -79,27 +109,20 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
   const showStart = bikeState === null;
   const showReset = phase === "finished";
   const showPauseToggle = bikeState !== null && phase !== "finished";
-  // A plain-rest protocol (Lactic Capacity) has no drill at all, so there
-  // is no drillMode/difficulty to read -- narrowed once here rather than
-  // re-checked at each use.
-  const drill = config.rest.kind === "drill" ? config.rest : null;
-  const isDrilling = phase === "drill" && !isPaused && drill !== null;
-
-  // The template's drillMode is the default, not the verdict -- there is
-  // no bike template editor, so this is the only way Color Call is
-  // reachable at all (see DrillModePicker). Chosen per session and not
-  // persisted: which drill you feel like has nothing to do with which
-  // energy system the protocol trains.
-  const [drillMode, setDrillMode] = useState<DrillMode>(drill?.drillMode ?? "odd-one-out");
+  // Never true when drillChoice is "none": bikeConfig's rest is plain in
+  // that case, so the engine can never actually reach phase "drill".
+  const isDrilling = phase === "drill" && !isPaused;
 
   // Called unconditionally (rules of hooks); `active` stays false whenever
-  // this protocol isn't running its drill phase. Stats live here, above
-  // the per-round activation, so score and the shrinking trial window
-  // carry across all of the session's rounds.
+  // this protocol isn't running its drill phase. The drillMode argument is
+  // a harmless placeholder when drillChoice is "none" -- it's never read,
+  // since `active` can't be true in that case either. Stats live here,
+  // above the per-round activation, so score and the shrinking trial
+  // window carry across all of the session's rounds.
   const { trial, lastResult, deadlineAt, windowMs, stats, summary, handleTap, resetStats } = useDrillRun(
     isDrilling,
-    drillMode,
-    drill?.difficulty ?? "medium",
+    drillChoice === "none" ? "odd-one-out" : drillChoice,
+    templateDrill?.difficulty ?? "medium",
   );
 
   function handleStart() {
@@ -114,8 +137,10 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
 
   // Ready/Finished have no active phaseDurationMs -- the work duration is
   // as reasonable a static preview/fallback as Main Timer's own
-  // equivalent (see src/app/index.tsx's ringDurationMs).
-  const ringDurationMs = phaseDurationMs ?? bikeConfig.workSec * 1000;
+  // equivalent (see src/app/index.tsx's ringDurationMs). workSec never
+  // changes between baseBikeConfig and bikeConfig (withoutDrill only
+  // touches rest), so either would do here.
+  const ringDurationMs = phaseDurationMs ?? baseBikeConfig.workSec * 1000;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
@@ -145,7 +170,7 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
 
         {phase === "finished" ? (
           <SessionSummary summary={summary} />
-        ) : phase === "drill" && drill !== null ? (
+        ) : phase === "drill" ? (
           <View style={styles.drill}>
             <TrialTimerBar deadlineAt={deadlineAt} windowMs={windowMs} />
             <ScoreReadout score={stats.score} windowMs={windowMs} />
@@ -167,10 +192,11 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
       </View>
 
       {/* Only before the session starts, and only for a protocol that
-          actually runs a drill -- Lactic Capacity has nothing to pick. */}
-      {showStart && drill !== null ? (
+          structurally has a drill -- Lactic Capacity has nothing to pick,
+          since its rest is already too short for one. */}
+      {showStart && templateDrill !== null ? (
         <View style={styles.picker}>
-          <DrillModePicker value={drillMode} onChange={setDrillMode} />
+          <DrillModePicker value={drillChoice} onChange={setDrillChoice} />
         </View>
       ) : null}
 

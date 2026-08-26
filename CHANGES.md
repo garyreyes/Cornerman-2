@@ -1004,3 +1004,14 @@ Dated log of shipped changes, appended to as features complete.
     Smoke-tested on the emulator -- audio focus granted and released
     cleanly, no AudioAPI errors. **The audible result is not verified**;
     that needs a real ear on a real device.
+- 2026-08-26: Assault-Bike drill picker gained a third choice, **None** --
+  alongside Odd One Out and Color Call, for a straight rest with no
+  cognitive drill on any protocol that has one. `withoutDrill()`
+  collapses a session's Settle/Drill/Reset into the same plain
+  `work -> rest -> work` cycle Lactic Capacity already runs, at the exact
+  same total duration -- so choosing None never changes how long the
+  workout takes, and the state machine simply can't enter "drill" that
+  session (no "PHONE UP" for a phone the rider doesn't need). New
+  `DrillChoice = DrillMode | "none"` type, distinct from a protocol
+  structurally having no drill at all. Engine change written test-first
+  (5 red). 242/242 tests, lint/typecheck clean.

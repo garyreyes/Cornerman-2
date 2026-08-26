@@ -284,12 +284,12 @@ one (`assaultBike/types.ts`):
 
 ```mermaid
 flowchart TD
-    A[Work phase:\nall-out countdown] --> Z{rest kind?}
-    Z -->|plain| Y[Rest: easy spin\ntoo short for a drill]
+    A[Work phase:\nall-out countdown] --> Z{this session's\ndrill choice}
+    Z -->|none, or protocol\nhas no drill at all| Y[Rest: one continuous phase\n— no "PHONE UP/DOWN"]
     Y --> A
-    Z -->|drill| B["Rest: Settle\n\"PHONE UP\""]
+    Z -->|odd-one-out or\ncolor-call| B["Rest: Settle\n\"PHONE UP\""]
     B --> C[Rest: Cognitive Drill]
-    C --> D{drill mode}
+    C --> D{which drill}
     D -->|odd-one-out| E[Uniform grid, one tile differs:\ntap it]
     D -->|color-call| F[Multi-colour grid, one colour\nnamed aloud: tap the one you heard\n— reuses the Phase 5 speech pipeline]
     E --> G["Rest: Reset\n\"PHONE DOWN\""]
@@ -309,9 +309,17 @@ flowchart TD
 - **Lactic Capacity has no drill at all.** A 10s easy spin can't fit the
   phone-up/phone-down cycle, so that protocol runs `work → rest → work`
   and never enters Settle/Drill/Reset.
-- **The drill is chosen per session, not per template.** There is no
-  bike template editor, so the pre-start screen offers the choice
-  directly; the template's own `drillMode` is the default.
+- **The drill is chosen per session, not per template, and "none" is a
+  real third choice.** There is no bike template editor, so the
+  pre-start screen offers Odd One Out / Color Call / **None** directly;
+  the template's own `drillMode` is only the default. Picking None
+  collapses the session's own Settle/Drill/Reset into the same plain
+  `work → rest → work` cycle Lactic Capacity always runs — the rest
+  total is unchanged, only the shape collapses, so choosing None never
+  changes how long the workout takes. Two different reasons produce the
+  same "no drill" cycle: the protocol structurally can't fit one
+  (Lactic Capacity), or the rider opted out for this session on a
+  protocol that can.
 - **Nothing is persisted.** Score, reaction time and accuracy are shown
   live and again on a summary card when the last round ends, but they
   live in memory only — no storage write, no backend — and are gone once
