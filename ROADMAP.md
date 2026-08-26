@@ -497,11 +497,71 @@ visual-world decisions here (see risk check below).
   assault-bike row renders dimmed with correct spec-matching summary
   ("8 rounds · 10s work / 50s rest · visual"), and tapping it is a safe
   no-op (no crash, no broken navigation).
-- [ ] **11b. Assault-Bike Session screen** — `not started` — work phase
-  + rest's three sub-phases (Settle → Drill → Reset); visually distinct
-  from the boxing Main Timer.
-- [ ] **11c. Visual drill: Odd-One-Out** — `not started` — grid, tap
-  detection, live (unlogged) reaction-time display.
+- [x] **11b. Assault-Bike Session screen** — `done`, 2026-08-26 — new
+  `src/features/assaultBike/` state machine (`startBikeSession`/`tick`/
+  `pause`/`resume`), deliberately NOT built on `timer/service.ts` --
+  the phase set (`work`/`settle`/`drill`/`reset`/`finished`) and
+  transition rules genuinely differ, most notably: every round --
+  including the last -- runs its full Settle/Drill/Reset cycle before
+  `finished`, unlike the boxing timer's skip-the-trailing-rest
+  shortcut (matches Flow 7's own diagram, where the "all rounds
+  complete" branch leaves from the Reset→next-Work loop-back point,
+  not right after Work). Test-first (correctness-critical, phase
+  transitions), 9 tests. New `src/app/assault-bike.tsx` screen, reached
+  by pushing (not the boxing pendingStart-and-pop-back pattern -- no
+  always-mounted instance to pop back to here). Reused as-is:
+  `RoundCounter`/`PhaseBadge`/`CountdownRing`/`AudioErrorBanner` --
+  none were boxing-specific, and `PhaseBadge`'s own
+  `phase.toUpperCase()` fallback already renders "SETTLE"/"DRILL"/
+  "RESET" correctly with no changes. `ControlRow` was generalized from
+  hardcoded boxing phase-name checks (`phase === "work" || "rest"`,
+  which would have silently hidden Pause during Settle/Drill/Reset) to
+  explicit `showStart`/`showPauseToggle`/`showReset` booleans the
+  caller computes -- a real bug caught before it shipped, not just a
+  refactor; Main Timer's own call site now computes the exact same
+  values it always implicitly used, behavior-preserving. No
+  background-audio/notification wiring (unlike boxing's `useSession`)
+  -- this mode is inherently eyes-on-screen/hands-on-device (the Drill
+  phase requires actively tapping), not a screen-off-friendly one; see
+  PROJECT_FACTS.md.
+- [x] **11c. Visual drill: Odd-One-Out** — `done`, 2026-08-26 — new
+  `src/features/oddOneOut/` (`gridSizeForDifficulty`/`startTrial`/
+  `resolveTap`, test-first, 5 tests) plus `OddOneOutGrid` (the tappable
+  grid, tiles labeled generically for screen readers -- never revealing
+  which one is odd, since that would trivialize an inherently sighted
+  reaction-time task) and `DrillFeedback` (live HIT/MISS + reaction-ms,
+  never persisted, matches "reaction time/accuracy ... live-only"). A
+  continuous stream of trials runs for the whole Drill window via
+  `useOddOneOutDrill`, not one static puzzle -- a repeated cognitive
+  stimulus is what a real Brain Endurance Training drill is for; round
+  timing is never blocked on resolving a trial, matching a live,
+  time-boxed task. Templates Picker's Assault Bike Cognitive row is no
+  longer "coming soon" for starting (`TemplateRow`'s prop narrowed from
+  a whole-row `comingSoon` to just `editDisabled` -- there's still no
+  assault-bike editor, not a planned Phase 11 deliverable, but Start
+  now genuinely works).
+  - 181/181 tests total (150+ new across 11b/11c), lint/typecheck
+    clean. Visually confirmed on the Android emulator: full Work→
+    Settle→Drill→Reset→next-round cycle observed directly (screenshots
+    at each phase), the Drill grid rendering at the correct size
+    (medium difficulty → 3×3) with the odd tile visibly distinct, and
+    round progression correctly continuing regardless of whether a
+    trial was tapped. Also caught and fixed a real bug this way: the
+    screen initially rendered "ROUND 1/8" under the status bar --
+    copied a nested-route's `SafeAreaView edges` (which excludes "top"
+    because THAT screen has a header reserving that space) onto this
+    screen before actually turning its own header on; fixed by
+    explicitly setting `headerShown: true` with the same themed header
+    Settings/Templates use. **Not separately screenshotted**: the live
+    HIT/MISS feedback overlay itself -- this environment's touch-input
+    lag (PROJECT_FACTS.md) made landing a tap at the right moment
+    unreliable across several genuine attempts; the underlying
+    tap-resolution/reaction-time arithmetic is fully covered by
+    `oddOneOut/service.test.ts` instead. Worth a real device's own
+    quick look once available.
+  - [ ] `/impeccable audit` — **not run yet**, deferred to the Phase 12
+    close alongside Templates Picker/Round Builder's own deferred
+    audit (see 10c/11a's notes) rather than run per-sub-phase.
 - [ ] **11d. Auditory drill: Corner Commands** — `not started` — reuses
   the Phase 5 speech pipeline with real corner-cue vocabulary.
   - [ ] `/impeccable audit`

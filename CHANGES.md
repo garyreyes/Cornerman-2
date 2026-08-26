@@ -861,3 +861,28 @@ Dated log of shipped changes, appended to as features complete.
   compile-time guarantee via `Extract<WorkoutTemplate, {workoutType:
   "boxing"}>`. 167/167 tests, lint/typecheck clean. Visually confirmed
   on the Android emulator.
+- 2026-08-26: Sub-phases 11b+11c -- Assault-Bike Session screen + the
+  Odd-One-Out visual drill. New `src/features/assaultBike/` state machine
+  (test-first, 9 tests), deliberately not built on the boxing timer engine
+  -- every round, including the last, runs its full Settle/Drill/Reset
+  cycle before finishing, unlike boxing's skip-the-trailing-rest shortcut.
+  New `src/app/assault-bike.tsx` screen reuses RoundCounter/PhaseBadge/
+  CountdownRing/AudioErrorBanner as-is; generalized `ControlRow` away
+  from hardcoded boxing phase-name checks (which would have hidden Pause
+  during Settle/Drill/Reset -- a real bug caught before shipping) to
+  explicit show/hide booleans the caller computes. New
+  `src/features/oddOneOut/` (test-first, 5 tests) plus the tappable grid
+  and live HIT/MISS + reaction-time feedback components; a continuous
+  stream of trials runs for the whole Drill window, matching a real Brain
+  Endurance Training drill rather than one static puzzle. Templates
+  Picker's Assault Bike Cognitive row can now actually be started (Edit
+  stays disabled -- still no assault-bike editor). 181/181 tests,
+  lint/typecheck clean. Visually confirmed on the Android emulator: full
+  phase cycle observed directly, drill grid rendering at the correct
+  size with the odd tile visible; also caught and fixed a real bug this
+  way (the screen initially rendered under the status bar -- a copied
+  SafeAreaView edges prop from a screen with a header, without actually
+  turning this screen's own header on). The live HIT/MISS overlay itself
+  wasn't separately screenshotted (touch-input lag in this environment
+  made timing a tap unreliable across several attempts) -- its logic is
+  fully covered by unit tests instead.

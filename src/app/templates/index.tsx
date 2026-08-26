@@ -19,14 +19,16 @@ function summarize(template: WorkoutTemplate): string {
 
 /**
  * Templates Picker (docs/user-flows.md Flow 6). Tapping a row starts that
- * template directly -- no forced preview step -- by leaving a "start
- * this" signal (see workoutTemplates/pendingStart.ts) and popping back to
- * the already-mounted Main Timer, which consumes it on focus. The
- * separate Edit icon opens the Round Builder (Phase 10c). Both actions
- * are guarded to boxing templates only -- Main Timer/Round Builder are
- * both boxing-specific, and the Assault-Bike Session screen/editor don't
- * exist yet (Phase 11b+); TemplateRow's `comingSoon` prop renders that
- * row's actions visibly disabled rather than routing somewhere broken.
+ * template directly -- no forced preview step. Boxing templates leave a
+ * "start this" signal (see workoutTemplates/pendingStart.ts) and pop
+ * back to the already-mounted Main Timer, which consumes it on focus;
+ * assault-bike templates push the Assault-Bike Session screen directly
+ * (Phase 11b) -- no always-mounted instance to pop back to, so a normal
+ * push is the right call there, unlike boxing's pop-back. The Edit icon
+ * only opens the Round Builder (Phase 10c) for boxing templates --
+ * there's no assault-bike editor (not a planned Phase 11 deliverable),
+ * so TemplateRow renders that icon disabled for those rows instead of
+ * routing somewhere that would crash.
  */
 export function TemplatesPickerScreen() {
   const router = useRouter();
@@ -41,11 +43,12 @@ export function TemplatesPickerScreen() {
   );
 
   function handleStart(template: WorkoutTemplate) {
-    if (template.workoutType !== "boxing") {
-      return;
+    if (template.workoutType === "boxing") {
+      setPendingTemplateStart(template.id);
+      router.back();
+    } else {
+      router.push({ pathname: "/assault-bike", params: { templateId: template.id } });
     }
-    setPendingTemplateStart(template.id);
-    router.back();
   }
 
   function handleEdit(template: WorkoutTemplate) {
@@ -73,7 +76,7 @@ export function TemplatesPickerScreen() {
             name={template.name}
             summary={summarize(template)}
             isBuiltIn={template.isBuiltIn}
-            comingSoon={template.workoutType !== "boxing"}
+            editDisabled={template.workoutType !== "boxing"}
             onPress={() => handleStart(template)}
             onEdit={() => handleEdit(template)}
           />

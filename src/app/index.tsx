@@ -78,6 +78,9 @@ function MainTimerScreen() {
   const phase = timerState?.phase ?? "ready";
   const isPaused = timerState?.isPaused ?? false;
   const round = timerState?.round ?? 0;
+  const showReset = phase === "finished";
+  const showStart = phase === "ready";
+  const showPauseToggle = phase === "warmup" || phase === "work" || phase === "rest";
 
   // useSession's phaseDurationMs is null outside an active phase
   // (Ready/Finished) -- CountdownRing needs a real number either way, and
@@ -112,7 +115,9 @@ function MainTimerScreen() {
 
       <View style={styles.bottom}>
         <ControlRow
-          phase={phase}
+          showStart={showStart}
+          showPauseToggle={showPauseToggle}
+          showReset={showReset}
           isPaused={isPaused}
           // Deliberately wrapped, not `onStart={start}` -- `start` now
           // optionally takes a WorkoutTemplate (Phase 10d), and

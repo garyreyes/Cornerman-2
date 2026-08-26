@@ -1269,3 +1269,35 @@ made during feature work.
   meant to accept one member of a wider union (e.g. once Phase 11b's
   Assault-Bike session hook exists, it should likely narrow the other
   way).
+- **No background-audio/notification wiring for the Assault-Bike Session
+  screen, deliberately** -- unlike boxing's `useSession`, this mode is
+  inherently eyes-on-screen and hands-on-device (the Drill phase requires
+  actively tapping a grid), not the boxing flow's audio-first,
+  screen-off-friendly one. Revisit only if a real user need for
+  screen-off assault-bike sessions surfaces -- nothing in the PRD/
+  ARCHITECTURE spec calls for it.
+- **`ControlRow` used to decide which buttons to show from hardcoded
+  boxing phase-name strings** (`phase === "work" || phase === "rest"`
+  for Pause). Building the Assault-Bike Session screen (Phase 11b), which
+  has a genuinely different phase set (`work`/`settle`/`drill`/
+  `reset`), surfaced this as a real bug risk, not just an inflexibility
+  -- reusing it as-is would have silently hidden Pause during Settle/
+  Drill/Reset. Generalized to explicit `showStart`/`showPauseToggle`/
+  `showReset` booleans the caller computes; Main Timer's own call site
+  now computes the exact same values it always implicitly used
+  (behavior-preserving, confirmed via the full test suite + a live
+  on-device check). Worth remembering next time a "generic-looking"
+  shared component turns out to encode one specific caller's domain
+  knowledge internally.
+- **This dev machine's Android emulator touch-input lag (already noted
+  once this session) can get severe enough that a tap doesn't register
+  at all for minutes, not just arrive late** -- hit while testing Phase
+  11c's Odd-One-Out drill: multiple genuine Start-button taps, well
+  spaced out, on a freshly-restarted app instance, simply never
+  registered. Confirmed it wasn't a real app bug first (no JS errors in
+  logcat/Metro, correct window focus via `dumpsys window`, app
+  otherwise rendering correctly) before concluding it was environmental.
+  When this happens, a full app restart sometimes clears it (as it did
+  earlier this session) but isn't guaranteed to -- don't burn excessive
+  time chasing one specific interaction if the underlying logic already
+  has solid unit-test coverage; a real device would be the actual fix.
