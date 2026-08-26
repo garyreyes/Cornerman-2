@@ -1301,3 +1301,22 @@ made during feature work.
   earlier this session) but isn't guaranteed to -- don't burn excessive
   time chasing one specific interaction if the underlying logic already
   has solid unit-test coverage; a real device would be the actual fix.
+- **Corner Commands' vocabulary IS defenseCues' vocabulary** (roll/slip/
+  duck/pivot/check/clinch) -- not a separate, richer corner-man word list.
+  If a future request wants Corner Commands to call out a broader
+  vocabulary (e.g. "JAB", "MOVE", "GUARD UP"), that means either
+  expanding `DEFENSE_CUES` itself (which would also change what boxing's
+  own Work-phase defense cues say) or giving `cornerCommands` its own
+  independent word list and voice-bank entries -- a real decision, not
+  a small tweak, since the current design deliberately shares one list
+  between two features.
+- **There is currently no way to actually create/select an
+  `drillMode: "auditory"` assault-bike template through the app's own
+  UI** -- the only assault-bike template that exists is the built-in
+  (hardcoded to `"visual"` since 11a), and there's no assault-bike
+  editor at all (never a planned Phase 11 deliverable). The auditory
+  drill (11d) is fully built, tested, and was verified working by
+  temporarily flipping the built-in's config value directly in code,
+  not through any in-app flow. Building a way to actually choose
+  `drillMode` for real (a second built-in, or a real editor) is
+  unscoped work, not an oversight.

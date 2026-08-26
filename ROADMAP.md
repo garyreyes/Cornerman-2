@@ -562,9 +562,57 @@ visual-world decisions here (see risk check below).
   - [ ] `/impeccable audit` — **not run yet**, deferred to the Phase 12
     close alongside Templates Picker/Round Builder's own deferred
     audit (see 10c/11a's notes) rather than run per-sub-phase.
-- [ ] **11d. Auditory drill: Corner Commands** — `not started` — reuses
-  the Phase 5 speech pipeline with real corner-cue vocabulary.
-  - [ ] `/impeccable audit`
+- [x] **11d. Auditory drill: Corner Commands** — `done`, 2026-08-26 —
+  a real scope discovery changed this sub-phase's shape before any code
+  was written: `defenseCues`' existing bundled vocabulary
+  (`roll`/`slip`/`duck`/`pivot`/`check`/`clinch`, built for Phase 5d's
+  boxing defense cues) turned out to already be exactly the kind of
+  "corner shouts a movement command" word set this drill needed, so
+  11d reuses it directly — zero new voice-bank generation. The other
+  real fork, confirmed with the user before building: Corner Commands
+  is **purely audio-paced, no tap** — the app has no camera/motion
+  sensor to see whether a physical shadow-boxing response was correct,
+  so it speaks commands at a difficulty-scaled gap and shows the
+  current word as text (mirrors `ComboCard` showing boxing's spoken
+  combos), full stop. "Reaction time/accuracy shown live"
+  (ARCHITECTURE.md) applies to the visual drill (11c) only, not this
+  one.
+  - New `src/features/cornerCommands/service.ts` —
+    `commandGapSecForDifficulty`/`nextCommandFireTime`, the one small
+    piece of genuinely new pure logic (a difficulty-scaled gap lookup
+    over the same shared `nextGapFireTime` primitive already used by
+    first-combo timing, combo repeats, and `defenseCues` itself).
+    Test-first, 4 tests.
+  - New `useCornerCommandsDrill` hook — owns its own short-lived
+    `SpeechEngine` for the hook's whole mount lifetime (not recreated
+    every time the Drill phase activates across rounds), same
+    "shorter-lived screen owns and closes its own engine" pattern
+    `settings/previewEngine.ts` already established for Punches'
+    Preview action.
+  - `src/app/assault-bike.tsx` branches Drill-phase rendering on
+    `config.drillMode`: `"visual"` → 11c's grid (unchanged),
+    `"auditory"` → the new `CornerCommandCard`.
+  - Small cleanup alongside the build: `Difficulty` was only declared
+    as `oddOneOut/types.ts`'s own local type; centralized as a named
+    export on `workoutTemplates/types.ts` (the actual owner of
+    `AssaultBikeConfig.difficulty`) so `cornerCommands` didn't
+    introduce a third copy.
+  - 185/185 tests, lint/typecheck clean. Visually confirmed on the
+    Android emulator: temporarily flipped the built-in template's
+    `drillMode` to `"auditory"` (reverted before committing — the
+    confirmed default stays `"visual"`), started a session, and
+    watched the Drill phase correctly render `CornerCommandCard` with
+    a real word ("DUCK") instead of the grid, no errors in logcat; the
+    Templates Picker's own summary line also correctly read "...
+    auditory" while the flip was live, confirming
+    `summarizeAssaultBikeConfig` already handled this with no new code
+    needed. There is currently no UI path to actually select
+    `drillMode: "auditory"` for a real template (no assault-bike
+    editor exists — not a planned Phase 11 deliverable at all), so
+    this mode is fully built and verified but only reachable via the
+    built-in's own hardcoded config for now.
+  - [ ] `/impeccable audit` — **not run yet**, deferred to the Phase 12
+    close alongside the rest of Phase 10/11's own deferred audits.
 
 ## Phase 12 — Templates Phase Close
 
