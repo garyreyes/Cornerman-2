@@ -406,11 +406,60 @@ visual-world decisions here (see risk check below).
   Visually confirmed end-to-end on the Android emulator: built a real
   custom template (name, a sequence-type round with Jab), saved it, and
   confirmed it appears correctly in the Templates Picker list.
-- [ ] **10d. Wire timer/combo engines to a `roundPlan`** — `not started`
-  — Main Timer consumes per-round duration/gap/comboSource overrides
-  when a template-driven session is active; existing Settings-driven
-  quick-start (Phases 1–9) keeps working unchanged.
-  - [ ] `/impeccable audit` (Templates Picker + Round Builder)
+- [x] **10d. Wire timer/combo engines to a `roundPlan`** — `done`,
+  2026-08-26 — Main Timer now consumes per-round duration/gap/
+  comboSource overrides when a template-driven session is active;
+  existing Settings-driven quick-start keeps working unchanged (every
+  new parameter is additive with a default that reproduces the old
+  behavior exactly). Correctness-critical (timer phase transitions,
+  combo generation) — test-first throughout, 15 new tests:
+  - `timer/service.ts` — `TimerConfig` gained an optional
+    `roundOverrides` array (ms, purely additive); new
+    `effectiveWorkDurationMs`/`effectiveRestDurationMs` resolve a
+    round's own override or fall back to the base, used by both
+    `beginWork`/`beginRest`'s `phaseEndAt` math and the 10-second
+    work-warning check (which had the exact same "reads the base
+    duration instead of the round's actual one" bug already fixed once
+    this session for short rounds — caught and fixed here too before
+    it could ship).
+  - `session/service.ts` — `sessionTick` gained an optional
+    `ActiveTemplateSession` parameter; when present, combo generation
+    resolves via `workoutTemplates`' `resolveRoundCombo` for the
+    current round instead of Settings-driven `generateCombo`, and
+    re-arms using that round's own comboGap override or the template's
+    base gap.
+  - `workoutTemplates/service.ts` — new `toTimerConfig(BoxingConfig)`
+    converts a template into the engine's own `TimerConfig`, sibling to
+    `useSession.ts`'s existing Settings-driven version.
+  - `useSession.ts` — `start()` now optionally takes a `WorkoutTemplate`
+    argument, snapshotting a template-driven config exactly like the
+    Settings-driven path already did. New `totalRounds`/
+    `phaseDurationMs` return values fix a real, previously-latent bug:
+    Main Timer was reading `settings.rounds`/`settings.*DurationSec`
+    directly for display, which would have shown the *wrong* round
+    count and ring duration for any template session (and technically
+    already could for any round with a future per-round override).
+    Templates Picker's tap-to-start now sets a small transient
+    "start this template" signal (`workoutTemplates/pendingStart.ts`)
+    and pops back to the already-mounted Main Timer (which stays
+    mounted underneath Templates the whole time) rather than pushing a
+    fresh instance -- avoids re-initializing native audio/speech
+    engines. Caught and fixed a real footgun before it shipped:
+    `ControlRow`'s plain Start button passes a `GestureResponderEvent`
+    through `onPress`, which would have been passed positionally as
+    `start`'s new `template` argument -- the call site now wraps it
+    (`onStart={() => start()}`).
+  - Judgment/presentation for the UI wiring itself, but the engine/
+    session layers are the correctness-critical core; 165/165 tests
+    total, lint/typecheck clean. Visually confirmed end-to-end on the
+    Android emulator: built a single-round "fixed-punch: Jab" template
+    with 0 warmup, started it from the Templates Picker, and watched
+    Main Timer show the correct round total (1/1, not Settings'
+    leftover value), skip straight to Work, and call "JAB" repeatedly
+    (3 combos called), never falling back to random generation.
+  - [ ] `/impeccable audit` (Templates Picker + Round Builder) —
+    **not run yet**, deferred to the Phase 12 close alongside the
+    Assault-Bike screens, per this file's own design-system risk check.
 
 ## Phase 11 — Assault-Bike Cognitive Protocol
 

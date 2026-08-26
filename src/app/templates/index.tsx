@@ -1,33 +1,28 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { InfoBanner } from "../../features/workoutTemplates/components/InfoBanner";
 import { TemplateRow } from "../../features/workoutTemplates/components/TemplateRow";
 import { summarizeBoxingConfig } from "../../features/workoutTemplates/format";
+import { setPendingTemplateStart } from "../../features/workoutTemplates/pendingStart";
 import { getWorkoutTemplates } from "../../features/workoutTemplates/service";
 import type { WorkoutTemplate } from "../../features/workoutTemplates/types";
 import { useTheme } from "../../shared/theme/ThemeContext";
 import type { ColorTokens, Fonts } from "../../shared/theme/tokens";
 
-const INFO_TIMEOUT_MS = 3000;
-
 /**
  * Templates Picker (docs/user-flows.md Flow 6). Tapping a row starts that
- * template directly; the separate Edit icon opens the Round Builder
- * (Phase 10c, now real). Tap-to-start is still stubbed to an info banner
- * -- wiring the timer engine to actually run a `roundPlan` is Phase 10d,
- * not built yet, so pretending it does something real would be worse
- * than an honest "not yet" -- see ROADMAP.md.
+ * template directly -- no forced preview step -- by leaving a "start
+ * this" signal (see workoutTemplates/pendingStart.ts) and popping back to
+ * the already-mounted Main Timer, which consumes it on focus. The
+ * separate Edit icon opens the Round Builder (Phase 10c).
  */
 export function TemplatesPickerScreen() {
   const router = useRouter();
   const { colors, fonts } = useTheme();
   const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const [templates, setTemplates] = useState<WorkoutTemplate[]>(() => getWorkoutTemplates());
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
-  const infoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -35,20 +30,9 @@ export function TemplatesPickerScreen() {
     }, []),
   );
 
-  useEffect(() => {
-    return () => {
-      if (infoTimeoutRef.current !== null) {
-        clearTimeout(infoTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  function showComingSoon(message: string) {
-    if (infoTimeoutRef.current !== null) {
-      clearTimeout(infoTimeoutRef.current);
-    }
-    setInfoMessage(message);
-    infoTimeoutRef.current = setTimeout(() => setInfoMessage(null), INFO_TIMEOUT_MS);
+  function handleStart(template: WorkoutTemplate) {
+    setPendingTemplateStart(template.id);
+    router.back();
   }
 
   return (
@@ -69,12 +53,10 @@ export function TemplatesPickerScreen() {
             name={template.name}
             summary={summarizeBoxingConfig(template.config)}
             isBuiltIn={template.isBuiltIn}
-            onPress={() => showComingSoon("Starting from a template is coming soon")}
+            onPress={() => handleStart(template)}
             onEdit={() => router.push({ pathname: "/templates/[id]", params: { id: template.id } })}
           />
         ))}
-
-        {infoMessage !== null ? <InfoBanner message={infoMessage} /> : null}
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,9 +1,12 @@
 import { generateCombo } from "../comboEngine/service";
+import type { Combo } from "../comboEngine/types";
 import { nextDefenseCueFireTime, pickDefenseCue } from "../defenseCues/service";
 import { nextGapFireTime } from "../../lib/gapTiming";
 import type { Preset, Punch, Settings } from "../settings/types";
 import type { TimerState } from "../timer/types";
+import { resolveRoundCombo } from "../workoutTemplates/service";
 import type {
+  ActiveTemplateSession,
   InterruptionDecision,
   InterruptionEvent,
   RandomFn,
@@ -51,6 +54,44 @@ export function shiftSessionForResume(session: SessionState, pausedDurationMs: n
  * non-retroactive philosophy as tick()'s rest-countdown latch: reschedule
  * forward from `now`, don't burst-replay everything that was missed.
  */
+/**
+ * Resolves the combo to speak and the gap range to re-arm with -- branches
+ * on whether a Workout Template (Phase 10+) is driving this session.
+ * Template-driven: the *current round's own* comboSource (fixed-punch/
+ * fixed-sequence/preset/random) via workoutTemplates' resolveRoundCombo,
+ * and that round's own comboGapMin/MaxSec override when set, else the
+ * template's base gap. Quick-start (activeTemplate null, the default):
+ * unchanged -- Settings-driven generateCombo + settings.comboGapMin/MaxSec,
+ * exactly as before this branch existed.
+ */
+function resolveComboAndGap(
+  activeTemplate: ActiveTemplateSession | null,
+  round: number,
+  settings: Settings,
+  punches: Punch[],
+  presets: Preset[],
+  random: RandomFn,
+): { combo: Combo; gapMinSec: number; gapMaxSec: number } {
+  if (activeTemplate === null) {
+    return {
+      combo: generateCombo(settings, punches, presets, random),
+      gapMinSec: settings.comboGapMinSec,
+      gapMaxSec: settings.comboGapMaxSec,
+    };
+  }
+  const activeRound = activeTemplate.roundPlan[round - 1];
+  // Round index out of range shouldn't happen (totalRounds is derived
+  // from roundPlan.length -- see workoutTemplates/service.ts's
+  // toTimerConfig), but degrade to the template's base gap + a random
+  // draw rather than crashing, same graceful-fallback spirit as elsewhere.
+  const source = activeRound?.comboSource ?? { type: "random" as const };
+  return {
+    combo: resolveRoundCombo(source, punches, presets, settings, random),
+    gapMinSec: activeRound?.comboGapMinSec ?? activeTemplate.baseComboGapMinSec,
+    gapMaxSec: activeRound?.comboGapMaxSec ?? activeTemplate.baseComboGapMaxSec,
+  };
+}
+
 export function sessionTick(
   session: SessionState,
   timerState: TimerState,
@@ -59,6 +100,7 @@ export function sessionTick(
   presets: Preset[],
   now: number,
   random: RandomFn = Math.random,
+  activeTemplate: ActiveTemplateSession | null = null,
 ): { session: SessionState; actions: SessionAction[] } {
   const actions: SessionAction[] = [];
   let s = session;
@@ -89,13 +131,20 @@ export function sessionTick(
     s = { ...s, nextComboAt: timerState.firstComboAt };
   }
   if (s.nextComboAt !== null && now >= s.nextComboAt) {
-    const combo = generateCombo(settings, punches, presets, random);
+    const { combo, gapMinSec, gapMaxSec } = resolveComboAndGap(
+      activeTemplate,
+      timerState.round,
+      settings,
+      punches,
+      presets,
+      random,
+    );
     actions.push({ type: "speak-combo", combo });
     s = {
       ...s,
       currentCombo: combo,
       comboCount: s.comboCount + 1,
-      nextComboAt: nextGapFireTime(now, settings.comboGapMinSec * 1000, settings.comboGapMaxSec * 1000, random),
+      nextComboAt: nextGapFireTime(now, gapMinSec * 1000, gapMaxSec * 1000, random),
     };
   }
 

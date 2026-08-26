@@ -6,6 +6,7 @@ import {
   deleteWorkoutTemplate,
   getWorkoutTemplates,
   resolveRoundCombo,
+  toTimerConfig,
   updateWorkoutTemplate,
 } from "./service";
 import type { BoxingConfig, ComboSource } from "./types";
@@ -126,5 +127,60 @@ describe("resolveRoundCombo", () => {
     const source: ComboSource = { type: "random", punchPool: [3] };
     const combo = resolveRoundCombo(source, punches, [], settings, () => 0);
     expect(combo.every((p) => p.num === 3)).toBe(true);
+  });
+});
+
+describe("toTimerConfig (Phase 10d: driving the timer engine from a BoxingConfig)", () => {
+  test("totalRounds/base durations come straight from the config, in ms", () => {
+    const config: BoxingConfig = {
+      baseWorkDurationSec: 120,
+      baseRestDurationSec: 30,
+      warmupDurationSec: 15,
+      baseComboGapMinSec: 1,
+      baseComboGapMaxSec: 2,
+      roundPlan: [{ comboSource: { type: "random" } }, { comboSource: { type: "random" } }],
+    };
+
+    const timerConfig = toTimerConfig(config);
+
+    expect(timerConfig).toEqual({
+      totalRounds: 2,
+      workDurationMs: 120_000,
+      restDurationMs: 30_000,
+      warmupDurationMs: 15_000,
+      roundOverrides: [{ workDurationMs: undefined, restDurationMs: undefined }, { workDurationMs: undefined, restDurationMs: undefined }],
+    });
+  });
+
+  test("a round's own workDurationSec/restDurationSec become that round's ms override", () => {
+    const config: BoxingConfig = {
+      baseWorkDurationSec: 120,
+      baseRestDurationSec: 30,
+      warmupDurationSec: 0,
+      baseComboGapMinSec: 1,
+      baseComboGapMaxSec: 2,
+      roundPlan: [
+        { comboSource: { type: "random" }, workDurationSec: 45 },
+        { comboSource: { type: "random" }, restDurationSec: 90 },
+      ],
+    };
+
+    const timerConfig = toTimerConfig(config);
+
+    expect(timerConfig.roundOverrides![0]).toEqual({ workDurationMs: 45_000, restDurationMs: undefined });
+    expect(timerConfig.roundOverrides![1]).toEqual({ workDurationMs: undefined, restDurationMs: 90_000 });
+  });
+
+  test("round count matches roundPlan.length exactly, even for a single-round template", () => {
+    const config: BoxingConfig = {
+      baseWorkDurationSec: 60,
+      baseRestDurationSec: 15,
+      warmupDurationSec: 0,
+      baseComboGapMinSec: 1,
+      baseComboGapMaxSec: 2,
+      roundPlan: [{ comboSource: { type: "random" } }],
+    };
+
+    expect(toTimerConfig(config).totalRounds).toBe(1);
   });
 });

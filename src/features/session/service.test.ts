@@ -1,8 +1,10 @@
 import { pause as pauseTimer, startTimer, tick } from "../timer/service";
 import type { TimerConfig } from "../timer/types";
 import { createDefaultSettings } from "../settings/service";
-import type { Punch, Settings } from "../settings/types";
+import type { Preset, Punch, Settings } from "../settings/types";
+import type { RoundConfig } from "../workoutTemplates/types";
 import { createSession, decideInterruptionAction, sessionTick, shiftSessionForResume } from "./service";
+import type { ActiveTemplateSession } from "./types";
 
 const config: TimerConfig = {
   totalRounds: 2,
@@ -15,6 +17,8 @@ const punches: Punch[] = [
   { id: "p1", num: 1, name: "Jab" },
   { id: "p2", num: 2, name: "Cross" },
 ];
+
+const presets: Preset[] = [{ id: "preset1", name: "1-2", sequence: [1, 2] }];
 
 const settings: Settings = {
   ...createDefaultSettings(),
@@ -94,6 +98,94 @@ describe("sessionTick -- combo scheduling", () => {
     expect(after.nextComboAt).toBeNull();
     expect(after.currentCombo).toEqual(session.currentCombo); // last combo stays visible into Rest
     expect(actions).toEqual([]);
+  });
+});
+
+describe("sessionTick -- template-driven combo generation (Phase 10d)", () => {
+  test("with no activeTemplate (the default), combo generation is unaffected -- Settings-driven quick-start behaves exactly as before", () => {
+    const now = 1_000_000;
+    const timerState = startTimer(config, now, () => 0);
+    let session = createSession();
+    ({ session } = sessionTick(session, timerState, settings, punches, [], now));
+    const { actions } = sessionTick(session, timerState, settings, punches, [], timerState.firstComboAt!, () => 0);
+    expect(actions).toEqual([{ type: "speak-combo", combo: [{ num: 1, name: "Jab" }, { num: 1, name: "Jab" }] }]);
+  });
+
+  test("with an activeTemplate, the current round's own comboSource resolves the combo, not Settings-driven random generation", () => {
+    const now = 1_000_000;
+    const timerState = startTimer(config, now, () => 0); // round 1
+    const roundPlan: RoundConfig[] = [{ comboSource: { type: "fixed-punch", punchNum: 2 } }];
+    const activeTemplate: ActiveTemplateSession = { roundPlan, baseComboGapMinSec: 4, baseComboGapMaxSec: 4 };
+
+    let session = createSession();
+    ({ session } = sessionTick(session, timerState, settings, punches, [], now, Math.random, activeTemplate));
+    const { actions } = sessionTick(
+      session,
+      timerState,
+      settings,
+      punches,
+      [],
+      timerState.firstComboAt!,
+      () => 0,
+      activeTemplate,
+    );
+
+    // fixed-punch always resolves to that one punch, never the Settings-driven random draw.
+    expect(actions).toEqual([{ type: "speak-combo", combo: [{ num: 2, name: "Cross" }] }]);
+  });
+
+  test("a round's own comboGapMinSec/MaxSec override drives re-arming, not the template's base or Settings", () => {
+    const now = 1_000_000;
+    const timerState = startTimer(config, now, () => 0);
+    const roundPlan: RoundConfig[] = [
+      { comboSource: { type: "random" }, comboGapMinSec: 9, comboGapMaxSec: 9 },
+    ];
+    const activeTemplate: ActiveTemplateSession = { roundPlan, baseComboGapMinSec: 2, baseComboGapMaxSec: 2 };
+
+    let session = createSession();
+    ({ session } = sessionTick(session, timerState, settings, punches, [], now, Math.random, activeTemplate));
+    const dueNow = timerState.firstComboAt!;
+    const { session: after } = sessionTick(session, timerState, settings, punches, [], dueNow, () => 0, activeTemplate);
+
+    expect(after.nextComboAt).toBe(dueNow + 9_000);
+  });
+
+  test("falls back to the template's base combo gap when the round itself has no gap override", () => {
+    const now = 1_000_000;
+    const timerState = startTimer(config, now, () => 0);
+    const roundPlan: RoundConfig[] = [{ comboSource: { type: "random" } }];
+    const activeTemplate: ActiveTemplateSession = { roundPlan, baseComboGapMinSec: 6, baseComboGapMaxSec: 6 };
+
+    let session = createSession();
+    ({ session } = sessionTick(session, timerState, settings, punches, [], now, Math.random, activeTemplate));
+    const dueNow = timerState.firstComboAt!;
+    const { session: after } = sessionTick(session, timerState, settings, punches, [], dueNow, () => 0, activeTemplate);
+
+    expect(after.nextComboAt).toBe(dueNow + 6_000);
+  });
+
+  test("a preset comboSource resolves against the presets array passed into sessionTick", () => {
+    const now = 1_000_000;
+    const timerState = startTimer(config, now, () => 0);
+    const roundPlan: RoundConfig[] = [{ comboSource: { type: "preset", presetId: "preset1" } }];
+    const activeTemplate: ActiveTemplateSession = { roundPlan, baseComboGapMinSec: 3, baseComboGapMaxSec: 3 };
+
+    let session = createSession();
+    ({ session } = sessionTick(session, timerState, settings, punches, presets, now, Math.random, activeTemplate));
+    const { actions } = sessionTick(
+      session,
+      timerState,
+      settings,
+      punches,
+      presets,
+      timerState.firstComboAt!,
+      () => 0,
+      activeTemplate,
+    );
+
+    expect(actions).toEqual([
+      { type: "speak-combo", combo: [{ num: 1, name: "Jab" }, { num: 2, name: "Cross" }] },
+    ]);
   });
 });
 
