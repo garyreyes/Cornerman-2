@@ -45,48 +45,74 @@ export interface BoxingConfig {
   roundPlan: RoundConfig[];
 }
 
-/** "mixed" is a real, named value (ARCHITECTURE.md) but explicitly
- * deferred -- not constructible by anything built so far (Phase 11
- * ships "visual" and "auditory" only). Kept in the type now so a future
- * mixed-mode build doesn't need another discriminant migration. */
-export type DrillMode = "visual" | "auditory" | "mixed";
-
-/** Only two drill types ship in Phase 11 -- the "other twelve drill
- * variants from the reference protocol" (ARCHITECTURE.md) are deferred,
- * not designed away. Distinct from DrillMode on purpose: once more
- * drills exist, one mode could offer a choice of several. */
-export type DrillType = "odd-one-out" | "corner-commands";
+/**
+ * The two cognitive drills that actually ship (Phase 12).
+ *
+ * This replaces Phase 11's `DrillMode`/`DrillType` *pair*, which encoded
+ * one choice in two fields that could drift out of sync (the same
+ * redundancy that got the original flat `restSec` dropped below). It also
+ * retires "corner-commands" -- the Phase 11d drill that called defensive
+ * movements ("duck"/"roll"/"pivot") aloud. That drill assumed the rider
+ * would perform the movement, which means dismounting the bike and
+ * remounting inside a rest period; confirmed as unworkable in practice,
+ * so the auditory channel became a *stimulus* for an on-screen tap
+ * ("color-call") rather than an instruction to move. See PROJECT_FACTS.md.
+ *
+ * - `odd-one-out`: a uniform grid with one different tile -- tap it.
+ * - `color-call`: a multi-colour grid, one colour named aloud -- tap it.
+ */
+export type DrillMode = "odd-one-out" | "color-call";
 
 /** "One fixed difficulty rather than the reference protocol's per-round
  * auto-scaling" (ARCHITECTURE.md) -- the type stays the full range for
  * whichever difficulty a template specifies. Named/exported here (the
- * actual owner of AssaultBikeConfig.difficulty) rather than each drill
- * declaring its own copy -- oddOneOut and cornerCommands both import
- * this one. */
+ * actual owner of the drill difficulty) rather than each drill declaring
+ * its own copy -- every drill feature imports this one. */
 export type Difficulty = "easy" | "medium" | "hard";
 
 /**
- * `{ roundsTarget, workSec, restPhases: {settleSec, drillSec, resetSec},
- * drillMode, drillType, difficulty }` -- ARCHITECTURE.md's original list
- * also named a flat `restSec` alongside `restPhases`, but never gave it a
- * purpose distinct from `restPhases`' own three sub-durations (which are
- * what the actual Settle/Drill/Reset state machine needs); dropped as
- * redundant rather than carrying an unused field that could drift out of
- * sync with its own breakdown -- see PROJECT_FACTS.md. **One fixed
- * difficulty, no bike hardware integration, no stats/history logging** --
- * all confirmed scope limits, not oversights (ARCHITECTURE.md).
+ * How one round's rest is spent. Discriminated because the four real bike
+ * protocols genuinely don't share a rest shape: three have room for a
+ * cognitive drill, and Anaerobic Lactic Capacity (20s all-out / 10s easy
+ * spin) does not -- 10s can't fit "pick the phone up, drill, put it
+ * down". Modelling that as `{settleSec: 10, drillSec: 0, resetSec: 0}`
+ * would fake a Settle phase that means something else on screen and leave
+ * two nonsense states expressible (drill durations with no drill; a drill
+ * with no durations). `drillMode`/`difficulty` live *inside* the drill
+ * arm for the same reason -- a plain rest has no difficulty to set.
+ *
+ * Mirrors assaultBike/types.ts's BikeRest, minus the drill identity the
+ * state machine deliberately doesn't know about.
+ */
+export type RestPlan =
+  | { kind: "plain"; restSec: number }
+  | {
+      kind: "drill";
+      settleSec: number;
+      drillSec: number;
+      resetSec: number;
+      drillMode: DrillMode;
+      difficulty: Difficulty;
+    };
+
+/**
+ * ARCHITECTURE.md's original list also named a flat `restSec` alongside
+ * the rest breakdown, but never gave it a purpose distinct from that
+ * breakdown's own sub-durations; dropped as redundant rather than
+ * carrying an unused field that could drift out of sync -- see
+ * PROJECT_FACTS.md. **No bike hardware integration, and nothing
+ * persisted** -- both still confirmed scope limits (Phase 12 adds a live
+ * score and an end-of-session summary, but they're in-memory only and
+ * gone once the screen unmounts; no storage, no backend).
+ *
+ * Deliberately carries no `protocol` discriminant naming which of the
+ * four it is -- the template's own `name` already says, and a second
+ * source of truth for the same fact is what this file keeps avoiding.
  */
 export interface AssaultBikeConfig {
   roundsTarget: number;
   workSec: number;
-  restPhases: {
-    settleSec: number;
-    drillSec: number;
-    resetSec: number;
-  };
-  drillMode: DrillMode;
-  drillType: DrillType;
-  difficulty: Difficulty;
+  rest: RestPlan;
 }
 
 interface WorkoutTemplateBase {

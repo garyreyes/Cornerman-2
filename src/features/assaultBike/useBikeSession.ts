@@ -3,9 +3,29 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createAudioEngine } from "../audio/service";
 import type { AudioEngine } from "../audio/types";
 import { pause as pauseBike, resume as resumeBike, startBikeSession, tick } from "./service";
-import type { BikeConfig, BikeState } from "./types";
+import type { BikeConfig, BikePhase, BikeState } from "./types";
 
 const TICK_INTERVAL_MS = 200;
+
+/** null for phases this protocol's own rest shape never enters, and for
+ * finished -- the caller falls back to a static preview duration. */
+function phaseDurationMs(config: BikeConfig, phase: BikePhase): number | null {
+  const { rest } = config;
+  switch (phase) {
+    case "work":
+      return config.workSec * 1000;
+    case "rest":
+      return rest.kind === "plain" ? rest.restSec * 1000 : null;
+    case "settle":
+      return rest.kind === "drill" ? rest.settleSec * 1000 : null;
+    case "drill":
+      return rest.kind === "drill" ? rest.drillSec * 1000 : null;
+    case "reset":
+      return rest.kind === "drill" ? rest.resetSec * 1000 : null;
+    case "finished":
+      return null;
+  }
+}
 
 export interface UseBikeSessionResult {
   bikeState: BikeState | null;
@@ -24,9 +44,9 @@ export interface UseBikeSessionResult {
  * fixed WorkoutTemplate resolved once when this screen is entered (not
  * live, mutable Settings), so there's no need for useSession's
  * snapshot-into-a-ref-at-start() dance; a stable prop closure is enough.
- * No speech engine either -- the visual drill (Phase 11c) needs none;
- * the auditory drill (Corner Commands, Phase 11d) will need one, not
- * built yet.
+ * No speech engine here -- Odd One Out needs none, and Color Call (Phase
+ * 12c) owns its own inside its drill hook rather than pushing a
+ * drill-specific dependency up into the session loop.
  */
 export function useBikeSession(config: BikeConfig): UseBikeSessionResult {
   const [bikeState, setBikeState] = useState<BikeState | null>(null);
@@ -53,9 +73,15 @@ export function useBikeSession(config: BikeConfig): UseBikeSessionResult {
         }
         const { state: next, events } = tick(prev, config, now);
         events.forEach((event) => {
-          if (event.type === "phase-changed" && (event.phase === "work" || event.phase === "settle")) {
+          if (
+            event.type === "phase-changed" &&
+            (event.phase === "work" || event.phase === "settle" || event.phase === "rest")
+          ) {
             // Bell marks the all-out/recovery boundary, mirroring the
-            // boxing timer's own bell-on-work-and-rest convention.
+            // boxing timer's own bell-on-work-and-rest convention. Both
+            // rest-side openers ring: "settle" for the drill protocols,
+            // "rest" for the plain one (Phase 12a) -- they're the same
+            // moment, just different cycle shapes.
             void audioEngineRef.current?.playCue("bell");
           } else if (event.type === "session-finished") {
             void audioEngineRef.current?.playCue("finalBell");
@@ -87,18 +113,15 @@ export function useBikeSession(config: BikeConfig): UseBikeSessionResult {
     setBikeState(null);
   }, []);
 
-  const phaseDurationMs =
-    bikeState === null
-      ? null
-      : bikeState.phase === "work"
-        ? config.workSec * 1000
-        : bikeState.phase === "settle"
-          ? config.settleSec * 1000
-          : bikeState.phase === "drill"
-            ? config.drillSec * 1000
-            : bikeState.phase === "reset"
-              ? config.resetSec * 1000
-              : null;
+  const currentPhaseDurationMs = bikeState === null ? null : phaseDurationMs(config, bikeState.phase);
 
-  return { bikeState, totalRounds: config.roundsTarget, phaseDurationMs, audioError, start, togglePause, reset };
+  return {
+    bikeState,
+    totalRounds: config.roundsTarget,
+    phaseDurationMs: currentPhaseDurationMs,
+    audioError,
+    start,
+    togglePause,
+    reset,
+  };
 }

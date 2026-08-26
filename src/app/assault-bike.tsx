@@ -4,8 +4,6 @@ import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useBikeSession } from "../features/assaultBike/useBikeSession";
-import { CornerCommandCard } from "../features/cornerCommands/components/CornerCommandCard";
-import { useCornerCommandsDrill } from "../features/cornerCommands/useCornerCommandsDrill";
 import { DrillFeedback } from "../features/oddOneOut/components/DrillFeedback";
 import { OddOneOutGrid } from "../features/oddOneOut/components/OddOneOutGrid";
 import { useOddOneOutDrill } from "../features/oddOneOut/useOddOneOutDrill";
@@ -76,15 +74,18 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
   const showStart = bikeState === null;
   const showReset = phase === "finished";
   const showPauseToggle = bikeState !== null && phase !== "finished";
-  const isDrilling = phase === "drill" && !isPaused;
-  // Both hooks are always called (rules of hooks), but each only actually
-  // runs its own effect loop while its own drillMode is the active one --
-  // the other's `active` boolean stays false.
-  const isVisualDrilling = isDrilling && config.drillMode === "visual";
-  const isAuditoryDrilling = isDrilling && config.drillMode === "auditory";
+  // A plain-rest protocol (Lactic Capacity) has no drill at all, so there
+  // is no drillMode/difficulty to read -- narrowed once here rather than
+  // re-checked at each use.
+  const drill = config.rest.kind === "drill" ? config.rest : null;
+  const isDrilling = phase === "drill" && !isPaused && drill !== null;
 
-  const { trial, lastResult, handleTap } = useOddOneOutDrill(isVisualDrilling, config.difficulty);
-  const { currentCommand } = useCornerCommandsDrill(isAuditoryDrilling, config.difficulty);
+  // Called unconditionally (rules of hooks); `active` stays false whenever
+  // this protocol isn't running its drill phase.
+  const { trial, lastResult, handleTap } = useOddOneOutDrill(
+    isDrilling && drill?.drillMode === "odd-one-out",
+    drill?.difficulty ?? "medium",
+  );
 
   // Ready/Finished have no active phaseDurationMs -- the work duration is
   // as reasonable a static preview/fallback as Main Timer's own
@@ -117,7 +118,7 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
 
         {audioError ? <AudioErrorBanner /> : null}
 
-        {phase === "drill" && config.drillMode === "visual" ? (
+        {phase === "drill" && drill?.drillMode === "odd-one-out" ? (
           <>
             <DrillFeedback result={lastResult} />
             {trial !== null ? (
@@ -129,8 +130,6 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
               />
             ) : null}
           </>
-        ) : phase === "drill" && config.drillMode === "auditory" ? (
-          <CornerCommandCard command={currentCommand} />
         ) : (
           <CountdownRing phaseEndAt={bikeState?.phaseEndAt ?? null} phaseDurationMs={ringDurationMs} isPaused={isPaused} />
         )}

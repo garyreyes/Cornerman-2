@@ -1,7 +1,7 @@
 import { resolvePunchName } from "../comboEngine/service";
 import { formatSeconds } from "../settings/format";
 import type { Preset, Punch } from "../settings/types";
-import type { AssaultBikeConfig, BoxingConfig, ComboSource, RoundConfig } from "./types";
+import type { AssaultBikeConfig, BoxingConfig, ComboSource, DrillMode, RoundConfig } from "./types";
 
 /** "8 rounds · 3:00 work / 1:00 rest" summary line for a Templates Picker row. */
 export function summarizeBoxingConfig(config: BoxingConfig): string {
@@ -34,12 +34,27 @@ export function roundDisplayLabel(round: RoundConfig, index: number): string {
   return round.label && round.label.trim() !== "" ? round.label : `Round ${index + 1}`;
 }
 
-/** "8 rounds · 10s work / 50s rest · visual" summary line for a Templates
- * Picker row -- total rest is the restPhases' own sum, not a separately
- * tracked field (see types.ts's note on why `restSec` was dropped). */
+/** Title-cased for display -- the DrillMode values themselves stay
+ * kebab-case identifiers, never shown raw (Phase 11 leaked "visual"
+ * straight into this row; a user-facing string and a discriminant are
+ * different things). */
+const DRILL_LABEL: Readonly<Record<DrillMode, string>> = {
+  "odd-one-out": "Odd One Out",
+  "color-call": "Color Call",
+};
+
+/** "8 rounds · 0:10 work / 0:40 rest · Odd One Out" summary line for a
+ * Templates Picker row. Total rest is the rest plan's own sum, not a
+ * separately tracked field (see types.ts's note on why `restSec` was
+ * dropped); a plain-rest protocol says "no drill" rather than naming one
+ * it doesn't run. Uses formatSeconds like the boxing row above rather
+ * than raw `${n}s` -- Aerobic Power's 4-minute work interval would
+ * otherwise read "240s". */
 export function summarizeAssaultBikeConfig(config: AssaultBikeConfig): string {
   const rounds = config.roundsTarget;
   const roundsLabel = `${rounds} round${rounds === 1 ? "" : "s"}`;
-  const totalRestSec = config.restPhases.settleSec + config.restPhases.drillSec + config.restPhases.resetSec;
-  return `${roundsLabel} · ${config.workSec}s work / ${totalRestSec}s rest · ${config.drillMode}`;
+  const { rest } = config;
+  const totalRestSec = rest.kind === "plain" ? rest.restSec : rest.settleSec + rest.drillSec + rest.resetSec;
+  const drillLabel = rest.kind === "plain" ? "no drill" : DRILL_LABEL[rest.drillMode];
+  return `${roundsLabel} · ${formatSeconds(config.workSec)} work / ${formatSeconds(totalRestSec)} rest · ${drillLabel}`;
 }

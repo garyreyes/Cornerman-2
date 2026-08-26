@@ -30,28 +30,44 @@ function uniformConfig(): BoxingConfig {
 }
 
 describe("built-in workout templates", () => {
-  test("getWorkoutTemplates seeds exactly the 3 boxing built-ins plus the 1 assault-bike built-in on first read", () => {
+  test("getWorkoutTemplates seeds exactly the 3 boxing built-ins plus the 4 bike protocols on first read", () => {
     const templates = getWorkoutTemplates();
-    expect(templates).toHaveLength(4);
+    expect(templates).toHaveLength(7);
     expect(templates.every((t) => t.isBuiltIn)).toBe(true);
     expect(templates.map((t) => t.name)).toEqual([
       "Relax / Zone-2",
       "Moderate",
       "Intense",
-      "Assault Bike Cognitive",
+      "Bike · Aerobic Power",
+      "Bike · Lactic Capacity",
+      "Bike · Alactic Power",
+      "Bike · Combat Effort",
     ]);
     expect(templates.slice(0, 3).every((t) => t.workoutType === "boxing")).toBe(true);
+    expect(templates.slice(3).every((t) => t.workoutType === "assault-bike-cognitive")).toBe(true);
   });
 
-  test("the assault-bike built-in has real, spec-sourced restPhases figures (Flow 7: 8s settle + 30s drill + 12s reset = 50s rest)", () => {
-    const found = getWorkoutTemplates().find((t) => t.workoutType === "assault-bike-cognitive");
-    if (found === undefined || found.workoutType !== "assault-bike-cognitive") {
-      throw new Error("expected the assault-bike built-in to be seeded");
-    }
-    expect(found.config.workSec).toBe(10);
-    expect(found.config.restPhases).toEqual({ settleSec: 8, drillSec: 30, resetSec: 12 });
-    expect(found.config.drillMode).toBe("visual");
-    expect(found.config.drillType).toBe("odd-one-out");
+  test("each bike protocol's work/rest/round figures match the reference protocol table", () => {
+    const bikes = getWorkoutTemplates().filter((t) => t.workoutType === "assault-bike-cognitive");
+    const shape = bikes.map((t) => {
+      if (t.workoutType !== "assault-bike-cognitive") throw new Error("unreachable");
+      const { rest } = t.config;
+      const restSec = rest.kind === "plain" ? rest.restSec : rest.settleSec + rest.drillSec + rest.resetSec;
+      return { rounds: t.config.roundsTarget, workSec: t.config.workSec, restSec };
+    });
+
+    expect(shape).toEqual([
+      { rounds: 4, workSec: 240, restSec: 180 }, // 4 min hard / 3 min easy x4
+      { rounds: 8, workSec: 20, restSec: 10 }, //  20s all-out / 10s easy x8
+      { rounds: 6, workSec: 10, restSec: 150 }, // 8-10s all-out / 2-3 min full rest x5-6
+      { rounds: 12, workSec: 10, restSec: 40 }, // 10s hard / 35-40s easy x10-12
+    ]);
+  });
+
+  test("Lactic Capacity is the only protocol with no drill -- a 10s rest can't fit the phone-up/phone-down cycle", () => {
+    const bikes = getWorkoutTemplates().filter((t) => t.workoutType === "assault-bike-cognitive");
+    const kinds = bikes.map((t) => (t.workoutType === "assault-bike-cognitive" ? t.config.rest.kind : "?"));
+    expect(kinds).toEqual(["drill", "plain", "drill", "drill"]);
   });
 
   test("seeded built-ins persist -- a second read returns the same rows, not freshly regenerated ones", () => {
