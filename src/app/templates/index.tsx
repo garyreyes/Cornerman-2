@@ -1,4 +1,4 @@
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,16 +14,15 @@ import type { ColorTokens, Fonts } from "../../shared/theme/tokens";
 const INFO_TIMEOUT_MS = 3000;
 
 /**
- * Templates Picker (docs/user-flows.md Flow 6, Phase 10b). Tapping a row
- * starts that template directly; the separate Edit icon opens the Round
- * Builder -- both are stubbed to an info banner for now, the same
- * no-op-until-wired pattern the Main Timer's own Settings gear used back
- * in Phase 6 before Phase 8 built real Settings: the Round Builder editor
- * (Phase 10c) and wiring the timer engine to actually run a `roundPlan`
- * (Phase 10d) don't exist yet, so pretending either action does something
- * real would be worse than an honest "not yet" -- see ROADMAP.md.
+ * Templates Picker (docs/user-flows.md Flow 6). Tapping a row starts that
+ * template directly; the separate Edit icon opens the Round Builder
+ * (Phase 10c, now real). Tap-to-start is still stubbed to an info banner
+ * -- wiring the timer engine to actually run a `roundPlan` is Phase 10d,
+ * not built yet, so pretending it does something real would be worse
+ * than an honest "not yet" -- see ROADMAP.md.
  */
 export function TemplatesPickerScreen() {
+  const router = useRouter();
   const { colors, fonts } = useTheme();
   const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
   const [templates, setTemplates] = useState<WorkoutTemplate[]>(() => getWorkoutTemplates());
@@ -56,7 +55,7 @@ export function TemplatesPickerScreen() {
     <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Pressable
-          onPress={() => showComingSoon("Creating custom templates is coming soon")}
+          onPress={() => router.push({ pathname: "/templates/[id]", params: { id: "new" } })}
           style={({ pressed }) => [styles.newButton, pressed && styles.pressed]}
           accessibilityRole="button"
           accessibilityLabel="New template"
@@ -71,7 +70,7 @@ export function TemplatesPickerScreen() {
             summary={summarizeBoxingConfig(template.config)}
             isBuiltIn={template.isBuiltIn}
             onPress={() => showComingSoon("Starting from a template is coming soon")}
-            onEdit={() => showComingSoon("Editing templates is coming soon")}
+            onEdit={() => router.push({ pathname: "/templates/[id]", params: { id: template.id } })}
           />
         ))}
 
