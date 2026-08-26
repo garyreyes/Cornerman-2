@@ -463,8 +463,40 @@ visual-world decisions here (see risk check below).
 
 ## Phase 11 — Assault-Bike Cognitive Protocol
 
-- [ ] **11a. `AssaultBikeConfig` data model + built-in template** —
-  `not started`.
+- [x] **11a. `AssaultBikeConfig` data model + built-in template** —
+  `done`, 2026-08-26 — new `AssaultBikeConfig`/`DrillMode`/`DrillType`
+  in `workoutTemplates/types.ts`; `WorkoutTemplate` widened from its
+  Phase 10a-through-10d boxing-only shape to the real discriminated
+  union ARCHITECTURE.md always specified. Dropped the architecture
+  doc's flat `restSec` field as redundant with `restPhases`' own three
+  sub-durations (see PROJECT_FACTS.md). The fourth built-in ("Assault
+  Bike Cognitive") seeds with real, spec-sourced figures — `workSec`/
+  `restPhases` match `docs/user-flows.md` Flow 7's own stated numbers
+  exactly (10s work; 8+30+12=50s rest, matching the PRD's "50s rest"
+  reference); `roundsTarget`/`difficulty` are plausible defaults, same
+  spirit as the boxing built-ins' own pace numbers; `drillMode`
+  defaults to `"visual"` over `"auditory"` (every doc names visual
+  first, and 11c precedes 11d). Widening the union surfaced and fixed a
+  real bug via the type checker: `updateWorkoutTemplate` blindly merged
+  a `BoxingConfig` into whatever template matched by id, which would
+  have corrupted the assault-bike entry's shape if ever called with its
+  id — now guarded by `workoutType === "boxing"`, with a regression
+  test. Templates Picker and Round Builder both updated to handle the
+  wider type safely: the Picker summarizes either config and renders
+  the assault-bike row visibly disabled with a "COMING SOON" tag
+  (`TemplateRow`'s new `comingSoon` prop) rather than routing to a
+  boxing-only Round Builder that would crash on `AssaultBikeConfig`;
+  Round Builder itself narrows to boxing-only at the state level so a
+  stale/direct link to a non-boxing id degrades the same way a missing
+  one already did. `useSession.start()`'s template parameter is now
+  typed `Extract<WorkoutTemplate, {workoutType: "boxing"}>` — a
+  compile-time guarantee Main Timer can never be handed an assault-bike
+  template, not just a runtime check. 167/167 tests (3 new + 1 updated
+  seed-count assertion), lint/typecheck clean. Visually confirmed on
+  the Android emulator: fresh install seeds all 4 built-ins, the
+  assault-bike row renders dimmed with correct spec-matching summary
+  ("8 rounds · 10s work / 50s rest · visual"), and tapping it is a safe
+  no-op (no crash, no broken navigation).
 - [ ] **11b. Assault-Bike Session screen** — `not started` — work phase
   + rest's three sub-phases (Settle → Drill → Reset); visually distinct
   from the boxing Main Timer.

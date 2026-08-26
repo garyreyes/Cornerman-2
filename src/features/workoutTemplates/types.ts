@@ -45,20 +45,59 @@ export interface BoxingConfig {
   roundPlan: RoundConfig[];
 }
 
+/** "mixed" is a real, named value (ARCHITECTURE.md) but explicitly
+ * deferred -- not constructible by anything built so far (Phase 11
+ * ships "visual" and "auditory" only). Kept in the type now so a future
+ * mixed-mode build doesn't need another discriminant migration. */
+export type DrillMode = "visual" | "auditory" | "mixed";
+
+/** Only two drill types ship in Phase 11 -- the "other twelve drill
+ * variants from the reference protocol" (ARCHITECTURE.md) are deferred,
+ * not designed away. Distinct from DrillMode on purpose: once more
+ * drills exist, one mode could offer a choice of several. */
+export type DrillType = "odd-one-out" | "corner-commands";
+
 /**
- * `workoutType`/`config` are typed narrow to "boxing"/BoxingConfig for now
- * -- ARCHITECTURE.md's full shape is a discriminated union with
- * "assault-bike-cognitive"/AssaultBikeConfig, but that config type doesn't
- * exist until Phase 11a builds it. Widen both once it does; typing the
- * wider union today would let `workoutType: "assault-bike-cognitive"`
- * type-check against a BoxingConfig, which is worse than just being narrow.
+ * `{ roundsTarget, workSec, restPhases: {settleSec, drillSec, resetSec},
+ * drillMode, drillType, difficulty }` -- ARCHITECTURE.md's original list
+ * also named a flat `restSec` alongside `restPhases`, but never gave it a
+ * purpose distinct from `restPhases`' own three sub-durations (which are
+ * what the actual Settle/Drill/Reset state machine needs); dropped as
+ * redundant rather than carrying an unused field that could drift out of
+ * sync with its own breakdown -- see PROJECT_FACTS.md. **One fixed
+ * difficulty, no bike hardware integration, no stats/history logging** --
+ * all confirmed scope limits, not oversights (ARCHITECTURE.md).
  */
-export interface WorkoutTemplate {
+export interface AssaultBikeConfig {
+  roundsTarget: number;
+  workSec: number;
+  restPhases: {
+    settleSec: number;
+    drillSec: number;
+    resetSec: number;
+  };
+  drillMode: DrillMode;
+  drillType: DrillType;
+  difficulty: "easy" | "medium" | "hard";
+}
+
+interface WorkoutTemplateBase {
   id: string;
   name: string;
   /** Ordinary editable rows, not specially locked -- confirmed in
-   * ARCHITECTURE.md, no delete/edit guard needed for these. */
+   * ARCHITECTURE.md. In practice, only boxing templates are actually
+   * editable yet: the Round Builder (Phase 10c) is boxing-specific, and
+   * no assault-bike editor is a planned Phase 11 deliverable -- see
+   * templates/index.tsx's edit guard and PROJECT_FACTS.md. */
   isBuiltIn: boolean;
-  workoutType: "boxing";
-  config: BoxingConfig;
 }
+
+/**
+ * Discriminated on `workoutType`, matching ARCHITECTURE.md's original
+ * shape -- narrowed to `{workoutType: "boxing"; config: BoxingConfig}`
+ * only from Phase 10a through 10d, since AssaultBikeConfig didn't exist
+ * yet; widened here now that it does (Phase 11a).
+ */
+export type WorkoutTemplate =
+  | (WorkoutTemplateBase & { workoutType: "boxing"; config: BoxingConfig })
+  | (WorkoutTemplateBase & { workoutType: "assault-bike-cognitive"; config: AssaultBikeConfig });

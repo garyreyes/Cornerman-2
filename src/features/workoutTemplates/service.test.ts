@@ -30,12 +30,28 @@ function uniformConfig(): BoxingConfig {
 }
 
 describe("built-in workout templates", () => {
-  test("getWorkoutTemplates seeds exactly the 3 boxing built-ins on first read", () => {
+  test("getWorkoutTemplates seeds exactly the 3 boxing built-ins plus the 1 assault-bike built-in on first read", () => {
     const templates = getWorkoutTemplates();
-    expect(templates).toHaveLength(3);
+    expect(templates).toHaveLength(4);
     expect(templates.every((t) => t.isBuiltIn)).toBe(true);
-    expect(templates.every((t) => t.workoutType === "boxing")).toBe(true);
-    expect(templates.map((t) => t.name)).toEqual(["Relax / Zone-2", "Moderate", "Intense"]);
+    expect(templates.map((t) => t.name)).toEqual([
+      "Relax / Zone-2",
+      "Moderate",
+      "Intense",
+      "Assault Bike Cognitive",
+    ]);
+    expect(templates.slice(0, 3).every((t) => t.workoutType === "boxing")).toBe(true);
+  });
+
+  test("the assault-bike built-in has real, spec-sourced restPhases figures (Flow 7: 8s settle + 30s drill + 12s reset = 50s rest)", () => {
+    const found = getWorkoutTemplates().find((t) => t.workoutType === "assault-bike-cognitive");
+    if (found === undefined || found.workoutType !== "assault-bike-cognitive") {
+      throw new Error("expected the assault-bike built-in to be seeded");
+    }
+    expect(found.config.workSec).toBe(10);
+    expect(found.config.restPhases).toEqual({ settleSec: 8, drillSec: 30, resetSec: 12 });
+    expect(found.config.drillMode).toBe("visual");
+    expect(found.config.drillType).toBe("odd-one-out");
   });
 
   test("seeded built-ins persist -- a second read returns the same rows, not freshly regenerated ones", () => {
@@ -65,6 +81,18 @@ describe("workout template CRUD", () => {
     expect(updated?.config).toEqual(newConfig);
   });
 
+  test("updateWorkoutTemplate never merges a BoxingConfig into a non-boxing template, even if its id somehow matches", () => {
+    const bike = getWorkoutTemplates().find((t) => t.workoutType === "assault-bike-cognitive");
+    if (bike === undefined) {
+      throw new Error("expected the assault-bike built-in to be seeded");
+    }
+
+    updateWorkoutTemplate(bike.id, "Hijacked", uniformConfig());
+
+    const stillBike = getWorkoutTemplates().find((t) => t.id === bike.id);
+    expect(stillBike).toEqual(bike);
+  });
+
   test("deleteWorkoutTemplate removes a template by id with no built-in protection", () => {
     const builtIns = getWorkoutTemplates();
     const created = createWorkoutTemplate("Temp", uniformConfig());
@@ -75,7 +103,10 @@ describe("workout template CRUD", () => {
     deleteWorkoutTemplate(created.id);
 
     const remaining = getWorkoutTemplates();
-    expect(remaining).toHaveLength(2);
+    // builtIns.length + the 1 created, minus the 2 just deleted -- computed
+    // rather than hardcoded so this doesn't silently drift if the seeded
+    // built-in count ever changes again.
+    expect(remaining).toHaveLength(builtIns.length + 1 - 2);
     expect(remaining.find((t) => t.id === builtIns[0]!.id)).toBeUndefined();
     expect(remaining.find((t) => t.id === created.id)).toBeUndefined();
   });

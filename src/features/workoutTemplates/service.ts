@@ -5,7 +5,7 @@ import type { Combo, RandomFn } from "../comboEngine/types";
 import { getItem, setItem } from "../../lib/storage";
 import type { Preset, Punch, Settings } from "../settings/types";
 import type { RoundOverride, TimerConfig } from "../timer/types";
-import type { BoxingConfig, ComboSource, RoundConfig, WorkoutTemplate } from "./types";
+import type { AssaultBikeConfig, BoxingConfig, ComboSource, RoundConfig, WorkoutTemplate } from "./types";
 
 const WORKOUT_TEMPLATES_KEY = "workoutTemplates";
 
@@ -14,10 +14,12 @@ function uniformRoundPlan(rounds: number): RoundConfig[] {
 }
 
 /**
- * Pace/round-count defaults chosen for a plausible boxing-training feel,
- * not sourced from any spec (PRD/ARCHITECTURE name the three templates but
- * not their numbers) -- easy to retune once felt on a real device, same
- * spirit as 4a's placeholder-then-sourced audio.
+ * The three boxing templates' pace/round-count defaults are chosen for a
+ * plausible training feel, not sourced from any spec (PRD/ARCHITECTURE
+ * name the four templates but not their numbers) -- easy to retune once
+ * felt on a real device, same spirit as 4a's placeholder-then-sourced
+ * audio. The fourth (Assault Bike Cognitive) is real, per-figure sourced
+ * from docs/user-flows.md Flow 7 -- see createBuiltInAssaultBikeConfig.
  */
 export function createBuiltInWorkoutTemplates(): WorkoutTemplate[] {
   return [
@@ -63,7 +65,36 @@ export function createBuiltInWorkoutTemplates(): WorkoutTemplate[] {
         roundPlan: uniformRoundPlan(12),
       },
     },
+    {
+      id: Crypto.randomUUID(),
+      name: "Assault Bike Cognitive",
+      isBuiltIn: true,
+      workoutType: "assault-bike-cognitive",
+      config: createBuiltInAssaultBikeConfig(),
+    },
   ];
+}
+
+/**
+ * workSec/restPhases match docs/user-flows.md Flow 7's own stated figures
+ * exactly (10s all-out work; 8s settle + 30s drill + 12s reset = the
+ * PRD's "50s rest" reference number). roundsTarget/difficulty aren't
+ * specified anywhere -- picked plausible HIIT-interval defaults, same
+ * spirit as the boxing built-ins' own pace numbers (PROJECT_FACTS.md).
+ * drillMode defaults to "visual" (Odd-One-Out, Phase 11c) over
+ * "auditory" (Corner Commands, Phase 11d) -- every doc mention names
+ * visual first, and it's sequenced first in ROADMAP.md; "mixed" is a
+ * real DrillMode value but explicitly deferred, never constructed here.
+ */
+function createBuiltInAssaultBikeConfig(): AssaultBikeConfig {
+  return {
+    roundsTarget: 8,
+    workSec: 10,
+    restPhases: { settleSec: 8, drillSec: 30, resetSec: 12 },
+    drillMode: "visual",
+    drillType: "odd-one-out",
+    difficulty: "medium",
+  };
 }
 
 /** Seeds the built-ins into storage on first read -- same pattern as
@@ -89,8 +120,18 @@ export function createWorkoutTemplate(name: string, config: BoxingConfig): Worko
   return template;
 }
 
+/** Boxing only -- guarded by `t.workoutType === "boxing"`, not just the id
+ * match. Without it, `{ ...t, name, config }` could merge a BoxingConfig
+ * into an assault-bike template's entry if this were ever called with
+ * its id (nothing does today -- the Round Builder is guarded to boxing
+ * templates -- but the function itself wasn't type-safe against the
+ * misuse; TypeScript caught this for real once WorkoutTemplate became a
+ * discriminated union, see PROJECT_FACTS.md). A ***non***-matching id
+ * still leaves every other entry, of either workoutType, untouched. */
 export function updateWorkoutTemplate(id: string, name: string, config: BoxingConfig): void {
-  saveWorkoutTemplates(getWorkoutTemplates().map((t) => (t.id === id ? { ...t, name, config } : t)));
+  saveWorkoutTemplates(
+    getWorkoutTemplates().map((t) => (t.id === id && t.workoutType === "boxing" ? { ...t, name, config } : t)),
+  );
 }
 
 /** No built-in protection -- ARCHITECTURE.md: built-ins are "ordinary
