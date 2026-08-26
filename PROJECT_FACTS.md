@@ -1184,3 +1184,29 @@ made during feature work.
   same reason; widen to the full discriminated union once 11a lands rather
   than typing a wider union today that would let `"assault-bike-cognitive"`
   type-check against a `BoxingConfig`.
+- **Phase 10b's tap-to-start and Edit actions on the Templates Picker are
+  intentionally no-ops for now** (an info-banner "coming soon" message),
+  not an oversight -- Round Builder (10c) and wiring the timer engine to
+  actually consume a `roundPlan` (10d) don't exist yet. Confirmed with the
+  user to ship 10b alone first rather than push through 10c+10d in the
+  same pass; same no-op-until-wired precedent `SettingsGear` itself used
+  in Phase 6 before Phase 8 built real Settings.
+- **This dev machine's Android emulator setup has two recurring
+  environment quirks worth knowing about before troubleshooting "app is
+  broken" symptoms**: (1) `adb` can report a booted emulator device as
+  "unauthorized" for no real reason -- fixed by `adb kill-server &&
+  adb start-server`, not by touching the emulator itself. (2) Synthetic
+  `adb shell input tap`/`swipe` events on this AVD can queue and land
+  several seconds to tens of seconds late, occasionally appearing to hit
+  the wrong element or "do nothing" when they actually just haven't fired
+  yet -- confirmed by re-dumping the UI hierarchy (`uiautomator dump`)
+  and waiting several extra seconds between actions rather than assuming
+  a real bug. Also: installing an EAS-built or locally-built APK over an
+  already-installed build signed with a different key fails with
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE` -- `adb uninstall` first.
+- **A dev-client build on the emulator needs `adb reverse tcp:8081
+  tcp:8081` before it can reach a host-machine Metro** -- "localhost"
+  from the emulator's own perspective is the emulator itself, not the
+  host. Metro itself can also crash on a stale/deleted path inside
+  `node_modules` it's still watching (hit once: a phantom
+  `__MACOSX` folder under `react-native-audio-api`) -- just restart it.
