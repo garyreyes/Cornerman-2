@@ -3,10 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { ScoreReadout } from "../features/assaultBike/components/ScoreReadout";
+import { SessionSummary } from "../features/assaultBike/components/SessionSummary";
+import { TrialTimerBar } from "../features/assaultBike/components/TrialTimerBar";
 import { useBikeSession } from "../features/assaultBike/useBikeSession";
+import { useDrillRun } from "../features/assaultBike/useDrillRun";
 import { DrillFeedback } from "../features/oddOneOut/components/DrillFeedback";
 import { OddOneOutGrid } from "../features/oddOneOut/components/OddOneOutGrid";
-import { useOddOneOutDrill } from "../features/oddOneOut/useOddOneOutDrill";
 import { AudioErrorBanner } from "../features/session/components/AudioErrorBanner";
 import { ControlRow } from "../features/session/components/ControlRow";
 import { CountdownRing } from "../features/session/components/CountdownRing";
@@ -81,11 +84,23 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
   const isDrilling = phase === "drill" && !isPaused && drill !== null;
 
   // Called unconditionally (rules of hooks); `active` stays false whenever
-  // this protocol isn't running its drill phase.
-  const { trial, lastResult, handleTap } = useOddOneOutDrill(
+  // this protocol isn't running its drill phase. Stats live here, above
+  // the per-round activation, so score and the shrinking trial window
+  // carry across all of the session's rounds.
+  const { trial, lastResult, deadlineAt, windowMs, stats, summary, handleTap, resetStats } = useDrillRun(
     isDrilling && drill?.drillMode === "odd-one-out",
     drill?.difficulty ?? "medium",
   );
+
+  function handleStart() {
+    resetStats();
+    start();
+  }
+
+  function handleReset() {
+    resetStats();
+    reset();
+  }
 
   // Ready/Finished have no active phaseDurationMs -- the work duration is
   // as reasonable a static preview/fallback as Main Timer's own
@@ -118,8 +133,12 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
 
         {audioError ? <AudioErrorBanner /> : null}
 
-        {phase === "drill" && drill?.drillMode === "odd-one-out" ? (
-          <>
+        {phase === "finished" ? (
+          <SessionSummary summary={summary} />
+        ) : phase === "drill" && drill?.drillMode === "odd-one-out" ? (
+          <View style={styles.drill}>
+            <TrialTimerBar deadlineAt={deadlineAt} windowMs={windowMs} />
+            <ScoreReadout score={stats.score} windowMs={windowMs} />
             <DrillFeedback result={lastResult} />
             {trial !== null ? (
               <OddOneOutGrid
@@ -129,7 +148,7 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
                 disabled={isPaused}
               />
             ) : null}
-          </>
+          </View>
         ) : (
           <CountdownRing phaseEndAt={bikeState?.phaseEndAt ?? null} phaseDurationMs={ringDurationMs} isPaused={isPaused} />
         )}
@@ -141,9 +160,9 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
           showPauseToggle={showPauseToggle}
           showReset={showReset}
           isPaused={isPaused}
-          onStart={() => start()}
+          onStart={handleStart}
           onTogglePause={togglePause}
-          onReset={reset}
+          onReset={handleReset}
         />
       </View>
     </SafeAreaView>
@@ -169,6 +188,15 @@ function createStyles(colors: ColorTokens) {
       justifyContent: "center",
       gap: 24,
       paddingHorizontal: 24,
+    },
+    // The drill stack is width-constrained to the grid's own max so the
+    // timer bar and score row line up with the tiles rather than running
+    // the full screen width past them.
+    drill: {
+      width: "100%",
+      maxWidth: 340,
+      alignItems: "center",
+      gap: 12,
     },
     bottom: {
       paddingHorizontal: 24,
