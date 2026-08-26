@@ -1,4 +1,4 @@
-import { startTimer, tick } from "./service";
+import { effectiveRestDurationMs, effectiveWorkDurationMs, startTimer, tick } from "./service";
 import type { TimerConfig, TimerEvent, TimerState } from "./types";
 
 const baseConfig: TimerConfig = {
@@ -115,6 +115,18 @@ describe("the 10-second work-warning latch (extraction doc §1.1)", () => {
     const { events } = advanceTicks(state, config, now, now + 400);
     expect(events.filter((e) => e.type === "work-warning")).toHaveLength(1);
   });
+
+  test("a per-round override shortening a round below the threshold suppresses the warning, even though the base duration is long (Phase 10d)", () => {
+    const now = 1_000_000;
+    const config: TimerConfig = {
+      ...baseConfig,
+      workDurationMs: 15_000, // base is well over the threshold
+      roundOverrides: [{ workDurationMs: 8_000 }], // but round 1 itself is short
+    };
+    const state = startTimer(config, now);
+    const { events } = advanceTicks(state, config, now, now + 8_000);
+    expect(events.filter((e) => e.type === "work-warning")).toHaveLength(0);
+  });
 });
 
 describe("the rest-phase 3-2-1 countdown latch (extraction doc §1.1)", () => {
@@ -202,6 +214,77 @@ describe("tick is a no-op once finished", () => {
     const { state: after, events } = tick(state, { ...baseConfig, totalRounds: 1 }, now + 999_999);
     expect(after.phase).toBe("finished");
     expect(events).toEqual([]);
+  });
+});
+
+describe("per-round duration overrides (Phase 10d: WorkoutTemplate roundPlan)", () => {
+  test("effectiveWorkDurationMs/effectiveRestDurationMs fall back to the base duration with no roundOverrides at all", () => {
+    expect(effectiveWorkDurationMs(baseConfig, 1)).toBe(baseConfig.workDurationMs);
+    expect(effectiveRestDurationMs(baseConfig, 1)).toBe(baseConfig.restDurationMs);
+  });
+
+  test("effectiveWorkDurationMs/effectiveRestDurationMs fall back to the base duration when a round's entry omits that field", () => {
+    const config: TimerConfig = { ...baseConfig, roundOverrides: [{ workDurationMs: 9_000 }] };
+    expect(effectiveWorkDurationMs(config, 1)).toBe(9_000);
+    expect(effectiveRestDurationMs(config, 1)).toBe(baseConfig.restDurationMs);
+  });
+
+  test("effectiveWorkDurationMs/effectiveRestDurationMs fall back to the base duration when a round has no entry at all", () => {
+    const config: TimerConfig = { ...baseConfig, roundOverrides: [{ workDurationMs: 9_000 }] };
+    expect(effectiveWorkDurationMs(config, 2)).toBe(baseConfig.workDurationMs);
+    expect(effectiveRestDurationMs(config, 2)).toBe(baseConfig.restDurationMs);
+  });
+
+  test("startTimer/tick actually use the overridden work duration for that round's phaseEndAt, not the base", () => {
+    const now = 1_000_000;
+    const config: TimerConfig = { ...baseConfig, workDurationMs: 15_000, roundOverrides: [{ workDurationMs: 3_000 }] };
+    const state = startTimer(config, now);
+    expect(state.phase).toBe("work");
+    expect(state.round).toBe(1);
+    expect(state.phaseEndAt).toBe(now + 3_000);
+  });
+
+  test("startTimer/tick actually use the overridden rest duration for that round's phaseEndAt, not the base", () => {
+    const now = 1_000_000;
+    const config: TimerConfig = {
+      ...baseConfig,
+      workDurationMs: 1_000,
+      restDurationMs: 5_000,
+      roundOverrides: [{ restDurationMs: 2_000 }],
+    };
+    const state = startTimer(config, now);
+    const { state: restState } = advanceTicks(state, config, now, now + 1_000);
+    expect(restState.phase).toBe("rest");
+    // Work (round 1, 1000ms) ends at now+1000; round 1's own restOverride
+    // (2000ms) applies from there, not the base 5000ms.
+    expect(restState.phaseEndAt).toBe(now + 1_000 + 2_000);
+  });
+
+  test("advancing into round 2 picks up round 2's own override, not round 1's", () => {
+    const now = 1_000_000;
+    const config: TimerConfig = {
+      ...baseConfig,
+      totalRounds: 2,
+      workDurationMs: 1_000,
+      restDurationMs: 1_000,
+      roundOverrides: [{ workDurationMs: 3_000 }, { workDurationMs: 7_000 }],
+    };
+    let state = startTimer(config, now);
+    expect(state.phaseEndAt).toBe(now + 3_000);
+
+    let cursor = now;
+    ({ state } = advanceTicks(state, config, cursor, cursor + 3_000));
+    expect(state.phase).toBe("rest");
+    // Round 1's work (3000ms) ends at now+3000; rest has no override, so
+    // the base 1000ms applies, ending at now+4000.
+    expect(state.phaseEndAt).toBe(now + 4_000);
+    cursor += 3_000 + 200;
+
+    ({ state } = advanceTicks(state, config, cursor, cursor + 1_000));
+    expect(state.phase).toBe("work");
+    expect(state.round).toBe(2);
+    // Round 2 begins at now+4000, using round 2's own 7000ms override.
+    expect(state.phaseEndAt).toBe(now + 4_000 + 7_000);
   });
 });
 

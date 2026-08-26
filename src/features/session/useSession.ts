@@ -14,10 +14,20 @@ import { createSpeechEngine } from "../speech/service";
 import type { SpeechEngine } from "../speech/types";
 import { getPresets, getPunches, getSettings } from "../settings/service";
 import type { Preset, Punch, Settings } from "../settings/types";
-import { pause as pauseTimer, resume as resumeTimer, startTimer, tick } from "../timer/service";
+import {
+  effectiveRestDurationMs,
+  effectiveWorkDurationMs,
+  pause as pauseTimer,
+  resume as resumeTimer,
+  startTimer,
+  tick,
+} from "../timer/service";
 import type { TimerConfig, TimerState } from "../timer/types";
+import { consumePendingTemplateStart } from "../workoutTemplates/pendingStart";
+import { getWorkoutTemplates, toTimerConfig as templateToTimerConfig } from "../workoutTemplates/service";
+import type { WorkoutTemplate } from "../workoutTemplates/types";
 import { createSession, decideInterruptionAction, sessionTick, shiftSessionForResume } from "./service";
-import type { SessionState } from "./types";
+import type { ActiveTemplateSession, SessionState } from "./types";
 
 const TICK_INTERVAL_MS = 200;
 
@@ -30,12 +40,39 @@ function toTimerConfig(settings: Settings): TimerConfig {
   };
 }
 
+/** The active phase's actual effective duration (round-override aware) --
+ * null outside an active phase (Ready has no TimerState yet; Finished has
+ * no ring to size). Pure, so it's safe to call from either start() or the
+ * tick loop below without touching a ref during render. */
+function computePhaseDurationMs(config: TimerConfig, state: TimerState): number | null {
+  if (state.phase === "warmup") {
+    return config.warmupDurationMs;
+  }
+  if (state.phase === "rest") {
+    return effectiveRestDurationMs(config, state.round);
+  }
+  if (state.phase === "work") {
+    return effectiveWorkDurationMs(config, state.round);
+  }
+  return null;
+}
+
 export interface UseSessionResult {
   timerState: TimerState | null;
   session: SessionState;
   settings: Settings;
   audioError: boolean;
-  start: () => void;
+  /** The active session's actual round total -- configRef's snapshot once
+   * running (which may be a template's roundPlan.length, not
+   * settings.rounds), else settings.rounds as a Ready-state preview. */
+  totalRounds: number;
+  /** The current phase's actual effective duration in ms (round-override
+   * aware), for the countdown ring's sweep fraction -- null in Ready/
+   * Finished, where no ring is shown. Deliberately not derived from
+   * `settings` directly (see this hook's own note on why): a template
+   * round's own duration can differ from `settings.workDurationSec`. */
+  phaseDurationMs: number | null;
+  start: (template?: WorkoutTemplate) => void;
   togglePause: () => void;
   reset: () => void;
 }
@@ -78,10 +115,23 @@ export function useSession(): UseSessionResult {
   const punchesRef = useRef<Punch[]>(getPunches());
   const presetsRef = useRef<Preset[]>(getPresets());
   const configRef = useRef<TimerConfig>(toTimerConfig(getSettings()));
+  // Non-null only for a template-driven session -- see this hook's own
+  // start()/ActiveTemplateSession notes. Snapshotted alongside configRef,
+  // held fixed for the same reason (round *structure* doesn't change
+  // mid-session).
+  const activeTemplateRef = useRef<ActiveTemplateSession | null>(null);
 
   const [timerState, setTimerState] = useState<TimerState | null>(null);
   const [session, setSession] = useState<SessionState>(() => createSession());
   const [audioError, setAudioError] = useState(false);
+  // Mirrors of configRef's derived values, kept as real state rather than
+  // read from the ref during render (ESLint's react-hooks/refs rule --
+  // ref reads belong in effects/callbacks, not render). Updated at the
+  // same two places configRef.current itself changes: start() and the
+  // tick loop below. null lastStartedTotalRounds means "no session
+  // started yet" -- see totalRounds' derivation below.
+  const [phaseDurationMs, setPhaseDurationMs] = useState<number | null>(null);
+  const [lastStartedTotalRounds, setLastStartedTotalRounds] = useState<number | null>(null);
 
   const audioEngineRef = useRef<AudioEngine | null>(null);
   const speechEngineRef = useRef<SpeechEngine | null>(null);
@@ -202,6 +252,12 @@ export function useSession(): UseSessionResult {
             hideSessionNotification();
           }
         });
+        // Piggybacks on this same 200ms cadence rather than adding a new
+        // one -- React bails out of re-rendering when the value is
+        // unchanged (the common case, most ticks don't cross a phase/
+        // round boundary), so this doesn't add extra renders beyond what
+        // setTimerState below already causes every tick.
+        setPhaseDurationMs(computePhaseDurationMs(configRef.current, nextTimerState));
 
         setSession((prevSession) => {
           const { session: nextSession, actions } = sessionTick(
@@ -211,6 +267,8 @@ export function useSession(): UseSessionResult {
             punchesRef.current,
             presetsRef.current,
             now,
+            Math.random,
+            activeTemplateRef.current,
           );
           actions.forEach((action) => {
             if (action.type === "speak-combo") {
@@ -232,15 +290,26 @@ export function useSession(): UseSessionResult {
     return () => clearInterval(intervalId);
   }, []);
 
-  const start = useCallback(() => {
+  const start = useCallback((template?: WorkoutTemplate) => {
     pausedByInterruptionRef.current = false;
     // Snapshot round *structure* fresh, at the moment Start is pressed --
     // not whatever was true when this hook first mounted (previously
     // frozen forever via configRef's initial value, since Main Timer is
     // the app's one long-lived screen and this ref was never
     // re-derived). Held fixed for the rest of this session once started --
-    // see this hook's own doc comment for why.
-    configRef.current = toTimerConfig(getSettings());
+    // see this hook's own doc comment for why. A template, when passed,
+    // drives this instead of Settings -- Phase 10d.
+    if (template) {
+      configRef.current = templateToTimerConfig(template.config);
+      activeTemplateRef.current = {
+        roundPlan: template.config.roundPlan,
+        baseComboGapMinSec: template.config.baseComboGapMinSec,
+        baseComboGapMaxSec: template.config.baseComboGapMaxSec,
+      };
+    } else {
+      configRef.current = toTimerConfig(getSettings());
+      activeTemplateRef.current = null;
+    }
     const initial = startTimer(configRef.current, Date.now());
     // startTimer computes the first TimerState directly rather than going
     // through tick() (there's no prior state to transition from), so it
@@ -254,6 +323,8 @@ export function useSession(): UseSessionResult {
     audioEngineRef.current?.handleTimerEvent({ type: "phase-changed", phase: initial.phase, round: initial.round });
     setTimerState(initial);
     setSession(createSession());
+    setLastStartedTotalRounds(configRef.current.totalRounds);
+    setPhaseDurationMs(computePhaseDurationMs(configRef.current, initial));
     showSessionNotification("playing");
   }, []);
 
@@ -279,10 +350,40 @@ export function useSession(): UseSessionResult {
 
   const reset = useCallback(() => {
     pausedByInterruptionRef.current = false;
+    activeTemplateRef.current = null;
     setTimerState(null);
     setSession(createSession());
+    setPhaseDurationMs(null);
+    setLastStartedTotalRounds(null);
     hideSessionNotification();
   }, []);
 
-  return { timerState, session, settings, audioError, start, togglePause, reset };
+  // Consumes a "start this template" signal left by the Templates Picker
+  // (docs/user-flows.md Flow 6: tapping a template starts it directly, no
+  // separate confirmation) -- Main Timer stays mounted underneath
+  // Templates the whole time, so router.back() alone carries no params to
+  // signal this; see workoutTemplates/pendingStart.ts. Same
+  // useFocusEffect timing as the settings/punches/presets resync above,
+  // just a separate effect since it depends on `start` (declared after
+  // that one).
+  useFocusEffect(
+    useCallback(() => {
+      const pendingId = consumePendingTemplateStart();
+      if (pendingId === null) {
+        return;
+      }
+      const template = getWorkoutTemplates().find((t) => t.id === pendingId);
+      if (template) {
+        start(template);
+      }
+    }, [start]),
+  );
+
+  // While Ready (no session started yet), tracks settings.rounds live --
+  // same preview behavior as before Phase 10d. Once a session has
+  // started (quick-start or template), freezes to whatever was actually
+  // snapshotted at start(), even after settings.rounds later changes.
+  const totalRounds = timerState === null ? settings.rounds : (lastStartedTotalRounds ?? settings.rounds);
+
+  return { timerState, session, settings, audioError, totalRounds, phaseDurationMs, start, togglePause, reset };
 }

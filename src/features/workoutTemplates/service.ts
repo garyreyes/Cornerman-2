@@ -4,6 +4,7 @@ import { generatePresetCombo, generateRandomCombo, resolvePunchName } from "../c
 import type { Combo, RandomFn } from "../comboEngine/types";
 import { getItem, setItem } from "../../lib/storage";
 import type { Preset, Punch, Settings } from "../settings/types";
+import type { RoundOverride, TimerConfig } from "../timer/types";
 import type { BoxingConfig, ComboSource, RoundConfig, WorkoutTemplate } from "./types";
 
 const WORKOUT_TEMPLATES_KEY = "workoutTemplates";
@@ -136,4 +137,29 @@ export function resolveRoundCombo(
         random,
       );
   }
+}
+
+/**
+ * Converts a template's BoxingConfig into the timer engine's own
+ * TimerConfig, in ms -- the Phase 10d sibling to useSession.ts's own
+ * `toTimerConfig(settings: Settings)` for quick-start. `totalRounds`
+ * comes straight from `roundPlan.length` (a template's round count *is*
+ * its round list, not a separate field to keep in sync). Each round's
+ * optional workDurationSec/restDurationSec becomes that round's ms
+ * override; a round with neither set produces an all-undefined entry,
+ * which timer/service.ts's effectiveWorkDurationMs/effectiveRestDurationMs
+ * already treat identically to a missing entry.
+ */
+export function toTimerConfig(config: BoxingConfig): TimerConfig {
+  const roundOverrides: RoundOverride[] = config.roundPlan.map((round) => ({
+    workDurationMs: round.workDurationSec !== undefined ? round.workDurationSec * 1000 : undefined,
+    restDurationMs: round.restDurationSec !== undefined ? round.restDurationSec * 1000 : undefined,
+  }));
+  return {
+    totalRounds: config.roundPlan.length,
+    workDurationMs: config.baseWorkDurationSec * 1000,
+    restDurationMs: config.baseRestDurationSec * 1000,
+    warmupDurationMs: config.warmupDurationSec * 1000,
+    roundOverrides,
+  };
 }

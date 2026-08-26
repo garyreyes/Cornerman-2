@@ -1210,3 +1210,31 @@ made during feature work.
   host. Metro itself can also crash on a stale/deleted path inside
   `node_modules` it's still watching (hit once: a phantom
   `__MACOSX` folder under `react-native-audio-api`) -- just restart it.
+- **Phase 10 (Workout Templates) is now fully functional end-to-end** --
+  10a (data model), 10b (Picker), 10c (Round Builder), 10d (engine
+  wiring) all shipped. Only the `/impeccable audit` a11y/perf pass on
+  Templates Picker + Round Builder remains, deliberately deferred to the
+  Phase 12 close alongside the Assault-Bike screens rather than run
+  per-sub-phase -- matches this project's general pattern of batching
+  visual/technical QA passes at phase closes.
+- **Reading `ref.current` during a hook's render body is a real ESLint
+  error in this project** (`react-hooks/refs`), not just a style
+  preference -- caught while building Phase 10d's `totalRounds`/
+  `phaseDurationMs` derivation in `useSession.ts`. The fix: mirror
+  whatever the ref holds into real `useState`, updated at the exact
+  same points the ref itself is written (inside `start()` and the tick
+  loop's `setInterval` callback, both legitimate non-render contexts),
+  and derive the public return value from that state instead of the ref.
+- **A native Pressable's onPress={someHandler} always passes a
+  GestureResponderEvent as the first argument, even when the prop's
+  declared TS type says the handler takes zero params.** TypeScript
+  doesn't catch this across a component boundary (ControlRow's own
+  onStart: () => void prop type doesn't stop a caller from assigning a
+  differently-shaped function to the *variable* passed in). Real risk
+  found and fixed in Phase 10d: useSession's start gained an optional
+  	emplate parameter, and the plain "START" button's
+  onStart={start} would have silently passed the tap's event object
+  as 	emplate on every ordinary quick-start. Any future prop named
+  onPress/onStart/etc. that's assigned a function with a *newly
+  added* parameter needs the same check -- wrap the call site
+  (() => start()) rather than passing the function reference directly.

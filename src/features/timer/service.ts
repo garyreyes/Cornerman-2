@@ -6,6 +6,20 @@ const FIRST_COMBO_MAX_MS = 1500; // clamped window (extraction doc §1.2)
 const REST_COUNTDOWN_START_SEC = 3;
 const WORK_WARNING_THRESHOLD_MS = 10_000;
 
+/** `round`'s own override when present, else the base duration -- exported
+ * so a display layer (e.g. the countdown ring's sweep fraction) can show
+ * the same effective duration this engine actually timed the round with,
+ * rather than re-deriving it (or worse, reading the wrong base value)
+ * itself. Phase 10+ (Workout Templates) is the only current producer of
+ * `roundOverrides`; with none set this is just `config.workDurationMs`. */
+export function effectiveWorkDurationMs(config: TimerConfig, round: number): number {
+  return config.roundOverrides?.[round - 1]?.workDurationMs ?? config.workDurationMs;
+}
+
+export function effectiveRestDurationMs(config: TimerConfig, round: number): number {
+  return config.roundOverrides?.[round - 1]?.restDurationMs ?? config.restDurationMs;
+}
+
 function beginWork(
   round: number,
   transitionAt: number,
@@ -15,7 +29,7 @@ function beginWork(
   return {
     phase: "work",
     round,
-    phaseEndAt: transitionAt + config.workDurationMs,
+    phaseEndAt: transitionAt + effectiveWorkDurationMs(config, round),
     tenWarned: false,
     lastRestCountdown: null,
     firstComboAt: nextGapFireTime(transitionAt, FIRST_COMBO_MIN_MS, FIRST_COMBO_MAX_MS, random),
@@ -28,7 +42,7 @@ function beginRest(round: number, transitionAt: number, config: TimerConfig): Ti
   return {
     phase: "rest",
     round,
-    phaseEndAt: transitionAt + config.restDurationMs,
+    phaseEndAt: transitionAt + effectiveRestDurationMs(config, round),
     tenWarned: false,
     lastRestCountdown: null,
     firstComboAt: null,
@@ -92,7 +106,7 @@ export function tick(
     }
   }
 
-  if (s.phase === "work" && !s.tenWarned && config.workDurationMs > WORK_WARNING_THRESHOLD_MS) {
+  if (s.phase === "work" && !s.tenWarned && effectiveWorkDurationMs(config, s.round) > WORK_WARNING_THRESHOLD_MS) {
     const remainingMs = s.phaseEndAt - now;
     if (remainingMs <= WORK_WARNING_THRESHOLD_MS) {
       s = { ...s, tenWarned: true };

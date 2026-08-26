@@ -72,23 +72,24 @@ function MainTimerScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { timerState, session, settings, audioError, start, togglePause, reset } = useSession();
+  const { timerState, session, settings, audioError, totalRounds, phaseDurationMs, start, togglePause, reset } =
+    useSession();
 
   const phase = timerState?.phase ?? "ready";
   const isPaused = timerState?.isPaused ?? false;
   const round = timerState?.round ?? 0;
 
-  const phaseDurationMs =
-    phase === "warmup"
-      ? settings.warmupDurationSec * 1000
-      : phase === "rest"
-        ? settings.restDurationSec * 1000
-        : settings.workDurationSec * 1000;
+  // useSession's phaseDurationMs is null outside an active phase
+  // (Ready/Finished) -- CountdownRing needs a real number either way, and
+  // settings.workDurationSec is exactly what it showed as the pre-Start
+  // preview before Phase 10d (unchanged for Finished too, where the ring
+  // shows full/complete regardless of which positive number this is).
+  const ringDurationMs = phaseDurationMs ?? settings.workDurationSec * 1000;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.topRow}>
-        <RoundCounter round={round} totalRounds={settings.rounds} />
+        <RoundCounter round={round} totalRounds={totalRounds} />
         <View style={styles.iconGroup}>
           <TemplatesButton onPress={() => router.push("/templates")} />
           <SettingsGear onPress={() => router.push("/settings")} />
@@ -100,7 +101,7 @@ function MainTimerScreen() {
 
         <CountdownRing
           phaseEndAt={timerState?.phaseEndAt ?? null}
-          phaseDurationMs={phaseDurationMs}
+          phaseDurationMs={ringDurationMs}
           isPaused={isPaused}
         />
 
@@ -110,7 +111,17 @@ function MainTimerScreen() {
       </View>
 
       <View style={styles.bottom}>
-        <ControlRow phase={phase} isPaused={isPaused} onStart={start} onTogglePause={togglePause} onReset={reset} />
+        <ControlRow
+          phase={phase}
+          isPaused={isPaused}
+          // Deliberately wrapped, not `onStart={start}` -- `start` now
+          // optionally takes a WorkoutTemplate (Phase 10d), and
+          // ControlRow's Pressable would otherwise pass its
+          // GestureResponderEvent through as that argument.
+          onStart={() => start()}
+          onTogglePause={togglePause}
+          onReset={reset}
+        />
       </View>
     </SafeAreaView>
   );

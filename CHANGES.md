@@ -816,3 +816,30 @@ Dated log of shipped changes, appended to as features complete.
   150/150 tests still pass, lint/typecheck clean. Visually confirmed
   end-to-end on the Android emulator -- built and saved a real custom
   template and confirmed it lists correctly afterward.
+- 2026-08-26: Sub-phase 10d -- wired the timer/combo engines to actually
+  run a WorkoutTemplate's roundPlan, closing out Phase 10 (Workout
+  Templates). Correctness-critical, test-first, 15 new tests:
+  `timer/service.ts` gained an optional, purely-additive
+  `roundOverrides` on `TimerConfig` plus
+  `effectiveWorkDurationMs`/`effectiveRestDurationMs` (also fixed the
+  10-second work-warning check, which had the same "reads the base
+  duration instead of the round's actual one" bug already fixed once
+  this session for short rounds); `session/service.ts`'s `sessionTick`
+  gained an optional `ActiveTemplateSession` that, when present, routes
+  combo generation through `resolveRoundCombo` for the current round
+  instead of Settings-driven `generateCombo`; `workoutTemplates/service.ts`
+  gained `toTimerConfig(BoxingConfig)`. `useSession.ts`'s `start()` now
+  optionally takes a `WorkoutTemplate`; fixed a real latent display bug
+  along the way (Main Timer was reading `settings.rounds`/
+  `settings.*DurationSec` directly, which would show the wrong round
+  count/ring duration for any template session) and a real footgun before
+  it shipped (`ControlRow`'s Start button passes a `GestureResponderEvent`
+  through `onPress`, which would have landed positionally as `start`'s
+  new template argument -- the call site now wraps it). Templates
+  Picker's tap-to-start is real now, via a small transient signal
+  (`workoutTemplates/pendingStart.ts`) consumed on focus by the
+  already-mounted Main Timer. 165/165 tests, lint/typecheck clean.
+  Visually confirmed end-to-end on the Android emulator: a single-round
+  "fixed-punch: Jab" test template correctly showed ROUND 1/1, skipped
+  straight to Work (0 warmup), and called "JAB" repeatedly -- never
+  falling back to random generation.

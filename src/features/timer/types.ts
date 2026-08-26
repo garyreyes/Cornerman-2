@@ -1,10 +1,26 @@
 export type Phase = "ready" | "warmup" | "work" | "rest" | "finished";
 
+/** A single round's duration overrides, in ms -- undefined fields mean
+ * "use the base work/restDurationMs on TimerConfig". Deliberately just a
+ * plain ms shape (not aware of WorkoutTemplate/RoundConfig at all) --
+ * this engine stays purely additive/agnostic to who produced the
+ * override, matching how it already knows nothing about Settings. */
+export interface RoundOverride {
+  workDurationMs?: number;
+  restDurationMs?: number;
+}
+
 export interface TimerConfig {
   totalRounds: number;
   workDurationMs: number;
   restDurationMs: number;
   warmupDurationMs: number;
+  /** 0-indexed by round-1 (round is 1-indexed everywhere else in this
+   * engine); a missing entry, or a missing field on an entry, falls back
+   * to the base work/restDurationMs above. Undefined entirely for the
+   * ordinary uniform (Settings-driven) case -- Phase 10+ (Workout
+   * Templates) is the only producer of this. */
+  roundOverrides?: RoundOverride[];
 }
 
 export interface TimerState {
