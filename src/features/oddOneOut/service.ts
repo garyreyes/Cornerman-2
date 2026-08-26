@@ -1,4 +1,4 @@
-import type { Difficulty, RandomFn, Trial, TrialResult } from "./types";
+import type { Difficulty, RandomFn, Trial, TrialOutcome } from "./types";
 
 const GRID_SIZE_BY_DIFFICULTY: Readonly<Record<Difficulty, number>> = {
   easy: 2,
@@ -22,6 +22,6 @@ export function startTrial(difficulty: Difficulty, now: number, random: RandomFn
 /** Reaction time is measured honestly regardless of correctness -- a wrong
  * tap still shows the user how fast they were, matching "reaction time/
  * accuracy shown live" (ARCHITECTURE.md), not just on a correct answer. */
-export function resolveTap(trial: Trial, tappedIndex: number, now: number): TrialResult {
+export function resolveTap(trial: Trial, tappedIndex: number, now: number): TrialOutcome {
   return { correct: tappedIndex === trial.oddIndex, reactionMs: now - trial.startedAt };
 }

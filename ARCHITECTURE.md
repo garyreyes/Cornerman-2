@@ -141,22 +141,42 @@ already built.
   existing resolve-at-call-time-with-graceful-fallback pattern — one
   resolution mechanism for the whole app, not two.
 
-- **`AssaultBikeConfig`** — `{ roundsTarget, workSec, restSec, restPhases:
-  { settleSec, drillSec, resetSec }, drillMode: "visual" | "auditory" |
-  "mixed", drillType, difficulty: "easy" | "medium" | "hard" }`. Scoped
-  down for the first build: one fixed difficulty rather than the
-  reference protocol's per-round auto-scaling, and only two drill types
-  shipped initially — visual **Odd-One-Out** and auditory **Corner
-  Commands** (the latter reuses the Phase 5 speech pipeline directly,
-  since it's just spoken cue words like the existing combo call-outs).
-  `mixed` mode and the other twelve drill variants from the reference
-  protocol are explicitly deferred, not designed away.
+- **`AssaultBikeConfig`** — `{ roundsTarget, workSec, rest: RestPlan }`,
+  where `RestPlan` is discriminated:
+  `{ kind: "plain", restSec }` or
+  `{ kind: "drill", settleSec, drillSec, resetSec, drillMode, difficulty }`.
+
+  *Revised in Phase 12* from a flat `{ restSec, restPhases, drillMode,
+  drillType, difficulty }`. Three changes, each for a stated reason:
+
+  1. **`restSec` dropped** (Phase 11a) — it duplicated the sub-durations
+     that the state machine actually reads, with no distinct purpose.
+  2. **The rest plan became a union** (Phase 12a) — the four real
+     protocols don't share a rest shape. Anaerobic Lactic Capacity (20s
+     all-out / 10s easy spin) has no room for a drill, and encoding that
+     as `{settleSec: 10, drillSec: 0, resetSec: 0}` would both fake a
+     phase that means something else on screen and leave nonsense states
+     expressible. `drillMode`/`difficulty` sit inside the drill arm for
+     the same reason: a plain rest has no difficulty to set.
+  3. **`drillMode` and `drillType` collapsed into one field** (Phase
+     12a) — two fields encoded a single choice and could drift apart.
+
+  Two drills ship: **Odd One Out** (uniform grid, one tile differs) and
+  **Color Call** (multi-colour grid, one colour named aloud — reuses the
+  Phase 5 speech pipeline). Corner Commands, briefly shipped in 11d, was
+  removed: calling defensive movements aloud assumed the rider would
+  perform them, which means dismounting and remounting mid-rest. The
+  other drill variants from the reference protocol remain deferred, not
+  designed away. Difficulty is still one fixed value per template rather
+  than the reference protocol's per-round auto-scaling — the *trial
+  window* self-scales instead (see `assaultBike/scoring.ts`).
 
   **No bike hardware integration** (confirmed) — the app only runs
   timing and the cognitive drill; watts/RPM stay on the bike's own
-  console. **No stats/history persisted** (confirmed) — matches the
-  PRD's existing v1 decision; reaction-time/accuracy display during a
-  drill is live-only, never logged.
+  console. **No stats/history persisted** (still confirmed) — Phase 12b
+  added a live score and an end-of-session summary card, but both are
+  in-memory only: no storage write, no backend, gone when the screen
+  unmounts.
 
 ## Deferred decisions (written down on purpose, not forgotten)
 

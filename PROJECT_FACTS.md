@@ -1320,3 +1320,84 @@ made during feature work.
   not through any in-app flow. Building a way to actually choose
   `drillMode` for real (a second built-in, or a real editor) is
   unscoped work, not an oversight.
+- **A drill that asks the rider to leave the bike is not a drill.**
+  Corner Commands (11d) called defensive movements aloud -- "duck",
+  "roll", "pivot" -- on the assumption the rider would perform them.
+  On an assault bike that means dismounting and remounting inside a
+  rest period, which the user confirmed is unworkable. Deleted in 12a.
+  The durable rule: **a cognitive drill during bike rest has to be
+  answerable with a thumb, without leaving the saddle.** Anything
+  requiring a whole-body response belongs in the boxing flow, where the
+  athlete is already standing and free. Voice can still be a *stimulus*
+  (Color Call names a colour to tap) -- it just can't be an instruction
+  to move.
+- **The four bike protocols do not share a rest shape, and that's why
+  the state machine has two cycles.** Anaerobic Lactic Capacity is 20s
+  all-out / 10s easy spin: 10s cannot fit "pick the phone up, drill, put
+  it down". It runs `work -> rest -> work` with a single rest phase.
+  The other three run the four-phase drill cycle. If a fifth protocol is
+  ever added, decide which cycle it uses before picking its numbers --
+  the rest duration is what determines whether a drill is possible at
+  all, not a preference.
+- **The rest split follows a stated rule: generous prep on both sides,
+  don't drill the whole window.** The user's own example was a 40s rest
+  as 10s get-the-phone / 20s drill / 10s put-it-down-and-get-set, which
+  is exactly Combat Effort's split. The longer-rest protocols scale the
+  drill up but deliberately leave the remainder as recovery rather than
+  filling it. Settle and Reset are labelled "PHONE UP"/"PHONE DOWN" on
+  screen for the same reason -- they're instructions, not phase names.
+- **The drill grid is a deliberate, documented exception to the
+  monochrome Light/Dark contract** in `docs/design-direction.md`. Color
+  Call's tiles use fixed hex, not theme tokens, because that is the one
+  surface in the app where colour *is* the information rather than
+  decoration -- "tap the red one" has to mean the same thing in every
+  theme. Everything around the grid stays monochrome. Don't "fix" this
+  by tokenising those colours.
+- **Stats are in-memory only, and that is not the same as "no backend
+  needed" being a design constraint.** This app has never had a
+  backend, and everything durable (settings, punches, presets,
+  templates) lives in on-device MMKV. Phase 12b's score/summary
+  deliberately doesn't even use MMKV -- it's React state that dies with
+  the screen. If persisted drill history is ever wanted, it's an MMKV
+  entity like the others, still no server involved. Local storage and a
+  backend are different questions; don't conflate them.
+- **`scripts/generate_voice_bank.py` takes an optional filename filter,
+  and adding a word should always use it.** Running it bare regenerates
+  every clip for every voice, overwriting the committed bank. Kokoro
+  output is not guaranteed byte-identical run to run, so replacing 33
+  working clips to add one is a real risk for no benefit. Use
+  `python scripts/generate_voice_bank.py red blue` and verify with
+  `git status` that only new files appear.
+- **A feature reachable only by editing source is a feature nobody has
+  tried.** 11d shipped "fully built and verified" with a standing note
+  that no UI path existed to select it; it was deleted two days later
+  as fundamentally wrong. The note was accurate and was treated as a
+  scope boundary when it was actually a warning sign. When a mode can't
+  be reached through the app, either build the path (12c added
+  `DrillModePicker` for exactly this) or treat the mode as unvalidated
+  -- not as done.
+- **Changing a stored entity's shape needs a migration, because
+  `get*` returns stored rows as-is.** Settings uses zero-migration
+  default-merging, but `getWorkoutTemplates` had no equivalent -- so
+  Phase 12a's `AssaultBikeConfig` reshape would have broken every
+  existing install until app data was cleared. `migrateStoredTemplates`
+  handles this one by detecting the field whose presence distinguishes
+  the shapes, not by a version stamp. **Any future reshape of a stored
+  entity needs the same treatment; the tests pass either way, because
+  tests start from empty storage and a real device does not.**
+- **On this machine, emulator taps can be delivered minutes late, and
+  that makes live UI verification genuinely ambiguous.** During Phase 12
+  verification a session visibly restarted from a START tap issued ~2
+  minutes earlier, and drill scores rose with no input sent -- almost
+  certainly queued taps landing on a grid that covers most of the
+  screen. The lesson is about method, not the emulator: **when a live
+  observation could have two explanations, pin the behaviour with a
+  deterministic test rather than staring at more screenshots.** That's
+  why `timeoutOutcome` exists as a named, tested function.
+- **`@testing-library/react-native@14`'s `renderHook` returns an empty
+  object under React 19 in this setup** -- `result` is undefined, so
+  hook-level tests can't be written with it as-is. Effect-loop hooks
+  (`useSession`, `useBikeSession`, `useDrillRun`) are therefore covered
+  only through their pure dependencies. If hook-level coverage is ever
+  wanted, that dependency needs upgrading first; don't burn time
+  assuming the test is written wrong.

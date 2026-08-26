@@ -2,20 +2,45 @@
  * Phase 11 (docs/user-flows.md Flow 7). Deliberately NOT built on top of
  * timer/types.ts -- the phase set and transition rules are genuinely
  * different (no warmup, no combo/warning latches, every round -- including
- * the last -- runs its full Settle/Drill/Reset cycle rather than skipping
- * a trailing rest), and shoehorning that in would cost more than a fresh,
+ * the last -- runs its full rest cycle rather than skipping a trailing
+ * rest), and shoehorning that in would cost more than a fresh,
  * purpose-built state machine mirroring the *pattern* timer/service.ts
  * already proved (pure functions, phase-changed events, exact-remaining-
  * time pause/resume).
+ *
+ * Phase 12a widened this from one hardcoded cycle to two, because the
+ * four real bike protocols don't share a rest shape: three of them have
+ * room for a cognitive drill, and Anaerobic Lactic Capacity (20s all-out
+ * / 10s easy spin) does not -- 10s can't fit "pick the phone up, drill,
+ * put it down".
  */
-export type BikePhase = "work" | "settle" | "drill" | "reset" | "finished";
+export type BikePhase = "work" | "rest" | "settle" | "drill" | "reset" | "finished";
 
+/**
+ * Discriminated rather than a flat `{settleSec, drillSec, resetSec}` with
+ * a separate "no drill" flag: a plain rest genuinely has *one* duration,
+ * and modelling it as `{settleSec: 10, drillSec: 0, resetSec: 0}` would
+ * both fake a Settle phase that means something else on screen ("PHONE
+ * UP" -- see the drill cycle's own copy) and leave two nonsense states
+ * expressible (drill durations set with no drill; a drill with none).
+ * Same reasoning that dropped AssaultBikeConfig's originally-specified
+ * flat `restSec` as redundant with its own breakdown.
+ */
+export type BikeRest =
+  | { kind: "plain"; restSec: number }
+  | { kind: "drill"; settleSec: number; drillSec: number; resetSec: number };
+
+/**
+ * Carries no drillMode/difficulty on purpose -- the state machine only
+ * needs to know *how long* the drill phase runs, never which drill fills
+ * it. Keeps the same "engine stays decoupled from the template entity's
+ * field layout" boundary that toBikeConfig/toTimerConfig already hold;
+ * the screen reads drillMode straight off the template's own config.
+ */
 export interface BikeConfig {
   roundsTarget: number;
   workSec: number;
-  settleSec: number;
-  drillSec: number;
-  resetSec: number;
+  rest: BikeRest;
 }
 
 export interface BikeState {

@@ -66,41 +66,105 @@ export function createBuiltInWorkoutTemplates(): WorkoutTemplate[] {
         roundPlan: uniformRoundPlan(12),
       },
     },
-    {
-      id: Crypto.randomUUID(),
-      name: "Assault Bike Cognitive",
-      isBuiltIn: true,
-      workoutType: "assault-bike-cognitive",
-      config: createBuiltInAssaultBikeConfig(),
-    },
+    ...createBuiltInBikeTemplates(),
   ];
 }
 
 /**
- * workSec/restPhases match docs/user-flows.md Flow 7's own stated figures
- * exactly (10s all-out work; 8s settle + 30s drill + 12s reset = the
- * PRD's "50s rest" reference number). roundsTarget/difficulty aren't
- * specified anywhere -- picked plausible HIIT-interval defaults, same
- * spirit as the boxing built-ins' own pace numbers (PROJECT_FACTS.md).
- * drillMode defaults to "visual" (Odd-One-Out, Phase 11c) over
- * "auditory" (Corner Commands, Phase 11d) -- every doc mention names
- * visual first, and it's sequenced first in ROADMAP.md; "mixed" is a
- * real DrillMode value but explicitly deferred, never constructed here.
+ * The four real assault-bike energy-system protocols (Phase 12a),
+ * replacing Phase 11's single generic "Assault Bike Cognitive" entry.
+ * Work/rest/round figures come from the user's own reference protocol
+ * table, not from Flow 7 (whose single 10s/50s example is preserved
+ * almost exactly by Combat Effort below).
+ *
+ * The rest *split* within each drill protocol is ours, and follows one
+ * rule the user set explicitly: give generous prep on both sides rather
+ * than drilling the whole window -- roughly "pick the phone up, drill,
+ * put it down and get set again". Combat Effort's 10/20/10 is that rule
+ * stated verbatim; the longer-rest protocols scale the drill up but
+ * deliberately leave the remainder as recovery rather than filling it.
+ *
+ * Lactic Capacity is the one protocol with no drill at all: a 10s easy
+ * spin can't fit the phone-up/phone-down cycle, confirmed by the user.
+ *
+ * Difficulty is "medium" across the board for now -- retunable once
+ * these are ridden for real, same spirit as the boxing built-ins' own
+ * pace numbers (PROJECT_FACTS.md). Every drill protocol starts on
+ * "odd-one-out"; Color Call becomes reachable per-session from the bike
+ * screen itself (Phase 12c) rather than by multiplying these rows.
  */
-function createBuiltInAssaultBikeConfig(): AssaultBikeConfig {
-  return {
-    roundsTarget: 8,
-    workSec: 10,
-    restPhases: { settleSec: 8, drillSec: 30, resetSec: 12 },
-    drillMode: "visual",
-    drillType: "odd-one-out",
-    difficulty: "medium",
-  };
+function createBuiltInBikeTemplates(): WorkoutTemplate[] {
+  const bike = (name: string, config: AssaultBikeConfig): WorkoutTemplate => ({
+    id: Crypto.randomUUID(),
+    name,
+    isBuiltIn: true,
+    workoutType: "assault-bike-cognitive",
+    config,
+  });
+
+  return [
+    // 4 min hard / 3 min easy spin x4 -- HR climbing to 90-95% max by the
+    // end of each block.
+    bike("Bike · Aerobic Power", {
+      roundsTarget: 4,
+      workSec: 240,
+      rest: { kind: "drill", settleSec: 20, drillSec: 60, resetSec: 100, drillMode: "odd-one-out", difficulty: "medium" },
+    }),
+    // 20s all-out / 10s easy spin x8 -- max effort every rep, not paced to
+    // survive. No drill: 10s is the whole rest.
+    bike("Bike · Lactic Capacity", {
+      roundsTarget: 8,
+      workSec: 20,
+      rest: { kind: "plain", restSec: 10 },
+    }),
+    // 8-10s all-out / 2-3 min FULL rest x5-6 -- every rep should hit the
+    // same peak watts, so the rest is genuinely long.
+    bike("Bike · Alactic Power", {
+      roundsTarget: 6,
+      workSec: 10,
+      rest: { kind: "drill", settleSec: 20, drillSec: 60, resetSec: 70, drillMode: "odd-one-out", difficulty: "medium" },
+    }),
+    // 10s hard / 35-40s easy x10-12 -- hard but not a max sprint, mimics
+    // burst/reset. This is Flow 7's original example protocol.
+    bike("Bike · Combat Effort", {
+      roundsTarget: 12,
+      workSec: 10,
+      rest: { kind: "drill", settleSec: 10, drillSec: 20, resetSec: 10, drillMode: "odd-one-out", difficulty: "medium" },
+    }),
+  ];
+}
+
+/**
+ * Phase 12a reshaped `AssaultBikeConfig` from `{restPhases, drillMode,
+ * drillType, difficulty}` to `{rest: RestPlan}`. Storage holds whatever
+ * an install last wrote, so an app that ran any Phase 11 build has bike
+ * templates in the old shape -- and `toBikeConfig` would read a `rest`
+ * that isn't there and break the session screen.
+ *
+ * Rather than a version stamp, this checks the one field whose presence
+ * actually distinguishes the shapes. Boxing templates never changed, so
+ * they pass through untouched, custom ones included -- only the stale
+ * bike rows are dropped, and the four protocols are re-seeded to replace
+ * them. Idempotent: current data comes back unchanged, so this can't
+ * append a duplicate set on every read.
+ *
+ * Exported for its own tests; callers should use getWorkoutTemplates.
+ */
+export function migrateStoredTemplates(stored: WorkoutTemplate[]): WorkoutTemplate[] {
+  const kept = stored.filter(
+    (t) => t.workoutType !== "assault-bike-cognitive" || (t.config as AssaultBikeConfig).rest !== undefined,
+  );
+  if (kept.some((t) => t.workoutType === "assault-bike-cognitive")) {
+    return kept;
+  }
+  return [...kept, ...createBuiltInBikeTemplates()];
 }
 
 /** Seeds the built-ins into storage on first read -- same pattern as
  * getPunches, since ARCHITECTURE.md confirms built-ins are ordinary
- * editable rows a user can modify, not code-level constants. */
+ * editable rows a user can modify, not code-level constants. On a later
+ * read it also repairs the Phase 11 -> 12 shape change above, writing the
+ * result back so regenerated ids stay stable between reads. */
 export function getWorkoutTemplates(): WorkoutTemplate[] {
   const stored = getItem<WorkoutTemplate[]>(WORKOUT_TEMPLATES_KEY);
   if (stored === undefined) {
@@ -108,7 +172,11 @@ export function getWorkoutTemplates(): WorkoutTemplate[] {
     setItem(WORKOUT_TEMPLATES_KEY, defaults);
     return defaults;
   }
-  return stored;
+  const migrated = migrateStoredTemplates(stored);
+  if (migrated.length !== stored.length) {
+    setItem(WORKOUT_TEMPLATES_KEY, migrated);
+  }
+  return migrated;
 }
 
 function saveWorkoutTemplates(templates: WorkoutTemplate[]): void {
@@ -207,20 +275,26 @@ export function toTimerConfig(config: BoxingConfig): TimerConfig {
 }
 
 /**
- * Flattens AssaultBikeConfig's `restPhases` into assaultBike/service.ts's
- * own BikeConfig shape (Phase 11b) -- the bike state machine stays
- * decoupled from the template entity's exact field layout, same
- * "purely additive, engine doesn't know about the template layer"
- * boundary toTimerConfig above already keeps for the boxing timer.
- * Both sides use seconds (unlike toTimerConfig's ms), so this is a
- * plain reshape, no unit conversion.
+ * Narrows AssaultBikeConfig's `rest` into assaultBike/service.ts's own
+ * BikeRest (Phase 11b) -- the bike state machine stays decoupled from the
+ * template entity's exact field layout, same "engine doesn't know about
+ * the template layer" boundary toTimerConfig above already keeps for the
+ * boxing timer. Both sides use seconds (unlike toTimerConfig's ms), so
+ * this is a plain reshape, no unit conversion.
+ *
+ * The drop of `drillMode`/`difficulty` here is the whole point, not an
+ * omission: the state machine needs the drill phase's *duration* and
+ * nothing else about it (Phase 12a). The screen reads those two off the
+ * template config directly.
  */
 export function toBikeConfig(config: AssaultBikeConfig): BikeConfig {
+  const { rest } = config;
   return {
     roundsTarget: config.roundsTarget,
     workSec: config.workSec,
-    settleSec: config.restPhases.settleSec,
-    drillSec: config.restPhases.drillSec,
-    resetSec: config.restPhases.resetSec,
+    rest:
+      rest.kind === "plain"
+        ? { kind: "plain", restSec: rest.restSec }
+        : { kind: "drill", settleSec: rest.settleSec, drillSec: rest.drillSec, resetSec: rest.resetSec },
   };
 }

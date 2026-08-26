@@ -1,15 +1,16 @@
 import { createDefaultSettings, createDefaultPunches, createPreset } from "../settings/service";
 import type { Punch, Settings } from "../settings/types";
-import { clearAll } from "../../lib/storage";
+import { clearAll, setItem } from "../../lib/storage";
 import {
   createWorkoutTemplate,
   deleteWorkoutTemplate,
   getWorkoutTemplates,
+  migrateStoredTemplates,
   resolveRoundCombo,
   toTimerConfig,
   updateWorkoutTemplate,
 } from "./service";
-import type { BoxingConfig, ComboSource } from "./types";
+import type { BoxingConfig, ComboSource, WorkoutTemplate } from "./types";
 
 beforeEach(() => {
   clearAll();
@@ -30,34 +31,120 @@ function uniformConfig(): BoxingConfig {
 }
 
 describe("built-in workout templates", () => {
-  test("getWorkoutTemplates seeds exactly the 3 boxing built-ins plus the 1 assault-bike built-in on first read", () => {
+  test("getWorkoutTemplates seeds exactly the 3 boxing built-ins plus the 4 bike protocols on first read", () => {
     const templates = getWorkoutTemplates();
-    expect(templates).toHaveLength(4);
+    expect(templates).toHaveLength(7);
     expect(templates.every((t) => t.isBuiltIn)).toBe(true);
     expect(templates.map((t) => t.name)).toEqual([
       "Relax / Zone-2",
       "Moderate",
       "Intense",
-      "Assault Bike Cognitive",
+      "Bike · Aerobic Power",
+      "Bike · Lactic Capacity",
+      "Bike · Alactic Power",
+      "Bike · Combat Effort",
     ]);
     expect(templates.slice(0, 3).every((t) => t.workoutType === "boxing")).toBe(true);
+    expect(templates.slice(3).every((t) => t.workoutType === "assault-bike-cognitive")).toBe(true);
   });
 
-  test("the assault-bike built-in has real, spec-sourced restPhases figures (Flow 7: 8s settle + 30s drill + 12s reset = 50s rest)", () => {
-    const found = getWorkoutTemplates().find((t) => t.workoutType === "assault-bike-cognitive");
-    if (found === undefined || found.workoutType !== "assault-bike-cognitive") {
-      throw new Error("expected the assault-bike built-in to be seeded");
-    }
-    expect(found.config.workSec).toBe(10);
-    expect(found.config.restPhases).toEqual({ settleSec: 8, drillSec: 30, resetSec: 12 });
-    expect(found.config.drillMode).toBe("visual");
-    expect(found.config.drillType).toBe("odd-one-out");
+  test("each bike protocol's work/rest/round figures match the reference protocol table", () => {
+    const bikes = getWorkoutTemplates().filter((t) => t.workoutType === "assault-bike-cognitive");
+    const shape = bikes.map((t) => {
+      if (t.workoutType !== "assault-bike-cognitive") throw new Error("unreachable");
+      const { rest } = t.config;
+      const restSec = rest.kind === "plain" ? rest.restSec : rest.settleSec + rest.drillSec + rest.resetSec;
+      return { rounds: t.config.roundsTarget, workSec: t.config.workSec, restSec };
+    });
+
+    expect(shape).toEqual([
+      { rounds: 4, workSec: 240, restSec: 180 }, // 4 min hard / 3 min easy x4
+      { rounds: 8, workSec: 20, restSec: 10 }, //  20s all-out / 10s easy x8
+      { rounds: 6, workSec: 10, restSec: 150 }, // 8-10s all-out / 2-3 min full rest x5-6
+      { rounds: 12, workSec: 10, restSec: 40 }, // 10s hard / 35-40s easy x10-12
+    ]);
+  });
+
+  test("Lactic Capacity is the only protocol with no drill -- a 10s rest can't fit the phone-up/phone-down cycle", () => {
+    const bikes = getWorkoutTemplates().filter((t) => t.workoutType === "assault-bike-cognitive");
+    const kinds = bikes.map((t) => (t.workoutType === "assault-bike-cognitive" ? t.config.rest.kind : "?"));
+    expect(kinds).toEqual(["drill", "plain", "drill", "drill"]);
   });
 
   test("seeded built-ins persist -- a second read returns the same rows, not freshly regenerated ones", () => {
     const first = getWorkoutTemplates();
     const second = getWorkoutTemplates();
     expect(second).toEqual(first);
+  });
+});
+
+/**
+ * Phase 12a reshaped AssaultBikeConfig from `{restPhases, drillMode,
+ * drillType, difficulty}` to `{rest: RestPlan}`. Anything already
+ * installed has the old shape in MMKV, and getWorkoutTemplates returns
+ * stored rows as-is -- so without this, an existing install would hand
+ * toBikeConfig a config with no `rest` field at all and break the bike
+ * screen. Boxing templates are unaffected (their shape never changed)
+ * and must survive untouched, custom ones included.
+ */
+describe("migrateStoredTemplates -- Phase 11 -> 12 stored-shape change", () => {
+  /** Exactly what Phase 11a wrote to storage. */
+  const legacyBike = {
+    id: "legacy-bike",
+    name: "Assault Bike Cognitive",
+    isBuiltIn: true,
+    workoutType: "assault-bike-cognitive",
+    config: {
+      roundsTarget: 8,
+      workSec: 10,
+      restPhases: { settleSec: 8, drillSec: 30, resetSec: 12 },
+      drillMode: "visual",
+      drillType: "odd-one-out",
+      difficulty: "medium",
+    },
+  } as unknown as WorkoutTemplate;
+
+  const customBoxing: WorkoutTemplate = {
+    id: "custom-1",
+    name: "My Rounds",
+    isBuiltIn: false,
+    workoutType: "boxing",
+    config: uniformConfig(),
+  };
+
+  test("drops a stored bike template still using the old restPhases shape", () => {
+    const result = migrateStoredTemplates([legacyBike]);
+    expect(result.some((t) => t.id === "legacy-bike")).toBe(false);
+  });
+
+  test("re-seeds the four protocols once the stale bike row is gone", () => {
+    const result = migrateStoredTemplates([legacyBike]);
+    const bikes = result.filter((t) => t.workoutType === "assault-bike-cognitive");
+    expect(bikes).toHaveLength(4);
+    expect(bikes.every((t) => t.workoutType === "assault-bike-cognitive" && t.config.rest !== undefined)).toBe(true);
+  });
+
+  test("never touches boxing templates -- a custom one survives the migration intact", () => {
+    const result = migrateStoredTemplates([customBoxing, legacyBike]);
+    expect(result.find((t) => t.id === "custom-1")).toEqual(customBoxing);
+  });
+
+  test("is a no-op on already-current data -- no duplicate protocols on every read", () => {
+    const current = getWorkoutTemplates();
+    expect(migrateStoredTemplates(current)).toEqual(current);
+    expect(migrateStoredTemplates(migrateStoredTemplates(current))).toEqual(current);
+  });
+
+  test("getWorkoutTemplates migrates on read and writes the result back", () => {
+    setItem("workoutTemplates", [customBoxing, legacyBike]);
+
+    const first = getWorkoutTemplates();
+    expect(first.filter((t) => t.workoutType === "assault-bike-cognitive")).toHaveLength(4);
+    expect(first.find((t) => t.id === "custom-1")).toEqual(customBoxing);
+
+    // Persisted, so ids stay stable across reads rather than being
+    // regenerated every time the picker mounts.
+    expect(getWorkoutTemplates()).toEqual(first);
   });
 });
 

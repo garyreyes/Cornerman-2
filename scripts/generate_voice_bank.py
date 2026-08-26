@@ -67,6 +67,7 @@ var is still needed.
 """
 
 import os
+import sys
 
 import numpy as np
 import soundfile as sf
@@ -131,6 +132,16 @@ WORDS = {
     "pivot": "Pivot",
     "check": "Check",
     "clinch": "Clinch",
+    # Colours -- Phase 12c's Color Call drill on the Assault-Bike screen.
+    # Spoken as the stimulus the rider taps for; nothing to do with the
+    # boxing vocabulary above, but they share this bank so a rider hears
+    # the same voice they picked in Settings.
+    "red": "Red",
+    "blue": "Blue",
+    "green": "Green",
+    "yellow": "Yellow",
+    "orange": "Orange",
+    "purple": "Purple",
 }
 
 
@@ -143,6 +154,20 @@ def trim_silence(audio: np.ndarray, threshold: float = SILENCE_THRESHOLD) -> np.
 
 
 def main() -> None:
+    # Optional filename filter, e.g.
+    #     python scripts/generate_voice_bank.py red blue green
+    # regenerates only those clips. With no arguments every clip is
+    # regenerated, which overwrites the whole committed bank -- fine when
+    # that is genuinely what you want, but adding a word to WORDS above
+    # should normally be followed by generating *only* that word, since
+    # Kokoro output is not guaranteed byte-identical run to run and
+    # silently replacing 33 working clips to add one is a bad trade.
+    selected = set(sys.argv[1:])
+    unknown = selected - set(WORDS)
+    if unknown:
+        raise SystemExit(f"unknown word(s): {', '.join(sorted(unknown))}")
+    words = {k: v for k, v in WORDS.items() if not selected or k in selected}
+
     pipeline = KPipeline(lang_code=LANG_CODE)
 
     for voice in VOICES:
@@ -150,7 +175,7 @@ def main() -> None:
         os.makedirs(out_dir, exist_ok=True)
 
         results = []
-        for filename, text in WORDS.items():
+        for filename, text in words.items():
             chunks = [audio for _, _, audio in pipeline(text, voice=voice, speed=SPEED)]
             audio = np.concatenate(chunks) if len(chunks) > 1 else chunks[0]
             audio = trim_silence(audio)
