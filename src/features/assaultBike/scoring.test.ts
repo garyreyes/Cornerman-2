@@ -5,6 +5,7 @@ import {
   pointsForHit,
   recordTrial,
   SHRINK_OVER_TRIALS,
+  timeoutOutcome,
   trialWindowMs,
 } from "./scoring";
 
@@ -108,6 +109,45 @@ describe("recordTrial", () => {
     expect(stats.hits).toBe(2);
     expect(stats.totalHitReactionMs).toBe(1500);
     expect(stats.score).toBe(pointsForHit(1000, 2000) + pointsForHit(500, 2000));
+  });
+});
+
+/**
+ * A live emulator run showed the score climbing with no taps sent, and
+ * screenshots couldn't separate "a bug" from "the machine delivered a
+ * queued tap onto the grid" -- a known quirk here (PROJECT_FACTS.md).
+ * A hit nobody earned would make the whole readout meaningless, so the
+ * rule is pinned here rather than argued from a screenshot.
+ */
+describe("timeoutOutcome -- an untouched trial can never score", () => {
+  test("is always a non-hit", () => {
+    expect(timeoutOutcome(2000).correct).toBe(false);
+  });
+
+  test("reports the full window as the time it stood unanswered", () => {
+    expect(timeoutOutcome(1700).reactionMs).toBe(1700);
+  });
+
+  test("scores nothing, however fast the window was", () => {
+    for (const windowMs of [3000, 2500, 2000, 1200, 900]) {
+      const stats = recordTrial(emptyDrillStats(), timeoutOutcome(windowMs), windowMs);
+      expect(stats.score).toBe(0);
+      expect(stats.hits).toBe(0);
+      expect(stats.trials).toBe(1);
+    }
+  });
+
+  test("a whole drill phase of untouched trials still totals zero", () => {
+    let stats = emptyDrillStats();
+    for (let i = 0; i < 12; i += 1) {
+      const windowMs = trialWindowMs("medium", i);
+      stats = recordTrial(stats, timeoutOutcome(windowMs), windowMs);
+    }
+
+    expect(stats.trials).toBe(12);
+    expect(stats.score).toBe(0);
+    expect(drillSummary(stats).accuracyPct).toBe(0);
+    expect(drillSummary(stats).avgReactionMs).toBeNull();
   });
 });
 

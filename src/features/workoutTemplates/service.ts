@@ -134,9 +134,37 @@ function createBuiltInBikeTemplates(): WorkoutTemplate[] {
   ];
 }
 
+/**
+ * Phase 12a reshaped `AssaultBikeConfig` from `{restPhases, drillMode,
+ * drillType, difficulty}` to `{rest: RestPlan}`. Storage holds whatever
+ * an install last wrote, so an app that ran any Phase 11 build has bike
+ * templates in the old shape -- and `toBikeConfig` would read a `rest`
+ * that isn't there and break the session screen.
+ *
+ * Rather than a version stamp, this checks the one field whose presence
+ * actually distinguishes the shapes. Boxing templates never changed, so
+ * they pass through untouched, custom ones included -- only the stale
+ * bike rows are dropped, and the four protocols are re-seeded to replace
+ * them. Idempotent: current data comes back unchanged, so this can't
+ * append a duplicate set on every read.
+ *
+ * Exported for its own tests; callers should use getWorkoutTemplates.
+ */
+export function migrateStoredTemplates(stored: WorkoutTemplate[]): WorkoutTemplate[] {
+  const kept = stored.filter(
+    (t) => t.workoutType !== "assault-bike-cognitive" || (t.config as AssaultBikeConfig).rest !== undefined,
+  );
+  if (kept.some((t) => t.workoutType === "assault-bike-cognitive")) {
+    return kept;
+  }
+  return [...kept, ...createBuiltInBikeTemplates()];
+}
+
 /** Seeds the built-ins into storage on first read -- same pattern as
  * getPunches, since ARCHITECTURE.md confirms built-ins are ordinary
- * editable rows a user can modify, not code-level constants. */
+ * editable rows a user can modify, not code-level constants. On a later
+ * read it also repairs the Phase 11 -> 12 shape change above, writing the
+ * result back so regenerated ids stay stable between reads. */
 export function getWorkoutTemplates(): WorkoutTemplate[] {
   const stored = getItem<WorkoutTemplate[]>(WORKOUT_TEMPLATES_KEY);
   if (stored === undefined) {
@@ -144,7 +172,11 @@ export function getWorkoutTemplates(): WorkoutTemplate[] {
     setItem(WORKOUT_TEMPLATES_KEY, defaults);
     return defaults;
   }
-  return stored;
+  const migrated = migrateStoredTemplates(stored);
+  if (migrated.length !== stored.length) {
+    setItem(WORKOUT_TEMPLATES_KEY, migrated);
+  }
+  return migrated;
 }
 
 function saveWorkoutTemplates(templates: WorkoutTemplate[]): void {

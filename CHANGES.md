@@ -951,3 +951,22 @@ Dated log of shipped changes, appended to as features complete.
   - Engine, scoring and Color Call logic all written test-first (11, 18
     and 12 failing assertions observed before implementation
     respectively). 217/217 tests, lint/typecheck clean.
+- 2026-08-26: Phase 12 follow-ups found by actually running it, not by
+  reading it.
+  - **Stored-shape migration.** `getWorkoutTemplates` returned stored
+    rows unmigrated, so any install that had run a Phase 11 build still
+    held bike templates in the old `restPhases` shape -- `toBikeConfig`
+    would have read a `rest` field that wasn't there and broken the
+    session screen on launch. `migrateStoredTemplates` now drops stale
+    bike rows and re-seeds the four protocols, leaving boxing templates
+    (custom ones included) untouched, and is idempotent so it can't
+    append a duplicate set on every read. Written test-first (5 red),
+    then confirmed live on the emulator: the stale Phase 11 row was gone
+    and all four protocols appeared with correct figures.
+  - **`timeoutOutcome` extracted and pinned by tests.** A live run showed
+    the score climbing with no taps sent. Screenshots couldn't separate a
+    real bug from this machine's known delayed-tap delivery (the same run
+    also restarted a session from a tap issued two minutes earlier), so
+    the rule "an untouched trial can never score" is now a named function
+    with its own tests rather than a literal buried in an effect
+    callback. Behaviour unchanged; the guarantee is now checkable.

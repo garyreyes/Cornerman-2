@@ -9,7 +9,7 @@ import { getSettings } from "../settings/service";
 import { createSpeechEngine } from "../speech/service";
 import type { SpeechEngine } from "../speech/types";
 import type { Difficulty, DrillMode } from "../workoutTemplates/types";
-import { drillSummary, emptyDrillStats, recordTrial, trialWindowMs } from "./scoring";
+import { drillSummary, emptyDrillStats, recordTrial, timeoutOutcome, trialWindowMs } from "./scoring";
 import type { DrillStats, DrillSummary } from "./scoring";
 
 const NEXT_TRIAL_DELAY_MS = 500;
@@ -145,9 +145,10 @@ export function useDrillRun(active: boolean, drillMode: DrillMode, difficulty: D
     setLastResult(null);
 
     timeoutRef.current = setTimeout(() => {
-      // A timeout is a non-hit that used the whole window -- scoring.ts
-      // deliberately keeps that "reaction" out of the reported average.
-      finishTrial({ correct: false, reactionMs: nextWindowMs }, nextWindowMs);
+      // A timeout is a non-hit that used the whole window. The shape is
+      // scoring.ts's own timeoutOutcome rather than a literal here, so
+      // "an untouched trial can never score" is pinned by a test.
+      finishTrial(timeoutOutcome(nextWindowMs), nextWindowMs);
     }, nextWindowMs);
   }, [difficulty, drillMode, finishTrial]);
 

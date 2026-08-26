@@ -1,15 +1,16 @@
 import { createDefaultSettings, createDefaultPunches, createPreset } from "../settings/service";
 import type { Punch, Settings } from "../settings/types";
-import { clearAll } from "../../lib/storage";
+import { clearAll, setItem } from "../../lib/storage";
 import {
   createWorkoutTemplate,
   deleteWorkoutTemplate,
   getWorkoutTemplates,
+  migrateStoredTemplates,
   resolveRoundCombo,
   toTimerConfig,
   updateWorkoutTemplate,
 } from "./service";
-import type { BoxingConfig, ComboSource } from "./types";
+import type { BoxingConfig, ComboSource, WorkoutTemplate } from "./types";
 
 beforeEach(() => {
   clearAll();
@@ -74,6 +75,76 @@ describe("built-in workout templates", () => {
     const first = getWorkoutTemplates();
     const second = getWorkoutTemplates();
     expect(second).toEqual(first);
+  });
+});
+
+/**
+ * Phase 12a reshaped AssaultBikeConfig from `{restPhases, drillMode,
+ * drillType, difficulty}` to `{rest: RestPlan}`. Anything already
+ * installed has the old shape in MMKV, and getWorkoutTemplates returns
+ * stored rows as-is -- so without this, an existing install would hand
+ * toBikeConfig a config with no `rest` field at all and break the bike
+ * screen. Boxing templates are unaffected (their shape never changed)
+ * and must survive untouched, custom ones included.
+ */
+describe("migrateStoredTemplates -- Phase 11 -> 12 stored-shape change", () => {
+  /** Exactly what Phase 11a wrote to storage. */
+  const legacyBike = {
+    id: "legacy-bike",
+    name: "Assault Bike Cognitive",
+    isBuiltIn: true,
+    workoutType: "assault-bike-cognitive",
+    config: {
+      roundsTarget: 8,
+      workSec: 10,
+      restPhases: { settleSec: 8, drillSec: 30, resetSec: 12 },
+      drillMode: "visual",
+      drillType: "odd-one-out",
+      difficulty: "medium",
+    },
+  } as unknown as WorkoutTemplate;
+
+  const customBoxing: WorkoutTemplate = {
+    id: "custom-1",
+    name: "My Rounds",
+    isBuiltIn: false,
+    workoutType: "boxing",
+    config: uniformConfig(),
+  };
+
+  test("drops a stored bike template still using the old restPhases shape", () => {
+    const result = migrateStoredTemplates([legacyBike]);
+    expect(result.some((t) => t.id === "legacy-bike")).toBe(false);
+  });
+
+  test("re-seeds the four protocols once the stale bike row is gone", () => {
+    const result = migrateStoredTemplates([legacyBike]);
+    const bikes = result.filter((t) => t.workoutType === "assault-bike-cognitive");
+    expect(bikes).toHaveLength(4);
+    expect(bikes.every((t) => t.workoutType === "assault-bike-cognitive" && t.config.rest !== undefined)).toBe(true);
+  });
+
+  test("never touches boxing templates -- a custom one survives the migration intact", () => {
+    const result = migrateStoredTemplates([customBoxing, legacyBike]);
+    expect(result.find((t) => t.id === "custom-1")).toEqual(customBoxing);
+  });
+
+  test("is a no-op on already-current data -- no duplicate protocols on every read", () => {
+    const current = getWorkoutTemplates();
+    expect(migrateStoredTemplates(current)).toEqual(current);
+    expect(migrateStoredTemplates(migrateStoredTemplates(current))).toEqual(current);
+  });
+
+  test("getWorkoutTemplates migrates on read and writes the result back", () => {
+    setItem("workoutTemplates", [customBoxing, legacyBike]);
+
+    const first = getWorkoutTemplates();
+    expect(first.filter((t) => t.workoutType === "assault-bike-cognitive")).toHaveLength(4);
+    expect(first.find((t) => t.id === "custom-1")).toEqual(customBoxing);
+
+    // Persisted, so ids stay stable across reads rather than being
+    // regenerated every time the picker mounts.
+    expect(getWorkoutTemplates()).toEqual(first);
   });
 });
 

@@ -75,6 +75,21 @@ export function emptyDrillStats(): DrillStats {
 }
 
 /**
+ * What a trial nobody answered resolves to. Named rather than written
+ * inline at the hook's timeout callback so the "an untouched trial can
+ * never score" rule is pinned by a test instead of by one literal buried
+ * in an effect -- a hit nobody earned would make the whole readout
+ * meaningless, and a live emulator run couldn't distinguish that from
+ * the machine's own delayed-tap delivery (PROJECT_FACTS.md).
+ *
+ * `reactionMs` is the full window because that is honestly how long the
+ * trial stood unanswered; recordTrial keeps it out of the average.
+ */
+export function timeoutOutcome(windowMs: number): TrialOutcome {
+  return { correct: false, reactionMs: windowMs };
+}
+
+/**
  * Only a hit contributes to `totalHitReactionMs`. A timeout's "reaction
  * time" is really just the window length, and a wrong tap measures how
  * fast someone was wrong -- averaging either into the reported figure

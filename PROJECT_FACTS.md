@@ -1376,3 +1376,28 @@ made during feature work.
   be reached through the app, either build the path (12c added
   `DrillModePicker` for exactly this) or treat the mode as unvalidated
   -- not as done.
+- **Changing a stored entity's shape needs a migration, because
+  `get*` returns stored rows as-is.** Settings uses zero-migration
+  default-merging, but `getWorkoutTemplates` had no equivalent -- so
+  Phase 12a's `AssaultBikeConfig` reshape would have broken every
+  existing install until app data was cleared. `migrateStoredTemplates`
+  handles this one by detecting the field whose presence distinguishes
+  the shapes, not by a version stamp. **Any future reshape of a stored
+  entity needs the same treatment; the tests pass either way, because
+  tests start from empty storage and a real device does not.**
+- **On this machine, emulator taps can be delivered minutes late, and
+  that makes live UI verification genuinely ambiguous.** During Phase 12
+  verification a session visibly restarted from a START tap issued ~2
+  minutes earlier, and drill scores rose with no input sent -- almost
+  certainly queued taps landing on a grid that covers most of the
+  screen. The lesson is about method, not the emulator: **when a live
+  observation could have two explanations, pin the behaviour with a
+  deterministic test rather than staring at more screenshots.** That's
+  why `timeoutOutcome` exists as a named, tested function.
+- **`@testing-library/react-native@14`'s `renderHook` returns an empty
+  object under React 19 in this setup** -- `result` is undefined, so
+  hook-level tests can't be written with it as-is. Effect-loop hooks
+  (`useSession`, `useBikeSession`, `useDrillRun`) are therefore covered
+  only through their pure dependencies. If hook-level coverage is ever
+  wanted, that dependency needs upgrading first; don't burn time
+  assuming the test is written wrong.
