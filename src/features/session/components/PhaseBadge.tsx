@@ -12,11 +12,24 @@ import Animated, {
 import { useTheme } from "../../../shared/theme/ThemeContext";
 import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
 
+/**
+ * Keyed by phase name across both session types -- boxing never enters
+ * the bike's three sub-rest phases and vice versa, so one map covers both
+ * without either having to know about the other.
+ *
+ * The bike's Settle and Reset labels say what to physically do rather
+ * than naming the phase (Phase 12d). They bracket a drill that needs the
+ * phone in hand, and "SETTLE" gave a rider no clue that the next 20
+ * seconds wanted them looking at a screen.
+ */
 const PHASE_LABEL: Record<string, string> = {
   ready: "READY",
   warmup: "WARMUP",
   work: "WORK",
   rest: "REST",
+  settle: "PHONE UP",
+  drill: "DRILL",
+  reset: "PHONE DOWN",
   finished: "FINISHED",
 };
 

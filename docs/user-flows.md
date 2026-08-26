@@ -265,23 +265,37 @@ flowchart TD
 
 ---
 
-## Flow 7 — Assault-Bike Cognitive session *(Phase 11+)*
+## Flow 7 — Assault-Bike Cognitive session *(Phase 11+, reworked in Phase 12)*
 
 ```
 Templates Picker → (assault-bike template) → Assault-Bike Session
 ```
 
+Four protocols ship, one per energy system, and they do **not** share a
+rest shape — which is why the state machine has two cycles rather than
+one (`assaultBike/types.ts`):
+
+| Protocol | Work | Rest | Rounds | Drill |
+|---|---|---|---|---|
+| Aerobic Power (VO2max) | 4:00 | 3:00 | 4 | yes |
+| Anaerobic Lactic Capacity | 0:20 | 0:10 | 8 | **no** |
+| Anaerobic Alactic Power | 0:10 | 2:30 | 6 | yes |
+| Combat-Specific Repeated Effort | 0:10 | 0:40 | 12 | yes |
+
 ```mermaid
 flowchart TD
-    A[Work phase: 10s\nall-out countdown] --> B[Rest: Settle\n0-8s, just breathe]
-    B --> C[Rest: Cognitive Drill\n~30s]
-    C --> D{drillMode}
-    D -->|visual| E[Odd-One-Out grid:\ntap the different tile,\nreaction time shown live]
-    D -->|auditory| F[Corner Commands:\nspoken cue, quick\nshadow-response window\n— reuses the Phase 5\nspeech pipeline]
-    E --> G[Rest: Reset\n~12s, \"get ready\"]
+    A[Work phase:\nall-out countdown] --> Z{rest kind?}
+    Z -->|plain| Y[Rest: easy spin\ntoo short for a drill]
+    Y --> A
+    Z -->|drill| B["Rest: Settle\n\"PHONE UP\""]
+    B --> C[Rest: Cognitive Drill]
+    C --> D{drill mode}
+    D -->|odd-one-out| E[Uniform grid, one tile differs:\ntap it]
+    D -->|color-call| F[Multi-colour grid, one colour\nnamed aloud: tap the one you heard\n— reuses the Phase 5 speech pipeline]
+    E --> G["Rest: Reset\n\"PHONE DOWN\""]
     F --> G
     G --> A
-    A -.all rounds complete.-> H[Finished]
+    A -.all rounds complete.-> H[Finished + summary]
 ```
 
 - **This screen is visually distinct from the boxing Main Timer** —
@@ -289,12 +303,25 @@ flowchart TD
   phase is a stark countdown, the drill phase is the one moment this
   mode asks for eyes-on-screen attention (unlike the boxing flow's
   audio-first, mostly-eyes-off pattern).
-- **No data is logged.** Reaction time/accuracy shown during the drill
-  is live-only and disappears once the round ends — matches the
-  confirmed "no bike integration, no stats tracking" scope.
+- **Settle and Reset are instructions, not phase names.** They read
+  "PHONE UP" and "PHONE DOWN" on screen, because they exist to bracket a
+  drill that needs the phone in hand.
+- **Lactic Capacity has no drill at all.** A 10s easy spin can't fit the
+  phone-up/phone-down cycle, so that protocol runs `work → rest → work`
+  and never enters Settle/Drill/Reset.
+- **The drill is chosen per session, not per template.** There is no
+  bike template editor, so the pre-start screen offers the choice
+  directly; the template's own `drillMode` is the default.
+- **Nothing is persisted.** Score, reaction time and accuracy are shown
+  live and again on a summary card when the last round ends, but they
+  live in memory only — no storage write, no backend — and are gone once
+  the screen unmounts. Still matches the confirmed "no bike integration,
+  no stats history" scope.
 - **Empty/error state:** none beyond what Phase 6/7's audio-engine error
   banner already covers (sound-unavailable degrades the same way here
-  as on the boxing timer).
+  as on the boxing timer). A Color Call session with no working audio is
+  unplayable by nature — the banner is the signal, and Odd One Out
+  remains selectable.
 
 ---
 

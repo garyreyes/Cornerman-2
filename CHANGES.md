@@ -910,3 +910,44 @@ Dated log of shipped changes, appended to as features complete.
   the built-in's drillMode to auditory, verified, reverted before
   committing) -- Drill phase correctly showed a real spoken command
   ("DUCK") as text, no errors.
+- 2026-08-26: Phase 12 -- the assault bike gets its four real protocols,
+  scored drills, and a corrected auditory drill. Four sub-phases, one PR.
+  - **12a:** replaced the single generic "Assault Bike Cognitive"
+    built-in with the four energy-system protocols from the user's own
+    reference table (Aerobic Power, Lactic Capacity, Alactic Power,
+    Combat Effort). `BikeRest`/`RestPlan` became discriminated unions so
+    Lactic Capacity (20s all-out / 10s easy spin) runs a real
+    `work -> rest -> work` cycle instead of faking a drill cycle with
+    three zeroed sub-phases -- 10s can't fit "phone up, drill, phone
+    down". `DrillMode` and `DrillType` collapsed into one field.
+    **Corner Commands (11d) deleted** -- calling defensive movements
+    aloud assumed the rider would perform them, which means dismounting
+    and remounting mid-rest; confirmed unworkable by the user.
+  - **12b:** trials now have a deadline that shrinks over the session
+    (start -> floor across 15 trials, then holds), so a timeout is a real
+    miss rather than a puzzle waiting forever. Points are speed-weighted
+    so `score` isn't just hit count restated. The reported average
+    reaction covers hits only -- a timeout's "reaction" is the window
+    length and a wrong tap measures how fast you were wrong, so
+    averaging either in would make a worse session look faster. Stats
+    moved up into `useDrillRun` (in `assaultBike/`) because the drill
+    deactivates every round and a drill-owned hook would reset the tally
+    12 times a session. New end-of-session summary card.
+  - **12c:** new Color Call drill -- a multi-colour grid with one colour
+    named aloud, tap the one you heard. Voice-only; printing the colour
+    name would turn colour recognition into reading. 12 new voice clips
+    (6 colours x 2 voices) via the existing Kokoro script, which gained a
+    filename filter first so adding words doesn't regenerate the 33
+    working clips. New `DrillModePicker` on the pre-start screen, since
+    with no bike template editor there was otherwise no way to reach
+    Color Call at all.
+  - **12d:** Settle/Reset relabelled **"PHONE UP"/"PHONE DOWN"** -- they
+    bracket a drill that needs the phone in hand, and "SETTLE" told a
+    rider nothing about that. `docs/user-flows.md` Flow 7 and
+    `ARCHITECTURE.md`'s `AssaultBikeConfig` entry rewritten to match
+    what shipped, including corrected persistence wording: a live score
+    and summary card now exist, but they're in-memory only -- no storage
+    write, no backend, gone when the screen unmounts.
+  - Engine, scoring and Color Call logic all written test-first (11, 18
+    and 12 failing assertions observed before implementation
+    respectively). 217/217 tests, lint/typecheck clean.

@@ -611,15 +611,101 @@ visual-world decisions here (see risk check below).
     editor exists — not a planned Phase 11 deliverable at all), so
     this mode is fully built and verified but only reachable via the
     built-in's own hardcoded config for now.
-  - [ ] `/impeccable audit` — **not run yet**, deferred to the Phase 12
+  - **⚠️ Reversed in Phase 12a (2026-08-26): Corner Commands was
+    deleted.** The drill assumed a rider would *perform* the defensive
+    movement it called ("duck", "roll", "pivot"), which on an assault
+    bike means dismounting and remounting inside a rest period — the
+    user confirmed this is unworkable in practice. The mistake wasn't
+    the implementation, which worked; it was accepting an interaction
+    model the physical situation ruled out. The auditory channel became
+    a *stimulus for an on-screen tap* instead (Color Call, 12c). Note
+    also that "no UI path to select it" above was a real warning sign
+    left standing rather than treated as one — a mode reachable only by
+    editing source is a mode nobody has actually tried.
+  - [ ] `/impeccable audit` — **not run yet**, deferred to the Phase 13
     close alongside the rest of Phase 10/11's own deferred audits.
 
-## Phase 12 — Templates Phase Close
+## Phase 12 — Bike Protocols, Scoring, and the Drill Rework
+
+*Added 2026-08-26, from user direction. Phase 11 shipped one generic bike
+interval and an auditory drill built on a wrong assumption; this phase
+replaces both. What was Phase 12 (the Templates phase close) is now Phase
+13 — this work landed in front of it, not instead of it.*
+
+- [x] **12a. Four protocols + the plain-rest cycle** — `done`,
+  2026-08-26 — the four real energy-system protocols (Aerobic Power,
+  Lactic Capacity, Alactic Power, Combat Effort) replace the single
+  "Assault Bike Cognitive" built-in, with work/rest/round figures from
+  the user's own reference protocol table. `BikeRest`/`RestPlan` became
+  discriminated unions so Lactic Capacity (20s all-out / 10s easy spin)
+  can run a genuine `work → rest → work` cycle rather than faking a
+  drill cycle with three zeroed sub-phases; the completion rule is
+  written once against the cycle's loop-back phase so both shapes
+  inherit it identically. `DrillMode`/`DrillType` collapsed into one
+  field (two fields, one choice, able to drift apart — the same
+  redundancy that killed the flat `restSec` in 11a). Corner Commands
+  deleted, see the 11d note below. Engine tests written first: 11 of 14
+  red before the implementation. 187/187, gates clean.
+- [x] **12b. Scored trials with a shrinking deadline** — `done`,
+  2026-08-26 — trials had no time limit, so a "miss" was only ever a
+  wrong tap. `trialWindowMs` now shrinks linearly from the difficulty's
+  start to its floor over 15 trials then holds (never reaching zero, so
+  a 12-round Combat Effort session stays hard rather than impossible),
+  and a timeout resolves as a non-hit. Points are speed-weighted —
+  flat points would have made `score` a restatement of hit count. The
+  reported average reaction covers **hits only**: a timeout's
+  "reaction" is just the window length and a wrong tap measures how
+  fast someone was wrong, so averaging either in would make a worse
+  session look faster. `useOddOneOutDrill` replaced by `useDrillRun` in
+  `assaultBike/` — the drill deactivates at every Drill phase boundary,
+  so a hook owned by the drill feature would reset the tally and
+  re-widen the window 12 times a session. Scoring tests written first
+  (18 red). 205/205, gates clean.
+- [x] **12c. Color Call drill** — `done`, 2026-08-26 — multi-colour
+  grid, one colour named aloud, tap the one you heard. Voice-only: no
+  colour name is printed, since printing it turns colour recognition
+  into reading. Twelve new voice clips (six colours × two voices) via
+  the existing Kokoro script, which gained a filename filter first so
+  adding words regenerates only those words — Kokoro output isn't
+  guaranteed byte-identical run to run, and replacing 33 working clips
+  to add six is a bad trade (verified: 12 added, 0 modified). The drill
+  grid uses **fixed hex, not theme tokens** — a documented exception to
+  `docs/design-direction.md`'s monochrome Light/Dark contract, because
+  this is the one surface where colour *is* the information and "tap the
+  red one" must mean the same thing in every mode. `DrillModePicker`
+  added on the pre-start screen: without it Color Call would be
+  unreachable, since there's no bike template editor and the only
+  alternative was duplicating every protocol row to vary one field.
+  `TrialOutcome` moved to `lib/drillTrial.ts` and `DrillFeedback` to
+  `assaultBike/components/` to avoid an assaultBike → drill →
+  assaultBike cycle. Service tests written first (12 red). 217/217,
+  gates clean.
+- [x] **12d. Phase copy + docs reconciliation** — `done`, 2026-08-26 —
+  Settle and Reset now read **"PHONE UP"** and **"PHONE DOWN"**: they
+  exist to bracket a drill that needs the phone in hand, and "SETTLE"
+  gave a rider no clue the next 20 seconds wanted them looking at a
+  screen. `docs/user-flows.md` Flow 7 and `ARCHITECTURE.md`'s
+  `AssaultBikeConfig` entry rewritten to match what actually shipped,
+  including the corrected "nothing is persisted" wording — Phase 12b
+  added a live score and a summary card, but both are in-memory only,
+  so the *scope* limit holds while the old "no data is logged, gone
+  once the round ends" phrasing no longer described the behaviour.
+- [ ] `/impeccable audit` + `critique`/`polish` for the Assault-Bike
+  screen — **not run yet**, folded into the Phase 13 close below along
+  with Phase 10/11's own deferred audits.
+
+## Phase 13 — Templates Phase Close
+
+*Was Phase 12 until 2026-08-26; renumbered when the bike protocol rework
+landed in front of it.*
 
 - [ ] **Phase close: `/impeccable critique` + `/impeccable polish`** —
   `not started` — Templates Picker, Round Builder, and Assault-Bike
   Session judged together for visual consistency with each other and
-  with the rest of the app.
+  with the rest of the app. The Assault-Bike screen has grown
+  materially since it was last looked at (drill grids, timer bar, score
+  readout, summary card, drill picker), so it carries the most unjudged
+  surface area of the three.
 
 ---
 
