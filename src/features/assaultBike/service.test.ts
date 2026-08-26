@@ -1,4 +1,4 @@
-import { pause, resume, startBikeSession, tick } from "./service";
+import { pause, resume, startBikeSession, tick, withoutDrill } from "./service";
 import type { BikeConfig, BikeEvent, BikeState } from "./types";
 
 /** Held as a narrow literal (not read back off `BikeConfig["rest"]`) so
@@ -248,5 +248,58 @@ describe("a large jump in `now` (e.g. resuming after the app was suspended)", ()
     expect(after.phase).toBe("work");
     expect(after.round).toBe(2);
     expect(events.filter((e) => e.type === "phase-changed" && e.phase === "work")).toHaveLength(1);
+  });
+});
+
+/**
+ * A rider can turn the drill off for a session on any protocol that has
+ * one (Phase 12e). Collapsing to the plain cycle -- rather than running
+ * the drill cycle with an empty Drill phase -- means the phase badge
+ * reads one continuous REST instead of instructing "PHONE UP" for a
+ * phone they were told they don't need.
+ */
+describe("withoutDrill", () => {
+  test("collapses settle/drill/reset into a single rest of exactly the same total", () => {
+    const collapsed = withoutDrill(config);
+
+    expect(collapsed.rest.kind).toBe("plain");
+    if (collapsed.rest.kind !== "plain") throw new Error("unreachable");
+    // The protocol's work:rest ratio is the entire point of the protocol,
+    // so turning the drill off must not shorten (or lengthen) the rest.
+    expect(collapsed.rest.restSec).toBe(drillRest.settleSec + drillRest.drillSec + drillRest.resetSec);
+  });
+
+  test("leaves work duration and round count untouched", () => {
+    const collapsed = withoutDrill(config);
+    expect(collapsed.workSec).toBe(config.workSec);
+    expect(collapsed.roundsTarget).toBe(config.roundsTarget);
+  });
+
+  test("is a no-op on a protocol that already has no drill", () => {
+    expect(withoutDrill(plainConfig)).toEqual(plainConfig);
+  });
+
+  test("the collapsed config runs the two-phase cycle, never entering settle/drill/reset", () => {
+    const now = 1_000_000;
+    const collapsed = withoutDrill(config);
+    const cycleMs = (collapsed.workSec + drillRest.settleSec + drillRest.drillSec + drillRest.resetSec) * 1000;
+
+    const { events } = advanceTicks(startBikeSession(collapsed, now), collapsed, now, now + cycleMs);
+
+    expect(phaseNames(events)).toEqual(["rest", "work"]);
+  });
+
+  test("a full session takes exactly as long with the drill off as with it on", () => {
+    const now = 1_000_000;
+    const withDrill = (config.workSec + drillRest.settleSec + drillRest.drillSec + drillRest.resetSec) * 1000;
+    const collapsed = withoutDrill(config);
+
+    let state = startBikeSession(collapsed, now);
+    ({ state } = advanceTicks(state, collapsed, now, now + withDrill));
+
+    // One whole round has elapsed and the next has begun -- same clock as
+    // the drill version, so a rider's workout length doesn't change.
+    expect(state.phase).toBe("work");
+    expect(state.round).toBe(2);
   });
 });

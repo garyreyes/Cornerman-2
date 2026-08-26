@@ -1422,3 +1422,12 @@ made during feature work.
   which is why both survived every phase gate until the app was used for
   real. When touching audio, reason about what accumulates over a *full*
   session, not what happens on the first cue.
+- **"This protocol has no drill" and "this session has no drill" are two
+  different facts, encoded two different ways.** The first is a property
+  of a protocol, fixed in its template (`RestPlan.kind === "plain"`,
+  e.g. Lactic Capacity's 10s rest). The second is a per-session opt-out
+  on a protocol that has one (`DrillChoice === "none"`), handled by
+  collapsing that session's `BikeConfig` to the same plain shape via
+  `withoutDrill()` before it reaches the engine. Once collapsed, the
+  engine genuinely can't tell the two apart -- which is the point: the
+  state machine only needs one "no drill" cycle, not two.

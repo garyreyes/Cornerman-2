@@ -34,6 +34,24 @@ function phaseDurationMs(config: BikeConfig, phase: BikePhase): number {
   }
 }
 
+/**
+ * Collapses a drill-rest config to plain rest of exactly the same total
+ * duration (Phase 12e) -- the engine side of "turn the drill off for this
+ * session". Collapsing the *shape*, not just skipping the drill phase at
+ * runtime, is what lets the phase badge read one continuous REST instead
+ * of instructing "PHONE UP" for a phone the rider was told they don't
+ * need this session. A no-op on a protocol that already has no drill
+ * (Lactic Capacity), so callers don't need to branch on `rest.kind`
+ * before calling this.
+ */
+export function withoutDrill(config: BikeConfig): BikeConfig {
+  if (config.rest.kind === "plain") {
+    return config;
+  }
+  const { settleSec, drillSec, resetSec } = config.rest;
+  return { ...config, rest: { kind: "plain", restSec: settleSec + drillSec + resetSec } };
+}
+
 export function startBikeSession(config: BikeConfig, now: number): BikeState {
   return {
     phase: "work",

@@ -1,3 +1,5 @@
+import type { DrillMode } from "../workoutTemplates/types";
+
 /**
  * Phase 11 (docs/user-flows.md Flow 7). Deliberately NOT built on top of
  * timer/types.ts -- the phase set and transition rules are genuinely
@@ -57,3 +59,19 @@ export interface BikeState {
 }
 
 export type BikeEvent = { type: "phase-changed"; phase: BikePhase; round: number } | { type: "session-finished" };
+
+/**
+ * What a rider picks for *this* session's Drill phase (Phase 12e):
+ * one of the real drills, or "none" to skip it. Distinct from a protocol
+ * that structurally has no drill at all (RestPlan's `"plain"` kind, e.g.
+ * Lactic Capacity's 10s rest) -- that's a property of the protocol, fixed
+ * in the template; this is an ephemeral per-session choice on a protocol
+ * that does have one. "none" is handled by collapsing the session's own
+ * BikeConfig via `withoutDrill` before it ever reaches the engine (see
+ * service.ts), not by threading a null case through the state machine --
+ * once collapsed, the engine can't tell the difference from a protocol
+ * that was never drilled, and the phase badge correctly reads one
+ * continuous REST instead of instructing "PHONE UP" for a phone the rider
+ * was told they don't need this session.
+ */
+export type DrillChoice = DrillMode | "none";
