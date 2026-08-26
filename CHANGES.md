@@ -782,3 +782,22 @@ Dated log of shipped changes, appended to as features complete.
   to generate that need. Test-first (correctness-adjacent, extends
   already-tested combo generation, per `ROADMAP.md`'s own note for this
   sub-phase); 11 new tests, 150/150 total, lint/typecheck clean.
+- 2026-08-26: Sub-phase 10b -- Templates Picker screen (`src/app/templates/`),
+  reached directly from Main Timer (new `TemplatesButton` next to the
+  Settings gear), per docs/user-flows.md Flow 6. Lists the Phase 10a
+  built-in templates with name/BUILT-IN tag/summary and an Edit icon;
+  tap-to-start and Edit are deliberately stubbed to an info banner --
+  Round Builder (10c) and wiring the timer engine to a roundPlan (10d)
+  don't exist yet, so pretending either action does something real would
+  be worse than an honest "coming soon", same precedent the Settings gear
+  itself used in Phase 6. Judgment/presentation, no new tests; 150/150
+  tests still pass, lint/typecheck clean. Visually confirmed on the
+  Android emulator.
+- 2026-08-26: 9a closed out -- EAS Android build pipeline fully verified.
+  Second cloud build succeeded after the lockfile-drift fix (PR #22); the
+  built APK was downloaded and sideloaded onto the Android emulator
+  (after uninstalling a differently-signed local dev-client build first --
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE`), confirmed to install and launch
+  correctly, Onboarding rendering in the real dark/orange theme on a
+  genuinely fresh install. iOS is explicitly deferred (Apple Developer
+  Program cost), confirmed with the user -- Android-only for now.

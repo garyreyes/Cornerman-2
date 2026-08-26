@@ -323,21 +323,26 @@ from the real, shipped result)*
 
 ## Phase 9 — Platform Builds & Ship Readiness
 
-- [ ] **9a. EAS build config, both platforms** — `in progress` — `eas.json`
+- [x] **9a. EAS build config, Android** — `done`, 2026-08-26 — `eas.json`
   written (development/preview/production profiles; `developmentClient:
   true` + `distribution: "internal"` + `android.buildType: "apk"` on
   development/preview for direct-install dev-client testing;
   `appVersionSource: "remote"` so EAS owns version/build-number bumping
   rather than hand-maintained native files). `com.gary.cornerman`
   continuity already confirmed (`PROJECT_FACTS.md`, predates this
-  sub-phase) and unchanged in `app.json`. **What's left, all requiring
-  the user's own action, not something buildable from here:** `eas
-  login` + `eas build:configure` to actually link an EAS project (writes
-  a `projectId` into `app.json` — needs the user's real Expo account,
-  can't be done on their behalf), then a real build +
-  real-device/simulator verification on iOS and Android. iOS
-  specifically also needs an Apple Developer account, which doesn't
-  exist yet (`PROJECT_FACTS.md`).
+  sub-phase) and unchanged in `app.json`. EAS project linked (`eas init
+  --account pontoy`, writes `projectId`/`owner` into `app.json`). First
+  cloud build hit the recurring lockfile-drift bug class (fixed, PR
+  #22); second build succeeded
+  (`c65cac86-8ea0-4c48-bc5a-65e6e3e831ec`). **Real-device verification
+  done**: downloaded the built APK and sideloaded it onto the Android
+  emulator (had to uninstall a stale differently-signed dev-client build
+  first — `INSTALL_FAILED_UPDATE_INCOMPATIBLE`), confirmed it installs
+  and actually launches, Onboarding rendering correctly in the
+  dark/orange theme on a genuinely fresh install. **iOS is explicitly
+  deferred** — confirmed with the user: Android-only for now due to the
+  $99/year Apple Developer Program cost, revisit once there's budget or
+  real iOS testers lined up (see `PROJECT_FACTS.md`).
 - [ ] **Phase close: full-app `/impeccable polish`** — `not started` —
   whole-app pass, not per-section, before considering this
   production-ready.
@@ -364,8 +369,22 @@ visual-world decisions here (see risk check below).
   Phase 11a, which is where `AssaultBikeConfig` gets built — see
   `PROJECT_FACTS.md`. Test-first per this item's own note; 11 new tests,
   150/150 total, all gates green.
-- [ ] **10b. Templates Picker screen** — `not started` — built-ins +
-  custom, start-directly-on-tap, edit as a separate action.
+- [x] **10b. Templates Picker screen** — `done`, 2026-08-26 —
+  `src/app/templates/` (new top-level nested stack, reached directly
+  from Main Timer per Flow 6, not nested under Settings). New
+  `TemplatesButton` (☰) sits next to the Settings gear in Main Timer's
+  top row. Lists all 10a templates with a name/BUILT-IN tag/summary
+  (`summarizeBoxingConfig`) and an Edit icon per row; "+ New Template".
+  **Tap-to-start and Edit are deliberately stubbed** (an `InfoBanner`
+  "coming soon" message) — same no-op-until-wired precedent
+  `SettingsGear` itself used in Phase 6 before Phase 8 built real
+  Settings, confirmed with the user rather than shipping a primary
+  action that silently does nothing. Round Builder (10c) and wiring the
+  timer engine to a `roundPlan` (10d) are what actually make those
+  real. Judgment/presentation, no new tests (matches Presets List's own
+  precedent); 150/150 tests still pass. Visually confirmed on the
+  Android emulator: the screen renders all three built-ins with correct
+  summaries and navigates correctly from Main Timer.
 - [ ] **10c. Round Builder / Template Editor screen** — `not started` —
   inline expandable round cards (add/reorder/edit), not a per-round
   sub-screen.

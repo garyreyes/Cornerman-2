@@ -46,6 +46,7 @@ import { CountdownRing } from "../features/session/components/CountdownRing";
 import { PhaseBadge } from "../features/session/components/PhaseBadge";
 import { RoundCounter } from "../features/session/components/RoundCounter";
 import { SettingsGear } from "../features/session/components/SettingsGear";
+import { TemplatesButton } from "../features/session/components/TemplatesButton";
 import { useSession } from "../features/session/useSession";
 import { getSettings } from "../features/settings/service";
 import { useTheme } from "../shared/theme/ThemeContext";
@@ -88,7 +89,10 @@ function MainTimerScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.topRow}>
         <RoundCounter round={round} totalRounds={settings.rounds} />
-        <SettingsGear onPress={() => router.push("/settings")} />
+        <View style={styles.iconGroup}>
+          <TemplatesButton onPress={() => router.push("/templates")} />
+          <SettingsGear onPress={() => router.push("/settings")} />
+        </View>
       </View>
 
       <View style={styles.center}>
@@ -124,6 +128,11 @@ function createStyles(colors: ColorTokens) {
       justifyContent: "space-between",
       paddingHorizontal: 20,
       paddingTop: 8,
+    },
+    iconGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
     },
     center: {
       flex: 1,
