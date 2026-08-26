@@ -1,6 +1,6 @@
 import * as Speech from "expo-speech";
 import { AudioContext } from "react-native-audio-api";
-import type { AudioBuffer } from "react-native-audio-api";
+import type { AudioBuffer, AudioBufferSourceNode } from "react-native-audio-api";
 
 import { DEFAULT_VOICE, type SpeechEngine, type TtsVoice } from "./types";
 
@@ -174,6 +174,56 @@ export function createSpeechEngine(voice: TtsVoice = DEFAULT_VOICE): SpeechEngin
 
   let currentRate = 1.0;
 
+  /**
+   * Every source still connected to the output bus. Tracked for two
+   * reasons, both real bugs found on a device (2026-08-26):
+   *
+   * 1. A source used to be created, connected and started, then never
+   *    disconnected. Finished nodes stayed wired into `volumeGain`
+   *    forever, so the graph grew with every word spoken -- roughly 110
+   *    of them over a 12-round Color Call session -- and audio latency
+   *    climbed with it. That was the "the bell gets delayed on later
+   *    rounds" report.
+   * 2. Nothing could silence playback already in flight, so overlapping
+   *    utterances stacked instead of replacing each other -- the "echo".
+   */
+  const activeSources = new Set<AudioBufferSourceNode>();
+
+  /**
+   * Bumped by every stop()/playWord/playCombo. `playSequence` decodes
+   * asynchronously between words, so without this a superseded combo
+   * would keep scheduling its remaining words onto the clock after a
+   * newer one had already started -- stopping the *current* sources
+   * alone wouldn't catch them.
+   */
+  let playGeneration = 0;
+
+  function releaseSource(source: AudioBufferSourceNode): void {
+    activeSources.delete(source);
+    try {
+      source.disconnect();
+    } catch {
+      // Already torn down (e.g. the context closed under it) -- the only
+      // goal here is that it stops referencing the bus.
+    }
+  }
+
+  function stop(): void {
+    playGeneration += 1;
+    for (const source of [...activeSources]) {
+      try {
+        source.stop();
+      } catch {
+        // Already ended; releasing it below is all that's left to do.
+      }
+      releaseSource(source);
+    }
+    // The TTS fallback plays through the OS, not this bus, so it needs
+    // its own stop -- otherwise an unrecognized word keeps talking over
+    // whatever replaced it.
+    Speech.stop();
+  }
+
   function setVolume(appVolume: number): void {
     volumeGain.gain.value = gainForVolume(appVolume);
   }
@@ -188,8 +238,13 @@ export function createSpeechEngine(voice: TtsVoice = DEFAULT_VOICE): SpeechEngin
   // context's own clock -- see playSequence. Returns the clip's real
   // playback duration (buffer.duration adjusted for the active rate) so
   // the caller can compute the next clip's start time.
-  async function scheduleBuffer(key: string, when: number): Promise<number> {
+  async function scheduleBuffer(key: string, when: number, generation: number): Promise<number> {
     const buffer = await buffers[key];
+    // Superseded while this clip was decoding -- scheduling it now would
+    // play a word from an utterance the caller has already replaced.
+    if (generation !== playGeneration) {
+      return 0;
+    }
     // pitchCorrection: true -- react-native-audio-api's native WSOLA
     // time-stretch, the whole point of this sub-phase (docs/PRD.md's
     // "real unsolved technical requirement").
@@ -197,12 +252,15 @@ export function createSpeechEngine(voice: TtsVoice = DEFAULT_VOICE): SpeechEngin
     source.buffer = buffer;
     source.playbackRate.value = currentRate;
     source.connect(volumeGain);
+    // Self-releasing, so a finished word stops weighing on the graph.
+    source.onEnded = () => releaseSource(source);
+    activeSources.add(source);
     source.start(when);
     return buffer.duration / currentRate;
   }
 
-  async function play(key: string): Promise<void> {
-    await scheduleBuffer(key, context.currentTime);
+  async function play(key: string, generation: number): Promise<void> {
+    await scheduleBuffer(key, context.currentTime, generation);
   }
 
   /**
@@ -215,16 +273,21 @@ export function createSpeechEngine(voice: TtsVoice = DEFAULT_VOICE): SpeechEngin
    * on-device TTS, which has no such clock to schedule against, so that
    * step genuinely awaits its onDone callback before continuing.
    */
-  async function playSequence(texts: string[]): Promise<void> {
+  async function playSequence(texts: string[], generation: number): Promise<void> {
     let when = context.currentTime;
     for (const text of texts) {
+      // A newer playWord/playCombo/stop has taken over -- abandon the rest
+      // of this combo rather than scheduling it behind the new one.
+      if (generation !== playGeneration) {
+        return;
+      }
       const trimmed = text.trim();
       if (trimmed === "") {
         continue;
       }
       const key = normalizeToKey(trimmed);
       if (key in clips) {
-        const durationSec = await scheduleBuffer(key, when);
+        const durationSec = await scheduleBuffer(key, when, generation);
         when += durationSec + WORD_GAP_SEC;
       } else {
         await new Promise<void>((resolve) => {
@@ -245,6 +308,11 @@ export function createSpeechEngine(voice: TtsVoice = DEFAULT_VOICE): SpeechEngin
     if (text.trim() === "") {
       return false;
     }
+    // Replace, don't layer -- see SpeechEngine.stop's note on the echo
+    // this fixes. Done after the blank-text guard so a no-op call can't
+    // cut off speech that is legitimately still playing.
+    stop();
+    const generation = playGeneration;
     const key = normalizeToKey(text);
     if (key in clips) {
       // Fire-and-forget: playWord's own contract is synchronous (existing
@@ -252,7 +320,7 @@ export function createSpeechEngine(voice: TtsVoice = DEFAULT_VOICE): SpeechEngin
       // boolean return -- see service.test.ts), so a decode/playback
       // failure here can't be reported back through this call's return
       // value. Still must not become an unhandled promise rejection.
-      play(key).catch(() => {});
+      play(key, generation).catch(() => {});
       return true;
     }
     // No library can synthesize TTS to a cacheable file (PROJECT_FACTS.md
@@ -266,13 +334,18 @@ export function createSpeechEngine(voice: TtsVoice = DEFAULT_VOICE): SpeechEngin
   }
 
   function playCombo(texts: string[]): void {
+    // Replace, don't layer -- the "Intense" built-in's 1s combo gap is
+    // shorter than a 3-4 punch combo takes to speak, so without this the
+    // next combo started underneath the previous one.
+    stop();
     // Same fire-and-forget contract as playWord -- see its comment above.
-    playSequence(texts).catch(() => {});
+    playSequence(texts, playGeneration).catch(() => {});
   }
 
   function close(): Promise<void> {
+    stop();
     return context.close();
   }
 
-  return { setVolume, setRate, playWord, playCombo, close };
+  return { setVolume, setRate, playWord, playCombo, stop, close };
 }

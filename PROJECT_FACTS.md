@@ -1401,3 +1401,24 @@ made during feature work.
   only through their pure dependencies. If hook-level coverage is ever
   wanted, that dependency needs upgrading first; don't burn time
   assuming the test is written wrong.
+- **Speech replaces, cues layer.** `SpeechEngine.playWord`/`playCombo`
+  stop whatever is currently sounding before starting; `AudioEngine`'s
+  cues deliberately do not. Two spoken things at once is unintelligible
+  (and was the echo users heard when a 1s combo gap met a ~4s combo);
+  two percussive cues at once is a real round-boundary event the
+  WaveShaper limiter already exists to handle. Don't "fix" the
+  inconsistency by making cues stop each other.
+- **Any node connected to an AudioContext must be disconnected when it
+  finishes, and any context built by a screen that unmounts must be
+  closed.** react-native-audio-api does not reclaim finished source nodes
+  on its own -- they stay wired into the bus and the graph keeps growing,
+  which shows up as steadily rising audio latency rather than as an
+  error. Both engines now track their sources and release them via
+  `onEnded`, and both expose `close()`. `useSession`'s engines are the
+  one deliberate exception (Main Timer never unmounts).
+- **Audio bugs of this kind won't show up in a short test run.** The
+  echo needed a combo gap shorter than a combo, and the bell latency
+  needed ~100+ accumulated nodes -- neither appears in a two-round trial,
+  which is why both survived every phase gate until the app was used for
+  real. When touching audio, reason about what accumulates over a *full*
+  session, not what happens on the first cue.

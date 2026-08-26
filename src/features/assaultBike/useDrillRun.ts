@@ -163,6 +163,9 @@ export function useDrillRun(active: boolean, drillMode: DrillMode, difficulty: D
     const syncActive = () => {
       if (!active) {
         clearTimers();
+        // A colour called just as the Drill phase ended would otherwise
+        // keep sounding into Reset, over the phase-change bell.
+        speechEngineRef.current?.stop();
         trialRef.current = null;
         setTrial(null);
         setDeadlineAt(null);

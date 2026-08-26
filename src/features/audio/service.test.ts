@@ -150,3 +150,82 @@ describe("createAudioEngine", () => {
     connectSpy.mockRestore();
   });
 });
+
+/**
+ * Reported from real use on a device (2026-08-26): the bell arrived
+ * progressively later in later rounds. Cue sources were created,
+ * connected and started but never disconnected, so every bell, clap and
+ * tick left another finished node wired into the output bus for the life
+ * of the context, and the graph the engine had to render grew all
+ * session. There was also no way to release the context at all, so the
+ * Assault-Bike screen leaked a whole engine on every visit.
+ */
+describe("createAudioEngine -- graph cleanup (the bell-latency fix)", () => {
+  test("a finished cue disconnects itself instead of staying wired to the bus", async () => {
+    const connectSpy = jest.spyOn(AudioBufferSourceNode.prototype, "connect");
+    const disconnectSpy = jest.spyOn(AudioBufferSourceNode.prototype, "disconnect");
+
+    const engine = createAudioEngine();
+    await engine.playCue("bell");
+
+    const source = connectSpy.mock.instances[0] as unknown as AudioBufferSourceNode;
+    expect(disconnectSpy).not.toHaveBeenCalled();
+
+    // What the native layer does once the cue finishes ringing.
+    source.onEnded?.({} as never);
+
+    expect(disconnectSpy).toHaveBeenCalledTimes(1);
+
+    connectSpy.mockRestore();
+    disconnectSpy.mockRestore();
+  });
+
+  test("every clap of the three-clap clapper releases itself, not just the first", async () => {
+    const connectSpy = jest.spyOn(AudioBufferSourceNode.prototype, "connect");
+    const disconnectSpy = jest.spyOn(AudioBufferSourceNode.prototype, "disconnect");
+
+    const engine = createAudioEngine();
+    await engine.playCue("clapper");
+
+    expect(connectSpy).toHaveBeenCalledTimes(3);
+    for (const instance of connectSpy.mock.instances) {
+      (instance as unknown as AudioBufferSourceNode).onEnded?.({} as never);
+    }
+
+    expect(disconnectSpy).toHaveBeenCalledTimes(3);
+
+    connectSpy.mockRestore();
+    disconnectSpy.mockRestore();
+  });
+
+  test("overlapping cues still layer -- a bell over a ringing clapper must not cut it off", async () => {
+    const stopSpy = jest.spyOn(AudioBufferSourceNode.prototype, "stop");
+
+    const engine = createAudioEngine();
+    await engine.playCue("clapper");
+    await engine.playCue("bell");
+
+    // Unlike speech, percussive cues deliberately co-exist; the limiter
+    // exists precisely so summed cues don't clip.
+    expect(stopSpy).not.toHaveBeenCalled();
+
+    stopSpy.mockRestore();
+  });
+
+  test("close() stops anything still sounding and releases the context", async () => {
+    const stopSpy = jest.spyOn(AudioBufferSourceNode.prototype, "stop");
+
+    const engine = createAudioEngine();
+    await engine.playCue("bell");
+    await engine.close();
+
+    expect(stopSpy).toHaveBeenCalledTimes(1);
+
+    stopSpy.mockRestore();
+  });
+
+  test("close() is safe when nothing ever played", async () => {
+    const engine = createAudioEngine();
+    await expect(engine.close()).resolves.toBeUndefined();
+  });
+});

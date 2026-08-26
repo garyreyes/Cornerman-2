@@ -970,3 +970,37 @@ Dated log of shipped changes, appended to as features complete.
     the rule "an untouched trial can never score" is now a named function
     with its own tests rather than a literal buried in an effect
     callback. Behaviour unchanged; the guarantee is now checkable.
+- 2026-08-26: Audio fixes for two bugs reported from real use -- voices
+  sometimes echoing, and the bell arriving late in later rounds. They
+  shared a root cause: **nothing ever stopped or disconnected an audio
+  source node.**
+  - **Echo.** Combos were scheduled on the AudioContext clock with no
+    regard for whether the previous one had finished. Settings allows a
+    combo gap down to 1s and the "Intense" built-in uses exactly that,
+    while a 3-4 punch combo takes ~4s to speak -- so the next combo
+    started underneath the previous one. `SpeechEngine` now replaces
+    rather than layers: `playWord`/`playCombo` stop what's sounding
+    first, and a generation counter abandons an in-flight combo's
+    remaining words instead of scheduling them behind the new one (they
+    decode asynchronously between words, so stopping current sources
+    alone wouldn't catch them). `stop()` is now part of the interface;
+    the Color Call drill calls it when a Drill phase ends so a colour
+    called at the buzzer doesn't talk over the phase-change bell.
+  - **Bell latency.** Source nodes were created, connected and started,
+    then never disconnected -- so every bell, clap, tick and spoken word
+    left another finished node wired into the output bus for the life of
+    the context. Roughly 130 of them accumulate over a 12-round Color
+    Call session, and the graph the engine re-renders grew with all of
+    them. Sources now self-release via `onEnded`.
+  - **A leaked engine per visit.** `AudioEngine` had no `close()` at all,
+    and `useBikeSession` never released the one it built -- so every trip
+    to the Assault-Bike screen leaked a whole native AudioContext plus its
+    decoded cue buffers, for the rest of the process. `close()` added and
+    called on unmount, mirroring `SpeechEngine.close`.
+  - Cues deliberately still layer with each other: a bell landing over a
+    still-ringing clapper is real, and the limiter exists for it. Only
+    speech replaces.
+  - 11 new tests covering all of it (237/237 total), lint/typecheck clean.
+    Smoke-tested on the emulator -- audio focus granted and released
+    cleanly, no AudioAPI errors. **The audible result is not verified**;
+    that needs a real ear on a real device.

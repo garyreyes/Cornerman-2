@@ -44,6 +44,20 @@ export interface SpeechEngine {
    */
   playCombo(texts: string[]): void;
   /**
+   * Silences anything currently sounding or still scheduled, and
+   * supersedes any in-flight playCombo so its remaining words are never
+   * scheduled at all.
+   *
+   * playWord/playCombo call this themselves before starting, which is the
+   * fix for a real bug: combos were scheduled on the AudioContext clock
+   * with no regard for whether the previous combo had finished, so a combo
+   * gap shorter than the combo itself (Settings allows down to 1s, and the
+   * "Intense" built-in uses exactly that) left two combos sounding at once
+   * -- heard as an echo. Also worth calling directly when a screen stops
+   * wanting speech at all, e.g. a drill phase ending mid-word.
+   */
+  stop(): void;
+  /**
    * Releases the underlying native AudioContext. useSession.ts's own engine
    * never calls this (Main Timer is the app's one long-lived screen, so it
    * was never needed there), but any engine created for a shorter-lived
