@@ -2,6 +2,7 @@ import { generateCombo } from "../comboEngine/service";
 import type { Combo } from "../comboEngine/types";
 import { nextDefenseCueFireTime, pickDefenseCue } from "../defenseCues/service";
 import { nextGapFireTime } from "../../lib/gapTiming";
+import { estimateComboSpeechMs } from "../../lib/speechTiming";
 import type { Preset, Punch, Settings } from "../settings/types";
 import type { TimerState } from "../timer/types";
 import { resolveRoundCombo } from "../workoutTemplates/service";
@@ -140,11 +141,18 @@ export function sessionTick(
       random,
     );
     actions.push({ type: "speak-combo", combo });
+    // The gap is throwing time, so it starts when the call-out *ends*, not
+    // when it begins. Arming from `now` made every configured gap shorter
+    // than it read -- a 4-punch combo takes ~3.3s to speak, so a 3-5s gap
+    // left barely a second to throw it, and the old 1-2s "Intense" gap was
+    // shorter than the combo itself. See lib/speechTiming.ts for why this
+    // is an estimate rather than the engine's real completion time.
+    const speechEndsAt = now + estimateComboSpeechMs(combo.length, settings.speechRate);
     s = {
       ...s,
       currentCombo: combo,
       comboCount: s.comboCount + 1,
-      nextComboAt: nextGapFireTime(now, gapMinSec * 1000, gapMaxSec * 1000, random),
+      nextComboAt: nextGapFireTime(speechEndsAt, gapMinSec * 1000, gapMaxSec * 1000, random),
     };
   }
 

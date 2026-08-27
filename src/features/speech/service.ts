@@ -2,6 +2,7 @@ import * as Speech from "expo-speech";
 import { AudioContext } from "react-native-audio-api";
 import type { AudioBuffer, AudioBufferSourceNode } from "react-native-audio-api";
 
+import { rateForSpeechRate } from "./rate";
 import { DEFAULT_VOICE, type SpeechEngine, type TtsVoice } from "./types";
 
 /**
@@ -137,18 +138,7 @@ function gainForVolume(appVolume: number): number {
  */
 const WORD_GAP_SEC = 0.12;
 
-/**
- * Clamped to [0.25, 4.0] -- react-native-audio-api's native WSOLA
- * time-stretch hard-caps playbackRate at a fixed C++ constant
- * (WsolaTimeStretcher::MAX_PLAYBACK_RATE = 4), confirmed 2026-08-24
- * reading its source. Revised down from an originally-discussed 5x
- * rather than building extra complexity (e.g. a second pre-compressed
- * buffer per clip) to work around a fixed native ceiling -- see
- * PROJECT_FACTS.md.
- */
-export function rateForSpeechRate(speechRate: number): number {
-  return Math.min(4.0, Math.max(0.25, speechRate));
-}
+export { rateForSpeechRate } from "./rate";
 
 /**
  * `voice` is fixed for this engine's lifetime -- it selects which of

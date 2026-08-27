@@ -1,6 +1,7 @@
 import { createDefaultSettings, createDefaultPunches, createPreset } from "../settings/service";
 import type { Punch, Settings } from "../settings/types";
 import { clearAll, setItem } from "../../lib/storage";
+import { estimateComboSpeechMs } from "../../lib/speechTiming";
 import {
   createWorkoutTemplate,
   deleteWorkoutTemplate,
@@ -31,21 +32,125 @@ function uniformConfig(): BoxingConfig {
 }
 
 describe("built-in workout templates", () => {
-  test("getWorkoutTemplates seeds exactly the 3 boxing built-ins plus the 4 bike protocols on first read", () => {
+  test("getWorkoutTemplates seeds the 6 boxing built-ins plus the 4 bike protocols on first read", () => {
     const templates = getWorkoutTemplates();
-    expect(templates).toHaveLength(7);
+    expect(templates).toHaveLength(10);
     expect(templates.every((t) => t.isBuiltIn)).toBe(true);
     expect(templates.map((t) => t.name)).toEqual([
-      "Relax / Zone-2",
-      "Moderate",
-      "Intense",
+      "Easy · Punches",
+      "Easy · Punches + Kicks",
+      "Moderate · Punches",
+      "Moderate · Punches + Kicks",
+      "Intense · Punches",
+      "Intense · Punches + Kicks",
       "Bike · Aerobic Power",
       "Bike · Lactic Capacity",
       "Bike · Alactic Power",
       "Bike · Combat Effort",
     ]);
-    expect(templates.slice(0, 3).every((t) => t.workoutType === "boxing")).toBe(true);
-    expect(templates.slice(3).every((t) => t.workoutType === "assault-bike-cognitive")).toBe(true);
+    expect(templates.slice(0, 6).every((t) => t.workoutType === "boxing")).toBe(true);
+    expect(templates.slice(6).every((t) => t.workoutType === "assault-bike-cognitive")).toBe(true);
+  });
+
+  describe("the boxing built-ins carry bagwork.md's actual programming", () => {
+    function boxing(): Extract<WorkoutTemplate, { workoutType: "boxing" }>[] {
+      return getWorkoutTemplates().filter(
+        (t): t is Extract<WorkoutTemplate, { workoutType: "boxing" }> => t.workoutType === "boxing",
+      );
+    }
+
+    test("round count, 2-minute rounds and 60s rest match the template table", () => {
+      expect(
+        boxing().map((t) => [t.name, t.config.roundPlan.length, t.config.baseWorkDurationSec, t.config.baseRestDurationSec]),
+      ).toEqual([
+        ["Easy · Punches", 6, 120, 60],
+        ["Easy · Punches + Kicks", 6, 120, 60],
+        ["Moderate · Punches", 8, 120, 60],
+        ["Moderate · Punches + Kicks", 8, 120, 60],
+        ["Intense · Punches", 10, 120, 60],
+        ["Intense · Punches + Kicks", 10, 120, 60],
+      ]);
+    });
+
+    test("the gap widens as the template gets easier", () => {
+      expect(boxing().map((t) => [t.config.baseComboGapMinSec, t.config.baseComboGapMaxSec])).toEqual([
+        [8, 12],
+        [8, 12],
+        [6, 9],
+        [6, 9],
+        [4, 6],
+        [4, 6],
+      ]);
+    });
+
+    test("every template's gap leaves time to actually throw its own longest combo", () => {
+      // The reported bug -- "I couldn't keep up on the sheer quantity of
+      // combos even in easy". The gap is throwing time now (the call-out no
+      // longer eats it, see lib/speechTiming.ts), so what has to hold is
+      // that it outlasts the combo itself at a brisk ~0.5s per strike.
+      const THROW_MS_PER_STRIKE = 500;
+      for (const template of boxing()) {
+        const longest = Math.max(
+          ...template.config.roundPlan.flatMap((r) =>
+            r.comboSource.type === "combo-pool" ? r.comboSource.combos.map((c) => c.length) : [0],
+          ),
+        );
+        expect([template.name, template.config.baseComboGapMinSec * 1000 >= longest * THROW_MS_PER_STRIKE]).toEqual([
+          template.name,
+          true,
+        ]);
+      }
+    });
+
+    test("a call-out can no longer start before the previous one has finished being spoken", () => {
+      for (const template of boxing()) {
+        expect(template.config.baseComboGapMinSec).toBeGreaterThan(0);
+      }
+      // The old "Intense" 1-2s gap was measured from when a combo *started*,
+      // so a 5-punch call-out (this long) ran straight into the next one.
+      expect(estimateComboSpeechMs(5, 1)).toBeGreaterThan(2_000);
+    });
+
+    test("every round names its focus and draws from real combos, never an unstructured random draw", () => {
+      for (const template of boxing()) {
+        for (const round of template.config.roundPlan) {
+          expect(round.label).toBeTruthy();
+          expect(round.comboSource.type).toBe("combo-pool");
+        }
+      }
+    });
+
+    test("a punches-only template never calls a kick; its kicks counterpart does", () => {
+      const kickNums = createDefaultPunches().filter((p) => p.name.includes("Kick")).map((p) => p.num);
+      const numsIn = (t: Extract<WorkoutTemplate, { workoutType: "boxing" }>) =>
+        t.config.roundPlan.flatMap((r) => (r.comboSource.type === "combo-pool" ? r.comboSource.combos.flat() : []));
+
+      for (const [punchesOnly, withKicks] of [
+        [boxing()[0]!, boxing()[1]!],
+        [boxing()[2]!, boxing()[3]!],
+        [boxing()[4]!, boxing()[5]!],
+      ]) {
+        expect(numsIn(punchesOnly).some((n) => kickNums.includes(n))).toBe(false);
+        expect(numsIn(withKicks).some((n) => kickNums.includes(n))).toBe(true);
+      }
+    });
+
+    test("every number any built-in calls resolves to a real seeded punch, never a \"Punch 42\" fallback", () => {
+      const seeded = createDefaultPunches().map((p) => p.num);
+      for (const template of boxing()) {
+        for (const round of template.config.roundPlan) {
+          if (round.comboSource.type !== "combo-pool") continue;
+          for (const num of round.comboSource.combos.flat()) {
+            expect([template.name, round.label, num, seeded.includes(num)]).toEqual([
+              template.name,
+              round.label,
+              num,
+              true,
+            ]);
+          }
+        }
+      }
+    });
   });
 
   test("each bike protocol's work/rest/round figures match the reference protocol table", () => {
@@ -148,6 +253,63 @@ describe("migrateStoredTemplates -- Phase 11 -> 12 stored-shape change", () => {
   });
 });
 
+/**
+ * The three original boxing built-ins (Relax / Zone-2, Moderate, Intense)
+ * called unstructured random punches on every round -- the reason a session
+ * felt nothing like the programming it was named after. They are replaced
+ * by the six bagwork templates, which is a stored-data change for anyone
+ * who has already run the app.
+ */
+describe("migrateStoredTemplates -- replacing the original random-only boxing built-ins", () => {
+  /** Exactly the shape the old built-ins were written in: no round labels,
+   * every round a bare random draw. */
+  const legacyBoxingBuiltIn: WorkoutTemplate = {
+    id: "legacy-moderate",
+    name: "Moderate",
+    isBuiltIn: true,
+    workoutType: "boxing",
+    config: {
+      baseWorkDurationSec: 180,
+      baseRestDurationSec: 60,
+      warmupDurationSec: 60,
+      baseComboGapMinSec: 2,
+      baseComboGapMaxSec: 3.5,
+      roundPlan: [{ comboSource: { type: "random" } }, { comboSource: { type: "random" } }],
+    },
+  };
+
+  const customBoxing: WorkoutTemplate = {
+    id: "custom-1",
+    name: "My Rounds",
+    isBuiltIn: false,
+    workoutType: "boxing",
+    config: uniformConfig(),
+  };
+
+  test("drops the old random-only built-ins and seeds the six bagwork templates", () => {
+    const result = migrateStoredTemplates([legacyBoxingBuiltIn]);
+    expect(result.some((t) => t.id === "legacy-moderate")).toBe(false);
+    expect(result.filter((t) => t.workoutType === "boxing")).toHaveLength(6);
+  });
+
+  test("a custom template the user built survives untouched, even though it is also random-only", () => {
+    const result = migrateStoredTemplates([customBoxing, legacyBoxingBuiltIn]);
+    expect(result.find((t) => t.id === "custom-1")).toEqual(customBoxing);
+  });
+
+  test("runs once -- a second read neither duplicates the six nor regenerates their ids", () => {
+    setItem("workoutTemplates", [legacyBoxingBuiltIn]);
+    const first = getWorkoutTemplates();
+    expect(getWorkoutTemplates()).toEqual(first);
+    expect(first.filter((t) => t.workoutType === "boxing")).toHaveLength(6);
+  });
+
+  test("a built-in the user has since deleted stays deleted", () => {
+    const remaining = getWorkoutTemplates().filter((t) => t.name !== "Easy · Punches");
+    expect(migrateStoredTemplates(remaining).some((t) => t.name === "Easy · Punches")).toBe(false);
+  });
+});
+
 describe("workout template CRUD", () => {
   test("createWorkoutTemplate adds a non-built-in template alongside the seeded built-ins", () => {
     const before = getWorkoutTemplates();
@@ -245,6 +407,58 @@ describe("resolveRoundCombo", () => {
     const source: ComboSource = { type: "random", punchPool: [3] };
     const combo = resolveRoundCombo(source, punches, [], settings, () => 0);
     expect(combo.every((p) => p.num === 3)).toBe(true);
+  });
+
+  // bagwork.md lists several combos per round (Moderate R3 is both `1-2b-3`
+  // and `2-3b-2`), which none of the sources above could express: one fixed
+  // sequence, one punch, one preset, or unstructured random.
+  describe("combo-pool", () => {
+    const source: ComboSource = {
+      type: "combo-pool",
+      combos: [
+        [1, 2],
+        [3, 2, 3],
+      ],
+    };
+
+    test("draws one whole combo from the pool, resolved to live names", () => {
+      expect(resolveRoundCombo(source, punches, [], settings, () => 0)).toEqual([
+        { num: 1, name: "Jab" },
+        { num: 2, name: "Cross" },
+      ]);
+    });
+
+    test("a later draw picks a different combo from the same pool", () => {
+      expect(resolveRoundCombo(source, punches, [], settings, () => 0.99)).toEqual([
+        { num: 3, name: "Lead Hook" },
+        { num: 2, name: "Cross" },
+        { num: 3, name: "Lead Hook" },
+      ]);
+    });
+
+    test("a pool of one is the rep-to-reflex case -- always the same combo", () => {
+      const single: ComboSource = { type: "combo-pool", combos: [[1, 1, 2]] };
+      for (const r of [0, 0.5, 0.99]) {
+        expect(resolveRoundCombo(single, punches, [], settings, () => r)).toEqual([
+          { num: 1, name: "Jab" },
+          { num: 1, name: "Jab" },
+          { num: 2, name: "Cross" },
+        ]);
+      }
+    });
+
+    test("an empty pool degrades to a random combo rather than a silent round", () => {
+      const empty: ComboSource = { type: "combo-pool", combos: [] };
+      expect(resolveRoundCombo(empty, punches, [], settings, () => 0).length).toBeGreaterThan(0);
+    });
+
+    test("a number matching no current punch still degrades gracefully, same as every other source", () => {
+      const stale: ComboSource = { type: "combo-pool", combos: [[1, 999]] };
+      expect(resolveRoundCombo(stale, punches, [], settings, () => 0)).toEqual([
+        { num: 1, name: "Jab" },
+        { num: 999, name: "Punch 999" },
+      ]);
+    });
   });
 });
 

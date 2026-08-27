@@ -1,6 +1,8 @@
-import { clearAll } from "../../lib/storage";
+import { clearAll, setItem } from "../../lib/storage";
 import {
+  createDefaultPunches,
   createDefaultSettings,
+  PUNCH_ONLY_POOL,
   createPreset,
   createPunch,
   deletePreset,
@@ -64,7 +66,7 @@ describe("settings persistence", () => {
     const settings = getSettings();
     expect(settings.comboLengthMin).toBe(2);
     expect(settings.comboLengthMax).toBe(4);
-    expect(settings.randomPunchPool).toBeNull();
+    expect(settings.randomPunchPool).toEqual(PUNCH_ONLY_POOL);
   });
 
   test("announceStyle and defense-cue fields default correctly when entirely absent from saved data", () => {
@@ -137,7 +139,7 @@ describe("settings persistence", () => {
 });
 
 describe("punches", () => {
-  test("seeds the standard orthodox 1-7 punches (lead/rear naming) on first read", () => {
+  test("seeds the orthodox 1-9 punches (lead/rear naming) then the 12 kicks on first read", () => {
     const punches = getPunches();
     expect(punches.map((p) => [p.num, p.name])).toEqual([
       [1, "Jab"],
@@ -147,8 +149,80 @@ describe("punches", () => {
       [5, "Lead Uppercut"],
       [6, "Rear Uppercut"],
       [7, "Body Hook"],
+      [8, "Body Jab"],
+      [9, "Body Cross"],
+      [10, "Lead Low Kick"],
+      [11, "Rear Low Kick"],
+      [12, "Lead Calf Kick"],
+      [13, "Rear Calf Kick"],
+      [14, "Lead Body Kick"],
+      [15, "Rear Body Kick"],
+      [16, "Lead High Kick"],
+      [17, "Rear High Kick"],
+      [18, "Lead Push Kick"],
+      [19, "Rear Push Kick"],
+      [20, "Lead Inside Kick"],
+      [21, "Rear Inside Kick"],
     ]);
   });
+
+  test("a fresh install's random pool is the punches only -- kicks exist but are never drawn until opted in", () => {
+    expect(createDefaultSettings().randomPunchPool).toEqual(PUNCH_ONLY_POOL);
+    expect(PUNCH_ONLY_POOL).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  });
+});
+
+describe("punches -- appending kicks to an install that predates them", () => {
+  /** An install from before kicks existed: the old 1-7 punch list, and the
+   * old `null` pool meaning "draw from every punch I have". */
+  function seedLegacyInstall(): void {
+    setItem("punches", [
+      { id: "a", num: 1, name: "Jab" },
+      { id: "b", num: 2, name: "Cross" },
+      { id: "c", num: 3, name: "Lead Hook" },
+      { id: "d", num: 4, name: "Rear Hook" },
+      { id: "e", num: 5, name: "Lead Uppercut" },
+      { id: "f", num: 6, name: "Rear Uppercut" },
+      { id: "g", num: 7, name: "Body Hook" },
+    ]);
+    saveSettings({ ...createDefaultSettings(), randomPunchPool: null });
+  }
+
+  test("appends the missing body shots and kicks, keeping the existing punches' own ids", () => {
+    seedLegacyInstall();
+    const after = getPunches();
+    expect(after).toHaveLength(21);
+    expect(after.find((p) => p.num === 1)!.id).toBe("a");
+    expect(after.map((p) => p.name)).toContain("Rear Calf Kick");
+  });
+
+  test("pins the pool to what they already had, so Random mode does not suddenly start calling head kicks", () => {
+    seedLegacyInstall();
+    getPunches();
+    expect(getSettings().randomPunchPool).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  test("runs exactly once -- a kick deleted afterwards stays deleted", () => {
+    seedLegacyInstall();
+    const kick = getPunches().find((p) => p.name === "Rear High Kick")!;
+    deletePunch(kick.id);
+    expect(getPunches().some((p) => p.name === "Rear High Kick")).toBe(false);
+  });
+
+  test("leaves a pool the user had already restricted exactly as they set it", () => {
+    seedLegacyInstall();
+    saveSettings({ ...getSettings(), randomPunchPool: [1, 2] });
+    getPunches();
+    expect(getSettings().randomPunchPool).toEqual([1, 2]);
+  });
+
+  test("a punch created later still joins the pool, so only the seeded kicks start out excluded", () => {
+    const created = createPunch("Superman Punch", 30);
+    expect(getSettings().randomPunchPool).toContain(created.num);
+  });
+});
+
+describe("punches -- editing", () => {
 
   test("punch numbers are not required to be unique", () => {
     const first = createPunch("Body Shot", 3);
@@ -213,21 +287,16 @@ describe("punches", () => {
     expect(getPunches()).toEqual(before);
   });
 
-  test("restoreDefaultPunches discards custom punches and resets to the factory 7", () => {
+  test("restoreDefaultPunches discards custom punches and resets to the full factory list", () => {
     createPunch("Superman Punch", 99);
     deletePunch(getPunches()[0]!.id);
 
     const restored = restoreDefaultPunches();
 
-    expect(restored.map((p) => [p.num, p.name])).toEqual([
-      [1, "Jab"],
-      [2, "Cross"],
-      [3, "Lead Hook"],
-      [4, "Rear Hook"],
-      [5, "Lead Uppercut"],
-      [6, "Rear Uppercut"],
-      [7, "Body Hook"],
-    ]);
+    expect(restored.map((p) => [p.num, p.name])).toEqual(
+      createDefaultPunches().map((p) => [p.num, p.name]),
+    );
+    expect(restored.map((p) => p.num)).toEqual([...Array(21).keys()].map((i) => i + 1));
     expect(getPunches()).toEqual(restored);
   });
 
@@ -242,7 +311,11 @@ describe("punches", () => {
   });
 
   test("toggleRandomPoolMembership: excluding one punch from an unrestricted (null) pool materializes everyone else", () => {
-    const nums = getPunches().map((p) => p.num); // [1..7]
+    // `null` is no longer the default pool (kicks ship excluded), but it is
+    // still reachable -- both for an install predating them and via the
+    // collapse-back below -- so this path still has to work.
+    saveSettings({ ...getSettings(), randomPunchPool: null });
+    const nums = getPunches().map((p) => p.num);
 
     toggleRandomPoolMembership(1);
 
@@ -250,6 +323,7 @@ describe("punches", () => {
   });
 
   test("toggleRandomPoolMembership: re-including the last excluded punch collapses back to null", () => {
+    saveSettings({ ...getSettings(), randomPunchPool: null });
     toggleRandomPoolMembership(1); // exclude
     expect(getSettings().randomPunchPool).not.toBeNull();
 

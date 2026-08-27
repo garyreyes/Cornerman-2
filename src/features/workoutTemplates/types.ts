@@ -34,7 +34,17 @@ export type ComboSource =
   | { type: "fixed-punch"; punchNum: number }
   | { type: "fixed-sequence"; sequence: number[] }
   | { type: "preset"; presetId: string }
-  | { type: "random"; punchPool?: number[] };
+  | { type: "random"; punchPool?: number[] }
+  /**
+   * A set of specific combos; one whole combo is drawn per call-out.
+   * Added for the bagwork round plans, whose rounds name several combos
+   * each (Moderate R3 is both `1-2b-3` and `2-3b-2`) -- none of the
+   * sources above could express that: `fixed-sequence` is one combo
+   * forever, `preset` is the same thing behind an id, and `random`
+   * throws the combo structure away entirely. A pool of one is the
+   * rep-to-reflex case bagwork's Easy rounds ask for.
+   */
+  | { type: "combo-pool"; combos: number[][] };
 
 export interface BoxingConfig {
   baseWorkDurationSec: number;
