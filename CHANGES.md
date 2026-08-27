@@ -1004,6 +1004,32 @@ Dated log of shipped changes, appended to as features complete.
     Smoke-tested on the emulator -- audio focus granted and released
     cleanly, no AudioAPI errors. **The audible result is not verified**;
     that needs a real ear on a real device.
+- 2026-08-27: Google Play compliance audit, from a direct ask rather than
+  a phase. Checked the actual generated Android project, not just
+  `app.json` — regenerated it fresh via `expo prebuild` and read the real
+  merged release manifest. Found and fixed one real issue: the release
+  build was shipping three permissions with zero use in this app —
+  `SYSTEM_ALERT_WINDOW` (a "special app access" permission Play requires
+  justification for) and `READ_EXTERNAL_STORAGE`/`WRITE_EXTERNAL_STORAGE`
+  — all three inherited untouched from Expo's own base manifest template,
+  which literally comments "OPTIONAL PERMISSIONS, REMOVE WHATEVER YOU DO
+  NOT NEED." New `app.json` `android.blockedPermissions` strips them via
+  `tools:node="remove"`, verified against the actual merged release
+  manifest (`android/app/build/intermediates/merged_manifests/...`), not
+  just the source file. Everything else checked out already compliant on
+  inspection: `targetSdkVersion` 36 (Play's Aug 2026 requirement is 35+
+  existing / 36 new), AGP 8.12.0 + NDK 27 auto-page-align native libraries
+  to 16KB, production EAS profile defaults to `.aab`, and the notification
+  permission request already explains itself before the OS dialog fires.
+  Drafted and published a real Privacy Policy (Play requires one for every
+  listing, code fix or not) matching the app's own dark/orange design
+  tokens rather than a generic template — one placeholder left blank on
+  purpose (a real contact email), since publishing the one on file wasn't
+  something explicitly asked for. Also surfaced, not fixed: `expo
+  prebuild` itself warned that `userInterfaceStyle: "automatic"` needs
+  `expo-system-ui` to actually take effect at the native level, which
+  isn't installed — a real gap in the Phase 6 native-audit fix, outside
+  this audit's actual scope. See `PROJECT_FACTS.md` for the full trace.
 - 2026-08-27: Onboarding gained an orientation tour — three swipeable
   cards covering workout templates, the assault-bike drills, and your own
   punches, each with a small SVG sketch drawn from the app's own motifs

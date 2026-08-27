@@ -1510,6 +1510,70 @@ made during feature work.
   point of a workout template, was invisible exactly when it was needed.
   Worth remembering as a shape: a field being *editable* is not the same
   as it being *used*, and this one sat half-wired across three phases.
+- **Google Play compliance audit, 2026-08-27 — one real fix shipped, two
+  Play Console actions still needed.** Triggered by a direct ask, not part
+  of a phase. Checked against the actual generated Android project (`expo
+  prebuild`), not just `app.json`.
+  - **Fixed: three unused, unjustified permissions were shipping to
+    production.** `android/app/src/main/AndroidManifest.xml` is
+    regenerated fresh by `expo prebuild` from Expo's own base template
+    (`@expo/config-plugins`'s `getAndroidManifestTemplate`, literally
+    commented `"OPTIONAL PERMISSIONS, REMOVE WHATEVER YOU DO NOT NEED"`),
+    which this project never pruned. `SYSTEM_ALERT_WINDOW` (a "special app
+    access" permission Play Console requires justification for, with zero
+    use here — this app has no overlay UI) and
+    `READ_EXTERNAL_STORAGE`/`WRITE_EXTERNAL_STORAGE` (legacy storage
+    access, subject to Play's storage-permissions policy, also unused —
+    every entity this app stores lives in MMKV, not the filesystem) were
+    all declaring into the release manifest for no reason. Fixed via
+    `app.json`'s `android.blockedPermissions`, which emits
+    `tools:node="remove"` in the manifest — guaranteed removal even if a
+    future dependency's own manifest tries to re-add one, not just an
+    omission that a library could silently reintroduce. **Verified against
+    the actual merged release manifest**, not just the source file:
+    `android/app/build/intermediates/merged_manifests/release/
+    processReleaseManifest/AndroidManifest.xml` shows none of the three
+    present after the fix; the remaining permission list is
+    `FOREGROUND_SERVICE`/`FOREGROUND_SERVICE_MEDIA_PLAYBACK` (real, for
+    background audio), `INTERNET` (Expo's non-optional base permission —
+    needed by the dev-client/Metro connection during development even
+    though the shipped app makes no network calls; removing it would break
+    the dev workflow for no Play-compliance benefit), and `VIBRATE`
+    (harmless, normal-protection-level, doesn't trigger Play's sensitive-
+    permission review — left alone).
+  - **Already compliant, verified rather than assumed:** `targetSdkVersion`
+    resolves to 36 (`./gradlew :app:properties`), clearing Play's Aug 31
+    2026 requirement (existing apps need 35+, new apps/updates need 36) —
+    this is Expo SDK 57's own default, nothing this project set explicitly.
+    AGP is 8.12.0 with NDK 27.1.12297006, which auto-page-aligns native
+    `.so` libraries to 16KB (Play's other 2025/2026 native-library
+    requirement) with no manual config — confirmed via `gradlew
+    buildEnvironment`, not a raw byte-alignment check on a built artifact.
+    `eas.json`'s production profile has no `android.buildType` override, so
+    it defaults to `.aab` (only `development`/`preview` override to `apk`
+    for direct-install testing) — Play requires App Bundle format for a
+    real submission. The notification-permission request already follows
+    Play's own recommended pattern: onboarding's intro card explains why
+    *before* the OS dialog fires, not after.
+  - **Still needed, Play Console side, not fixable from here:** a Data
+    Safety form declaring "no data collected" (true — no accounts, no
+    backend, no analytics/crash-reporting SDK exists in `package.json` at
+    all) and a **Privacy Policy URL, which Play requires for every
+    listing now regardless of data collected.** A real one was drafted and
+    published as an artifact matching the app's own dark/orange design
+    tokens (`src/shared/theme/tokens.ts`) rather than a generic legal
+    template — one placeholder remains: a real contact email, deliberately
+    left blank rather than guessed (the user's own email in this session's
+    context is for identifying them to me, not for publishing on a public
+    page without being asked).
+  - **A pre-existing, unrelated bug surfaced by `expo prebuild`'s own
+    warning, not this audit's actual subject**: `userInterfaceStyle:
+    Install expo-system-ui in your project to enable this feature.`
+    `app.json`'s `userInterfaceStyle: "automatic"` (the Phase 6 native-audit
+    fix, PROJECT_FACTS.md) may not actually be taking effect at the native
+    container level — `expo-system-ui` isn't a listed dependency. Not a
+    Play compliance blocker, but worth its own look; flagged, not fixed,
+    since it's outside what was asked.
 - **"This protocol has no drill" and "this session has no drill" are two
   different facts, encoded two different ways.** The first is a property
   of a protocol, fixed in its template (`RestPlan.kind === "plain"`,
