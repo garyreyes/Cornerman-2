@@ -10,6 +10,7 @@ import SettingsIndex from "../app/settings/index";
 import SettingsPresetEditor from "../app/settings/presets/[id]";
 import SettingsPresetsList from "../app/settings/presets/index";
 import SettingsPunches from "../app/settings/punches";
+import SettingsTour from "../app/settings/tour";
 
 beforeEach(() => {
   clearAll();
@@ -28,6 +29,7 @@ test("the gear icon pushes to a real, back-navigable Settings screen", async () 
       "settings/punches": SettingsPunches,
       "settings/presets/index": SettingsPresetsList,
       "settings/presets/[id]": SettingsPresetEditor,
+      "settings/tour": SettingsTour,
     });
   });
   await waitFor(() => expect(screen.getByText("READY")).toBeTruthy());

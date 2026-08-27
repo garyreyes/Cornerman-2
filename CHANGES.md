@@ -1004,6 +1004,37 @@ Dated log of shipped changes, appended to as features complete.
     Smoke-tested on the emulator -- audio focus granted and released
     cleanly, no AudioAPI errors. **The audible result is not verified**;
     that needs a real ear on a real device.
+- 2026-08-27: Onboarding gained an orientation tour — three swipeable
+  cards covering workout templates, the assault-bike drills, and your own
+  punches, each with a small SVG sketch drawn from the app's own motifs
+  (the round list, the Odd One Out grid, numbered punch chips) rather than
+  screenshots, which go stale the moment a screen changes and would have
+  to be captured twice for the light palette.
+  - **It runs last, after the permission steps.** The existing intro card
+    exists to justify the system dialog it triggers, so putting three
+    feature cards between the two would separate the reason from the ask;
+    ending on the tour also means the last thing seen before landing is
+    what the app does.
+  - **Replayable from Settings → Help → "How Cornerman works"**
+    (`/settings/tour`, under the Settings stack so it inherits the themed
+    header and back arrow). Onboarding runs exactly once ever, so without
+    this everything the tour says would be unreachable after the first
+    thirty seconds of use — which is precisely when it stops being
+    memorable. Skippable from any card in onboarding; no skip on the
+    replay, where the back arrow already leaves.
+  - Deliberately an orientation, not a manual — the standing UX rule is
+    that the app should be usable without one. It covers the three things
+    a user would otherwise have to go hunting for and leaves voice, speed,
+    gap and announce style to be found when wanted.
+  - Two fixes from seeing it on a device: the punch chips laid out from a
+    single left-anchored cursor, leaving short rows hanging off one side
+    of an otherwise centred card (they now wrap into rows that are each
+    centred), and two of the three titles wrapped onto a second line
+    carrying one orphaned word at 28px.
+  - Presentation work, but the Settings→tour route got a test anyway: it
+    is the only path back to the tour, so nothing else in the app would
+    reveal it breaking. Its own file, per the documented `renderRouter`
+    cross-test interference. 277/277 tests, lint/typecheck clean.
 - 2026-08-27: The combo gap became throwing time, and the boxing templates
   got real programming. Three findings from one report -- "I couldn't keep
   up on the sheer quantity of combos even in easy".

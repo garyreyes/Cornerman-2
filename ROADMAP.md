@@ -728,6 +728,15 @@ wrong end. What was Phase 13 (the Templates phase close) is now Phase 14
   note (they existed on `RoundConfig` since Phase 10a but nothing ever
   rendered them mid-session); Round Builder gained a combo-pool editor.
   Judgment/presentation, no new tests.
+- [x] **13e. Onboarding orientation tour** — `done`, 2026-08-27 — three
+  swipeable cards (templates, bike drills, your punches) with small SVG
+  sketches built from the app's own motifs, running after the permission
+  steps and replayable from Settings → Help. Deliberately an orientation
+  rather than a manual, per this project's own UX floor. New
+  `src/features/onboarding/`; `/settings/tour` route. Judgment/
+  presentation, but the Settings→tour path got a test since it is the
+  only route back to the tour. Verified on the emulator end to end,
+  including two layout fixes only visible on a device.
 - [ ] **Real-device confirmation of the new pacing** — the arithmetic is
   tested, but whether an 8-12s Easy gap actually *feels* right on the bag
   needs a real session. Same standing honesty gap as every other

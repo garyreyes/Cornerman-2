@@ -7,10 +7,16 @@
  * Flow (docs/user-flows.md Flow 1): intro explainer -> Android 13+ system
  * notification permission dialog (iOS has no runtime prompt for this) ->
  * battery-optimization tip (only shown if that permission was granted) ->
- * done. A denial doesn't block anything -- proceeds straight to done per
- * Flow 1's proposed default. router.replace (not push) back to "/" so
- * there's no back-stack entry pointing back here once done, matching
- * Flow 1's "never shown again" behavior.
+ * orientation tour -> done. A denial doesn't block anything -- proceeds
+ * straight to the tour per Flow 1's proposed default. router.replace (not
+ * push) back to "/" so there's no back-stack entry pointing back here once
+ * done, matching Flow 1's "never shown again" behavior.
+ *
+ * The tour comes last, after the permission business rather than before
+ * it: the intro card exists to justify the system dialog it triggers, and
+ * putting three feature cards between the two would separate the reason
+ * from the ask. It also means the last thing seen before landing on Main
+ * Timer is what the app does, not a settings detour.
  */
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
@@ -18,11 +24,12 @@ import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { requestNotificationPermission } from "../lib/backgroundAudio";
+import { TourPager } from "../features/onboarding/components/TourPager";
 import { markOnboardingComplete } from "../features/settings/service";
 import { useTheme } from "../shared/theme/ThemeContext";
 import type { ColorTokens, Fonts } from "../shared/theme/tokens";
 
-type Step = "intro" | "batteryTip";
+type Step = "intro" | "batteryTip" | "tour";
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -37,16 +44,20 @@ export default function OnboardingScreen() {
 
   const handleContinue = async () => {
     if (Platform.OS !== "android") {
-      finish();
+      setStep("tour");
       return;
     }
     const granted = await requestNotificationPermission();
-    if (granted) {
-      setStep("batteryTip");
-    } else {
-      finish();
-    }
+    setStep(granted ? "batteryTip" : "tour");
   };
+
+  if (step === "tour") {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <TourPager finishLabel="START TRAINING" onFinish={finish} onSkip={finish} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -76,7 +87,7 @@ export default function OnboardingScreen() {
 
       <View style={styles.bottom}>
         <Pressable
-          onPress={step === "intro" ? handleContinue : finish}
+          onPress={step === "intro" ? handleContinue : () => setStep("tour")}
           style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
           accessibilityRole="button"
           accessibilityLabel={step === "intro" ? "Continue" : "Got it"}

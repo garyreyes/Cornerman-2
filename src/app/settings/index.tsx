@@ -9,6 +9,8 @@ import { ComboTimingSection } from "../../features/settings/components/ComboTimi
 import { DefenseCuesSection } from "../../features/settings/components/DefenseCuesSection";
 import { ModeSection } from "../../features/settings/components/ModeSection";
 import { PunchesSection } from "../../features/settings/components/PunchesSection";
+import { SectionCard } from "../../shared/components/SectionCard";
+import { SummaryRow } from "../../shared/components/SummaryRow";
 import { RoundSection } from "../../features/settings/components/RoundSection";
 import { SoundsSection } from "../../features/settings/components/SoundsSection";
 import { getPresets, getPunches, getSettings, saveSettings } from "../../features/settings/service";
@@ -83,6 +85,11 @@ export function SettingsScreen() {
         <ComboTimingSection settings={settings} onChange={handleChange} />
         <DefenseCuesSection settings={settings} onChange={handleChange} />
         <PunchesSection punches={punches} onOpen={() => router.push("/settings/punches")} />
+        {/* Last section deliberately: onboarding shows this tour once and
+            never again, so this is the only way back to it. */}
+        <SectionCard title="HELP">
+          <SummaryRow label="How Cornerman works" value="Take the tour" onPress={() => router.push("/settings/tour")} />
+        </SectionCard>
       </ScrollView>
     </SafeAreaView>
   );
