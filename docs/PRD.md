@@ -240,9 +240,11 @@ Instead of one uniform combo behavior for a whole session, a
 jab-only at technical pace, round 2 a fixed 1-2, round 3 the user's real
 saved combos, round 4 a manually-picked body-work punch pool, round 9 a
 longer "championship round"), with an optional on-screen coaching note
-per round. Four built-ins ship (Relax/Zone-2, Moderate, Intense, Assault
-Bike Cognitive); users can also create and edit their own — see
-`ARCHITECTURE.md`'s Phase 10+ entities for the full data model.
+per round. Ten built-ins ship: six boxing templates carrying `bagwork.md`'s
+real programming (Easy, Moderate and Intense, each as punches-only and
+punches + kicks) and the four assault-bike energy-system protocols. Users
+can also create and edit their own — see `ARCHITECTURE.md`'s Phase 10+
+entities for the full data model.
 
 **Use case 9 — Run an assault-bike cognitive-motor HIIT session.** A
 different workout modality entirely (10s all-out bike intervals, 50s

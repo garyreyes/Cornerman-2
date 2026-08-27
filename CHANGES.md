@@ -1004,6 +1004,58 @@ Dated log of shipped changes, appended to as features complete.
     Smoke-tested on the emulator -- audio focus granted and released
     cleanly, no AudioAPI errors. **The audible result is not verified**;
     that needs a real ear on a real device.
+- 2026-08-27: The combo gap became throwing time, and the boxing templates
+  got real programming. Three findings from one report -- "I couldn't keep
+  up on the sheer quantity of combos even in easy".
+  - **The call-out was eating the gap.** `sessionTick` armed the next combo
+    from the instant the current one *started* being spoken. Measured from
+    the committed voice bank (0.73s mean per word, plus the engine's own
+    0.12s inter-word gap), a four-punch combo takes ~3.3s to say -- so a
+    3-5s gap left barely a second to actually throw it, and the old
+    "Intense" 1-2s gap was shorter than the combo itself, the same overlap
+    behind the Phase 12 echo. It now arms from when the call-out ends. The
+    estimate (`lib/speechTiming.ts`) is deliberate over feeding back the
+    engine's real completion time: that is unknowable ahead of time for a
+    custom name falling through to on-device TTS, and would move timing
+    into the untested consumer where a combo that never reports completion
+    would stall the round. Test-first, 10 red first.
+  - **The built-ins called random punches.** All three boxing templates
+    gave every round a bare `{type: "random"}` source, so a "Moderate"
+    session was unstructured random punches rather than the programming it
+    was named after. Replaced by six templates carrying `bagwork.md`'s
+    real round-by-round plans -- Easy/Moderate/Intense, each as
+    punches-only and punches + kicks, the kick rounds being the only
+    difference within a pair. Rounds are 2 min / 60s rest per bagwork's
+    own header; the previous 180s came from nowhere. Gaps are 8-12 / 6-9 /
+    4-6s, above bagwork's own rest-between-bursts figures on purpose --
+    that density proved unthrowable in practice, and tightening one is a
+    slider on the template.
+  - **Expressing those rounds needed a new `ComboSource`.** bagwork rounds
+    name several combos each (Moderate R3 is both `1-2b-3` and `2-3b-2`),
+    which nothing existing could hold: `fixed-sequence` is one combo
+    forever, `preset` is the same thing behind an id, `random` discards the
+    structure. New `combo-pool` draws one whole combo per call-out; a pool
+    of one is the rep-to-reflex case Easy's rounds ask for. Editable in the
+    Round Builder, and switching a fixed-sequence round to it carries the
+    existing sequence over rather than discarding it.
+  - **The kicks existed in the voice bank but not in the punch list**, so
+    those templates would have announced "punch fourteen". Seeded as
+    punches 8-21 (Body Jab/Body Cross plus the 12 kicks), with the random
+    pool now defaulting to the punches only -- a boxing quick-start
+    shouldn't start calling head kicks just because they exist. Existing
+    installs get a one-time backfill that pins a still-`null` pool to what
+    they already had, tracked by its own storage key rather than by
+    comparing against the defaults, which would resurrect a deleted punch
+    on every read forever. A punch created later still joins a restricted
+    pool, so only the seeded kicks start out excluded.
+  - **The round's focus now shows on screen** (`RoundFocus`). Round-by-round
+    focus is the whole point of a workout template, but the label and
+    coaching note only ever existed in the Round Builder -- a running
+    session never said which round you were in. Nothing renders for a
+    Settings-driven quick-start, which has no round plan.
+  - `bagwork.md`'s "lead-leg flick" has no clip of its own, so those rounds
+    call a Lead Low Kick and carry the flick mechanic in the round note.
+  - 276/276 tests, lint/typecheck clean.
 - 2026-08-26: Assault-Bike drill picker gained a third choice, **None** --
   alongside Odd One Out and Color Call, for a straight rest with no
   cognitive drill on any protocol that has one. `withoutDrill()`

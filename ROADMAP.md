@@ -694,10 +694,49 @@ replaces both. What was Phase 12 (the Templates phase close) is now Phase
   screen — **not run yet**, folded into the Phase 13 close below along
   with Phase 10/11's own deferred audits.
 
-## Phase 13 — Templates Phase Close
+## Phase 13 — Bagwork Templates & Combo Pacing
 
-*Was Phase 12 until 2026-08-26; renumbered when the bike protocol rework
-landed in front of it.*
+*Added 2026-08-27, from real use. Phase 10 shipped the template system and
+Phase 12 the bike protocols, but the boxing templates themselves were
+still calling random punches, and the combo gap was measured from the
+wrong end. What was Phase 13 (the Templates phase close) is now Phase 14
+— this landed in front of it, not instead of it.*
+
+- [x] **13a. The gap becomes throwing time** — `done`, 2026-08-27 —
+  `sessionTick` armed the next combo from the instant the current one
+  *started* being spoken, so the call-out ate the gap: a four-punch combo
+  takes ~3.3s to say (measured from the committed voice bank), leaving
+  barely a second of a 3-5s gap to throw it, and the old 1-2s "Intense"
+  gap was shorter than the combo itself. New `lib/speechTiming.ts`
+  estimates the call-out's duration and the gap starts after it. The
+  estimate is deliberate over the engine's real completion time — see
+  `PROJECT_FACTS.md`. Correctness-critical, test-first (10 red).
+- [x] **13b. `combo-pool` + kicks as real punches** — `done`, 2026-08-27 —
+  new `ComboSource` variant holding several combos, one drawn per
+  call-out (bagwork rounds name several each; nothing existing could hold
+  that). Body Jab/Body Cross and the 12 kicks seeded as punches 8-21, with
+  the random pool defaulting to punches only and a one-time backfill for
+  existing installs. Test-first.
+- [x] **13c. The six bagwork templates** — `done`, 2026-08-27 —
+  Easy/Moderate/Intense × punches / punches + kicks, carrying
+  `bagwork.md`'s real round-by-round plans, at 2 min / 60s rest and gaps
+  of 8-12 / 6-9 / 4-6s. Replaces the three random-only built-ins, via a
+  migration that leaves custom templates alone and never resurrects a
+  built-in the user deleted.
+- [x] **13d. Round focus on screen + Round Builder editing** — `done`,
+  2026-08-27 — `RoundFocus` shows the running round's label and coaching
+  note (they existed on `RoundConfig` since Phase 10a but nothing ever
+  rendered them mid-session); Round Builder gained a combo-pool editor.
+  Judgment/presentation, no new tests.
+- [ ] **Real-device confirmation of the new pacing** — the arithmetic is
+  tested, but whether an 8-12s Easy gap actually *feels* right on the bag
+  needs a real session. Same standing honesty gap as every other
+  by-feel number in this project (4a's audio, 10a's pace figures).
+
+## Phase 14 — Templates Phase Close
+
+*Was Phase 12 until 2026-08-26, then Phase 13; renumbered twice as the
+bike protocol rework and then the bagwork templates landed in front of it.*
 
 - [ ] **Phase close: `/impeccable critique` + `/impeccable polish`** —
   `not started` — Templates Picker, Round Builder, and Assault-Bike

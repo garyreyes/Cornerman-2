@@ -238,14 +238,14 @@ flowchart TD
     H --> I{Per round}
     I --> J[Optional label + note]
     I --> K[Optional duration override]
-    I --> L["comboSource: fixed punch /\nfixed sequence / preset /\nrandom (full or a picked pool)"]
+    I --> L["comboSource: fixed punch /\nfixed sequence / combo pool /\npreset / random (full or a picked pool)"]
     H --> M[Save] --> A
 ```
 
-- **Templates Picker empty-ish state:** the 4 built-ins (Relax,
-  Moderate, Intense, Assault Bike Cognitive) always exist — there's no
-  true empty state, but a first-time user sees only built-ins until they
-  create a custom one.
+- **Templates Picker empty-ish state:** the 10 built-ins (six boxing —
+  Easy/Moderate/Intense × punches / punches + kicks — and the four bike
+  protocols) always exist, so there's no true empty state; a first-time
+  user sees only built-ins until they create a custom one.
 - **Round Builder is inline, not a per-round sub-screen:** each round is
   an expandable card in one scrollable list (add/reorder/remove/edit
   in place) — matches the "low chrome, progressive disclosure" rule

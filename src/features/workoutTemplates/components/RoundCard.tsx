@@ -32,10 +32,13 @@ interface RoundCardProps {
 const WORK_VALUES = range(0, 600, 5);
 const REST_VALUES = range(0, 300, 5);
 
+// Abbreviated to keep five segments legible on a narrow phone -- the
+// editor that opens underneath each one says what it is at full length.
 const SOURCE_OPTIONS: { value: ComboSource["type"]; label: string }[] = [
   { value: "random", label: "RANDOM" },
   { value: "fixed-punch", label: "FIXED" },
-  { value: "fixed-sequence", label: "SEQUENCE" },
+  { value: "fixed-sequence", label: "SEQ" },
+  { value: "combo-pool", label: "COMBOS" },
   { value: "preset", label: "PRESET" },
 ];
 
@@ -83,6 +86,11 @@ export function RoundCard({
       updateSource({ type: "fixed-punch", punchNum: punches[0]?.num ?? 1 });
     } else if (type === "fixed-sequence") {
       updateSource({ type: "fixed-sequence", sequence: [] });
+    } else if (type === "combo-pool") {
+      // Carries an existing single sequence over rather than discarding it --
+      // a fixed sequence is exactly a pool of one, so switching should feel
+      // like widening what is already there, not starting again.
+      updateSource({ type: "combo-pool", combos: source.type === "fixed-sequence" ? [source.sequence] : [[]] });
     } else {
       updateSource({ type: "preset", presetId: presets[0]?.id ?? "" });
     }
@@ -240,6 +248,9 @@ export function RoundCard({
           {source.type === "fixed-sequence" ? (
             <SequenceSourceEditor source={source} punches={punches} onChange={updateSource} />
           ) : null}
+          {source.type === "combo-pool" ? (
+            <ComboPoolSourceEditor source={source} punches={punches} onChange={updateSource} />
+          ) : null}
           {source.type === "preset" ? (
             <PresetSourceEditor source={source} presets={presets} onChange={updateSource} />
           ) : null}
@@ -344,6 +355,80 @@ function SequenceSourceEditor({ source, punches, onChange }: SequenceSourceEdito
       <AddToSequenceRow punches={punches} onAdd={handleAdd} />
     </View>
   );
+}
+
+interface ComboPoolSourceEditorProps {
+  source: Extract<ComboSource, { type: "combo-pool" }>;
+  punches: Punch[];
+  onChange: (source: ComboSource) => void;
+}
+
+/**
+ * Several whole combos, one drawn per call-out -- the shape bagwork.md's
+ * rounds actually have ("Head-body-head: 1-2b-3, 2-3b-2"). Each combo gets
+ * the same sequence builder a fixed-sequence round uses; the combos
+ * themselves are unordered, so they have no move up/down, unlike the
+ * punches inside one.
+ */
+function ComboPoolSourceEditor({ source, punches, onChange }: ComboPoolSourceEditorProps) {
+  const { colors, fonts } = useTheme();
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
+
+  function replaceCombo(index: number, sequence: number[]) {
+    onChange({ type: "combo-pool", combos: source.combos.map((c, i) => (i === index ? sequence : c)) });
+  }
+
+  return (
+    <View style={styles.subSection}>
+      <Text style={styles.hint}>One of these is called each time. Add several to vary the round.</Text>
+      {source.combos.map((combo, comboIndex) => (
+        <View key={comboIndex} style={styles.comboBlock}>
+          <View style={styles.comboHeader}>
+            <Text style={styles.comboTitle}>COMBO {comboIndex + 1}</Text>
+            <Pressable
+              onPress={() =>
+                onChange({ type: "combo-pool", combos: source.combos.filter((_, i) => i !== comboIndex) })
+              }
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove combo ${comboIndex + 1}`}
+            >
+              <Text style={styles.removeGlyph}>✕</Text>
+            </Pressable>
+          </View>
+          {combo.length === 0 ? <Text style={styles.hint}>Add at least one punch below.</Text> : null}
+          {combo.map((num, punchIndex) => (
+            <PresetSequenceEntry
+              key={punchIndex}
+              position={punchIndex + 1}
+              label={punches.find((p) => p.num === num)?.name ?? `Punch ${num}`}
+              canMoveUp={punchIndex > 0}
+              canMoveDown={punchIndex < combo.length - 1}
+              onMoveUp={() => replaceCombo(comboIndex, swap(combo, punchIndex, punchIndex - 1))}
+              onMoveDown={() => replaceCombo(comboIndex, swap(combo, punchIndex, punchIndex + 1))}
+              onRemove={() => replaceCombo(comboIndex, combo.filter((_, i) => i !== punchIndex))}
+            />
+          ))}
+          <AddToSequenceRow punches={punches} onAdd={(num) => replaceCombo(comboIndex, [...combo, num])} />
+        </View>
+      ))}
+      <Pressable
+        onPress={() => onChange({ type: "combo-pool", combos: [...source.combos, []] })}
+        style={styles.addComboButton}
+        accessibilityRole="button"
+        accessibilityLabel="Add another combo to this round"
+      >
+        <Text style={styles.addComboLabel}>+ ADD COMBO</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function swap(sequence: number[], from: number, to: number): number[] {
+  const next = [...sequence];
+  next[from] = sequence[to]!;
+  next[to] = sequence[from]!;
+  return next;
 }
 
 interface PresetSourceEditorProps {
@@ -490,6 +575,41 @@ function createStyles(colors: ColorTokens, fonts: Fonts) {
     },
     sequenceList: {
       gap: 6,
+    },
+    comboBlock: {
+      gap: 6,
+      paddingLeft: 10,
+      borderLeftWidth: 2,
+      borderLeftColor: colors.panelLine,
+    },
+    comboHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    comboTitle: {
+      fontFamily: fonts.displaySemiBold,
+      fontSize: 11,
+      letterSpacing: 1.5,
+      color: colors.textMuted,
+    },
+    removeGlyph: {
+      fontFamily: fonts.body,
+      fontSize: 15,
+      color: colors.danger,
+    },
+    addComboButton: {
+      paddingVertical: 12,
+      alignItems: "center",
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+    },
+    addComboLabel: {
+      fontFamily: fonts.displaySemiBold,
+      fontSize: 12,
+      letterSpacing: 1.5,
+      color: colors.accent,
     },
     chipWrap: {
       flexDirection: "row",

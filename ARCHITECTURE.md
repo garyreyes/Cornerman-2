@@ -117,21 +117,29 @@ already built.
 
 - **`BoxingConfig`** — `{ baseWorkDurationSec, baseRestDurationSec,
   warmupDurationSec, baseComboGapMinSec, baseComboGapMaxSec, roundPlan:
-  RoundConfig[] }`. A "uniform" template (e.g. the Relax/Moderate/Intense
-  built-ins) is simply a `roundPlan` where every round has the same
-  `{ type: "random" }` comboSource and no overrides — the round-by-round
-  case and the uniform case are the same data shape, not two systems.
+  RoundConfig[] }`. A "uniform" template is simply a `roundPlan` where
+  every round has the same comboSource and no overrides — the
+  round-by-round case and the uniform case are the same data shape, not
+  two systems. The six boxing built-ins are *not* uniform: they carry
+  `bagwork.md`'s real round-by-round programming (Easy/Moderate/Intense ×
+  punches / punches + kicks), each round naming its own focus, coaching
+  cue, and combos. The three originals were uniform-random, which is
+  exactly why they felt nothing like the sessions they were named after.
 
 - **`RoundConfig`** — one entry per round, in order:
   `{ label?, note?, workDurationSec?, restDurationSec?, comboGapMinSec?,
   comboGapMaxSec?, comboSource }`. Per-round fields override the
   template's base values when set (e.g. a "championship round" running
-  longer than the rest). `note` is a coaching-reminder string displayed
-  on screen during that round — **visual only, not spoken aloud** (an
-  assumption, not explicitly confirmed — flag if wrong). `comboSource` is
-  one of:
+  longer than the rest). `label` and `note` are the round's focus and
+  coaching cue, shown on screen during that round by `RoundFocus` —
+  **visual only, never spoken aloud**. `comboSource` is one of:
   - `{ type: "fixed-punch", punchNum }` — one punch repeated (e.g. jab-only)
-  - `{ type: "fixed-sequence", sequence: number[] }` — a fixed combo repeated
+  - `{ type: "fixed-sequence", sequence: number[] }` — a fixed combo
+    repeated. Strictly redundant with `combo-pool` below (a pool of one),
+    kept only for stored templates that already use it
+  - `{ type: "combo-pool", combos: number[][] }` — a set of specific
+    combos, one drawn whole per call-out. What the boxing built-ins use:
+    a bagwork round names several combos, not one
   - `{ type: "preset", presetId }` — draws from a saved `Preset`
   - `{ type: "random", punchPool?: number[] }` — random draw from a
     manually chosen subset, or the full punch list when `punchPool` is

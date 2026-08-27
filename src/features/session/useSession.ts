@@ -25,7 +25,7 @@ import {
 import type { TimerConfig, TimerState } from "../timer/types";
 import { consumePendingTemplateStart } from "../workoutTemplates/pendingStart";
 import { getWorkoutTemplates, toTimerConfig as templateToTimerConfig } from "../workoutTemplates/service";
-import type { WorkoutTemplate } from "../workoutTemplates/types";
+import type { RoundConfig, WorkoutTemplate } from "../workoutTemplates/types";
 import { createSession, decideInterruptionAction, sessionTick, shiftSessionForResume } from "./service";
 import type { ActiveTemplateSession, SessionState } from "./types";
 
@@ -72,6 +72,10 @@ export interface UseSessionResult {
    * `settings` directly (see this hook's own note on why): a template
    * round's own duration can differ from `settings.workDurationSec`. */
   phaseDurationMs: number | null;
+  /** The running round's own entry in a template's round plan, for the
+   * focus/cue shown on screen. Null outside a template-driven session, and
+   * during Warmup/Finished, where no round is running. */
+  currentRoundConfig: RoundConfig | null;
   /** Boxing only -- Main Timer has no Assault-Bike Session logic (that's
    * Phase 11b+'s own screen, per docs/user-flows.md Flow 7). Narrowed at
    * the type level, not just a runtime check, so passing the wrong
@@ -136,6 +140,10 @@ export function useSession(): UseSessionResult {
   // started yet" -- see totalRounds' derivation below.
   const [phaseDurationMs, setPhaseDurationMs] = useState<number | null>(null);
   const [lastStartedTotalRounds, setLastStartedTotalRounds] = useState<number | null>(null);
+  /** Same mirror-the-ref-into-state reason as the two above: the screen
+   * shows the running round's own focus/cue, and a ref can't be read during
+   * render. Null for a Settings-driven quick-start, which has no round plan. */
+  const [activeRoundPlan, setActiveRoundPlan] = useState<RoundConfig[] | null>(null);
 
   const audioEngineRef = useRef<AudioEngine | null>(null);
   const speechEngineRef = useRef<SpeechEngine | null>(null);
@@ -310,9 +318,11 @@ export function useSession(): UseSessionResult {
         baseComboGapMinSec: template.config.baseComboGapMinSec,
         baseComboGapMaxSec: template.config.baseComboGapMaxSec,
       };
+      setActiveRoundPlan(template.config.roundPlan);
     } else {
       configRef.current = toTimerConfig(getSettings());
       activeTemplateRef.current = null;
+      setActiveRoundPlan(null);
     }
     const initial = startTimer(configRef.current, Date.now());
     // startTimer computes the first TimerState directly rather than going
@@ -359,6 +369,7 @@ export function useSession(): UseSessionResult {
     setSession(createSession());
     setPhaseDurationMs(null);
     setLastStartedTotalRounds(null);
+    setActiveRoundPlan(null);
     hideSessionNotification();
   }, []);
 
@@ -392,5 +403,23 @@ export function useSession(): UseSessionResult {
   // snapshotted at start(), even after settings.rounds later changes.
   const totalRounds = timerState === null ? settings.rounds : (lastStartedTotalRounds ?? settings.rounds);
 
-  return { timerState, session, settings, audioError, totalRounds, phaseDurationMs, start, togglePause, reset };
+  // Warmup runs before round 1 and Finished after the last, so neither has
+  // a round whose focus to show -- `round` is 0 in the first case and the
+  // session is over in the second.
+  const isRunningARound = timerState !== null && (timerState.phase === "work" || timerState.phase === "rest");
+  const currentRoundConfig =
+    isRunningARound && activeRoundPlan !== null ? (activeRoundPlan[timerState.round - 1] ?? null) : null;
+
+  return {
+    timerState,
+    session,
+    settings,
+    audioError,
+    totalRounds,
+    phaseDurationMs,
+    currentRoundConfig,
+    start,
+    togglePause,
+    reset,
+  };
 }

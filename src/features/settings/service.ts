@@ -131,7 +131,10 @@ function seedExtendedPunchesOnce(stored: Punch[]): Punch[] {
 
   const settings = getSettings();
   if (settings.randomPunchPool === null) {
-    saveSettings({ ...settings, randomPunchPool: existingNums });
+    // Deduped on write: Punch.num is explicitly allowed to be non-unique
+    // (extraction doc 1.6), and a pool carrying the same number twice
+    // defeats ChipMultiSelect's last-chip guard, which counts entries.
+    saveSettings({ ...settings, randomPunchPool: Array.from(new Set(existingNums)) });
   }
 
   const merged = [...stored, ...missing];

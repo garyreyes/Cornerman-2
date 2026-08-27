@@ -54,7 +54,20 @@ function round(label: string, note: string, combos: number[][]): RoundConfig {
  * with the rounds above it. */
 function flowRound(label: string, note: string, earlier: RoundConfig[]): RoundConfig {
   const combos = earlier.flatMap((r) => (r.comboSource.type === "combo-pool" ? r.comboSource.combos : []));
-  return round(label, note, combos);
+  // Deduped: a combo appearing in two earlier rounds would otherwise be
+  // drawn twice as often as the rest, which is a weighting nobody asked
+  // for -- a flow round means "any of these", evenly.
+  const seen = new Set<string>();
+  return round(
+    label,
+    note,
+    combos.filter((c) => {
+      const key = c.join(",");
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }),
+  );
 }
 
 // --- Rounds shared by both variants of a difficulty -------------------
@@ -78,7 +91,7 @@ const modHeadBody = round("Head-Body-Head", "Never the same level twice in a row
   [JAB, BODY_CROSS, LEAD_HOOK],
   [CROSS, BODY_HOOK, CROSS],
 ]);
-const modPocket = round("Pocket Combos", "Stay in range after the combo -- do not drift out.", [
+const modPocket = round("Pocket Combos", "Stay in range after the combo — do not drift out.", [
   [JAB, CROSS, LEAD_UPPERCUT, CROSS],
   [JAB, REAR_UPPERCUT, LEAD_HOOK],
   [LEAD_HOOK, CROSS, LEAD_HOOK],
@@ -89,7 +102,7 @@ const modPressure = round("Pressure", "Reset at an ANGLE, never straight back.",
   [JAB, BODY_CROSS, CROSS],
 ]);
 
-const intJab = round("Jab", "Technical opener -- do not blow the round.", [[JAB], [JAB, JAB], [BODY_JAB]]);
+const intJab = round("Jab", "Technical opener — do not blow the round.", [[JAB], [JAB, JAB], [BODY_JAB]]);
 const intOneTwo = round("1-2", "Build power-hand timing off the jab.", [[JAB, CROSS]]);
 const intHeadBody = round("Head-Body-Head", "Alternate levels on every single shot.", [
   [JAB, BODY_CROSS, LEAD_HOOK],
@@ -108,7 +121,7 @@ const intPressure = round("Pressure", "Never walk a straight line. Cut off, do n
   [JAB, BODY_CROSS, CROSS],
   [CROSS, LEAD_HOOK, CROSS],
 ]);
-const intTeardrop = round("Teardrop -- Body Accuracy", "Punch-shield substitute. Accuracy, guard never drops.", [
+const intTeardrop = round("Teardrop · Body Accuracy", "Punch-shield substitute. Accuracy, guard never drops.", [
   [BODY_CROSS],
   [BODY_HOOK],
   [JAB, BODY_CROSS],
@@ -117,14 +130,14 @@ const intTeardrop = round("Teardrop -- Body Accuracy", "Punch-shield substitute.
 
 // --- The rounds that differ between punches and punches + kicks -------
 
-const easyKickRound = round("Kicks", "Lead-leg flick only. Pendulum step, snap and retract -- NOT power.", [
+const easyKickRound = round("Kicks", "Lead-leg flick only. Pendulum step, snap and retract — NOT power.", [
   [FLICK],
 ]);
 const easyPunchSubstitute = round("Uppercuts", "Same rep-to-reflex rule. Turn the hip, do not reach.", [
   [JAB, REAR_UPPERCUT, LEAD_HOOK],
 ]);
 
-const modKickEntry = round("Kicks -- Entry", "The flick is bait. Follow it into the pocket.", [
+const modKickEntry = round("Kicks · Entry", "The flick is bait. Follow it into the pocket.", [
   [FLICK, FLICK, JAB, CROSS],
 ]);
 const modFusion = round("Punch to Kick Fusion", "Fluid transition, no pause between hands and kick.", [

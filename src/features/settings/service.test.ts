@@ -209,6 +209,19 @@ describe("punches -- appending kicks to an install that predates them", () => {
     expect(getPunches().some((p) => p.name === "Rear High Kick")).toBe(false);
   });
 
+  test("the pinned pool is deduped -- punch numbers are allowed to repeat", () => {
+    setItem("punches", [
+      { id: "a", num: 1, name: "Jab" },
+      { id: "b", num: 1, name: "Stiff Jab" },
+      { id: "c", num: 2, name: "Cross" },
+    ]);
+    saveSettings({ ...createDefaultSettings(), randomPunchPool: null });
+
+    getPunches();
+
+    expect(getSettings().randomPunchPool).toEqual([1, 2]);
+  });
+
   test("leaves a pool the user had already restricted exactly as they set it", () => {
     seedLegacyInstall();
     saveSettings({ ...getSettings(), randomPunchPool: [1, 2] });
