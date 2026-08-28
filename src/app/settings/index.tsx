@@ -13,6 +13,7 @@ import { SectionCard } from "../../shared/components/SectionCard";
 import { SummaryRow } from "../../shared/components/SummaryRow";
 import { RoundSection } from "../../features/settings/components/RoundSection";
 import { SoundsSection } from "../../features/settings/components/SoundsSection";
+import { openBackgroundSettings } from "../../features/onboarding/service";
 import { getPresets, getPunches, getSettings, saveSettings } from "../../features/settings/service";
 import type { Settings } from "../../features/settings/types";
 import { useTheme } from "../../shared/theme/ThemeContext";
@@ -89,6 +90,11 @@ export function SettingsScreen() {
             never again, so this is the only way back to it. */}
         <SectionCard title="HELP">
           <SummaryRow label="How Cornerman works" value="Take the tour" onPress={() => router.push("/settings/tour")} />
+          <SummaryRow
+            label="Combos cutting out mid-round?"
+            value="Allow background activity"
+            onPress={() => void openBackgroundSettings()}
+          />
         </SectionCard>
       </ScrollView>
     </SafeAreaView>
