@@ -29,6 +29,7 @@ export default function SettingsLayout() {
           PRESET vs EDIT PRESET, depending on the `id` param) -- see
           presets/[id].tsx. */}
       <Stack.Screen name="presets/[id]" options={{ title: "PRESET" }} />
+      <Stack.Screen name="tour" options={{ title: "HOW IT WORKS" }} />
     </Stack>
   );
 }

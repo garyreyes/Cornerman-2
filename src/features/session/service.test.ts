@@ -1,5 +1,6 @@
 import { pause as pauseTimer, startTimer, tick } from "../timer/service";
 import type { TimerConfig } from "../timer/types";
+import { estimateComboSpeechMs } from "../../lib/speechTiming";
 import { createDefaultSettings } from "../settings/service";
 import type { Preset, Punch, Settings } from "../settings/types";
 import type { RoundConfig } from "../workoutTemplates/types";
@@ -66,8 +67,11 @@ describe("sessionTick -- combo scheduling", () => {
     ]);
     expect(after.comboCount).toBe(1);
     expect(after.currentCombo).toEqual(actions[0]!.type === "speak-combo" ? actions[0].combo : null);
-    // Re-armed using comboGapMinSec (1.5s), not the first-combo [500,1500]ms window.
-    expect(after.nextComboAt).toBe(dueNow + settings.comboGapMinSec * 1000);
+    // Re-armed using comboGapMinSec (1.5s), not the first-combo [500,1500]ms window --
+    // and measured from when this 2-word combo finishes being spoken, not when it starts.
+    expect(after.nextComboAt).toBe(
+      dueNow + estimateComboSpeechMs(2, settings.speechRate) + settings.comboGapMinSec * 1000,
+    );
   });
 
   test("does not fire a burst of stale combos after a large jump in now -- fires exactly one and reschedules forward", () => {
@@ -80,7 +84,9 @@ describe("sessionTick -- combo scheduling", () => {
     const { session: after, actions } = sessionTick(session, timerState, settings, punches, [], farFuture, () => 0);
 
     expect(actions).toHaveLength(1);
-    expect(after.nextComboAt).toBe(farFuture + settings.comboGapMinSec * 1000);
+    expect(after.nextComboAt).toBe(
+      farFuture + estimateComboSpeechMs(2, settings.speechRate) + settings.comboGapMinSec * 1000,
+    );
   });
 
   test("clears nextComboAt/currentCombo count tracking when leaving Work phase, but keeps currentCombo visible", () => {
@@ -98,6 +104,47 @@ describe("sessionTick -- combo scheduling", () => {
     expect(after.nextComboAt).toBeNull();
     expect(after.currentCombo).toEqual(session.currentCombo); // last combo stays visible into Rest
     expect(actions).toEqual([]);
+  });
+});
+
+describe("sessionTick -- the gap is throwing time, not speaking time", () => {
+  // The reported bug: "I couldn't keep up on the sheer quantity of combos even
+  // in easy". The gap used to be armed from the instant a combo *started* being
+  // spoken, so the call-out ate it -- a 4-punch combo takes ~3.3s to say, which
+  // left almost nothing of a 3-5s gap to actually throw it, and was outright
+  // negative at the old "Intense" 1-2s gap (the Phase 12 echo, same root cause).
+  const longer = { ...settings, comboLengthMin: 5, comboLengthMax: 5 };
+  const shorter = { ...settings, comboLengthMin: 1, comboLengthMax: 1 };
+
+  function armedGapAfter(s: Settings, gapSec: number): number {
+    const now = 1_000_000;
+    const timerState = startTimer(config, now, () => 0);
+    const withGap = { ...s, comboGapMinSec: gapSec, comboGapMaxSec: gapSec };
+    let session = createSession();
+    ({ session } = sessionTick(session, timerState, withGap, punches, [], now));
+    const dueNow = timerState.firstComboAt!;
+    const { session: after } = sessionTick(session, timerState, withGap, punches, [], dueNow, () => 0);
+    return after.nextComboAt! - dueNow;
+  }
+
+  test("a longer combo pushes the next one further out, so the gap itself stays intact", () => {
+    expect(armedGapAfter(longer, 6)).toBeGreaterThan(armedGapAfter(shorter, 6));
+  });
+
+  test("the throwing time left after any combo is the full configured gap", () => {
+    for (const s of [shorter, longer]) {
+      const speech = estimateComboSpeechMs(s.comboLengthMin, s.speechRate);
+      expect(armedGapAfter(s, 6) - speech).toBeCloseTo(6_000, 5);
+    }
+  });
+
+  test("a 5-punch combo at a 4s gap can no longer start before the previous one finishes", () => {
+    expect(armedGapAfter(longer, 4)).toBeGreaterThan(estimateComboSpeechMs(5, longer.speechRate));
+  });
+
+  test("a faster speech rate shortens the wait, since the combo is spoken faster", () => {
+    const fast = { ...longer, speechRate: 2 };
+    expect(armedGapAfter(fast, 6)).toBeLessThan(armedGapAfter(longer, 6));
   });
 });
 
@@ -147,7 +194,7 @@ describe("sessionTick -- template-driven combo generation (Phase 10d)", () => {
     const dueNow = timerState.firstComboAt!;
     const { session: after } = sessionTick(session, timerState, settings, punches, [], dueNow, () => 0, activeTemplate);
 
-    expect(after.nextComboAt).toBe(dueNow + 9_000);
+    expect(after.nextComboAt).toBe(dueNow + estimateComboSpeechMs(2, settings.speechRate) + 9_000);
   });
 
   test("falls back to the template's base combo gap when the round itself has no gap override", () => {
@@ -161,7 +208,7 @@ describe("sessionTick -- template-driven combo generation (Phase 10d)", () => {
     const dueNow = timerState.firstComboAt!;
     const { session: after } = sessionTick(session, timerState, settings, punches, [], dueNow, () => 0, activeTemplate);
 
-    expect(after.nextComboAt).toBe(dueNow + 6_000);
+    expect(after.nextComboAt).toBe(dueNow + estimateComboSpeechMs(2, settings.speechRate) + 6_000);
   });
 
   test("a preset comboSource resolves against the presets array passed into sessionTick", () => {

@@ -12,9 +12,10 @@ OS-level permission gate covered in the onboarding flow below.
 
 ---
 
-## Screen inventory (10 screens total)
+## Screen inventory (11 screens total)
 
-1. **Onboarding** (first launch only, never shown again after)
+1. **Onboarding** (first launch only, never shown again after) — ends in the orientation tour
+1b. **Tour** *(added 2026-08-27)* — the same three cards on their own, reached from Settings → Help, since onboarding never runs twice
 2. **Main Timer** (home — the screen you land on every subsequent launch)
 3. **Settings**
 4. **Punches** (editor/list — reachable in both Random and Preset mode, see §3 below)
@@ -79,10 +80,10 @@ flowchart TD
     C -->|iOS| E[No runtime prompt needed\n— background audio mode is\na declared capability, not\na user permission]
     D --> F{Granted?}
     F -->|Yes| G[Battery-optimization tip\nscreen/step: link to OS\nsettings, explain why]
-    F -->|No, denied| H[Proceed anyway —\nshow a persistent note in\nSettings that background\naudio may not work reliably\nuntil permission is granted]
-    G --> I[Main Timer]
-    E --> I
-    H --> I
+    F -->|No, denied| T
+    G --> T[Orientation tour:\n3 swipeable cards —\ntemplates, bike drills,\nyour punches. Skippable.]
+    E --> T
+    T --> I[Main Timer]
     I -.never shown again.-> I
 ```
 
@@ -91,6 +92,17 @@ does **not** block the app — it degrades to foreground-only operation
 with a visible note in Settings (not a hard error), consistent with the
 "fail gracefully, don't block" pattern already used for OS-level TTS
 voice limitations in `ARCHITECTURE.md`'s edge cases.
+
+**The tour runs last, after the permission business** (added 2026-08-27):
+the intro card exists to justify the system dialog it triggers, so putting
+three feature cards between the two would separate the reason from the
+ask. It also means the last thing seen before landing is what the app
+does. It is skippable from any card, and — since onboarding itself is
+shown exactly once, ever — **replayable from Settings → Help → "How
+Cornerman works"** (`/settings/tour`), which is the only route back to it.
+Deliberately an orientation, not a manual: it covers the three things a
+user would otherwise have to go hunting for, and leaves the ordinary
+settings (voice, speed, gap, announce style) to be found when wanted.
 
 ---
 
@@ -238,14 +250,14 @@ flowchart TD
     H --> I{Per round}
     I --> J[Optional label + note]
     I --> K[Optional duration override]
-    I --> L["comboSource: fixed punch /\nfixed sequence / preset /\nrandom (full or a picked pool)"]
+    I --> L["comboSource: fixed punch /\nfixed sequence / combo pool /\npreset / random (full or a picked pool)"]
     H --> M[Save] --> A
 ```
 
-- **Templates Picker empty-ish state:** the 4 built-ins (Relax,
-  Moderate, Intense, Assault Bike Cognitive) always exist — there's no
-  true empty state, but a first-time user sees only built-ins until they
-  create a custom one.
+- **Templates Picker empty-ish state:** the 10 built-ins (six boxing —
+  Easy/Moderate/Intense × punches / punches + kicks — and the four bike
+  protocols) always exist, so there's no true empty state; a first-time
+  user sees only built-ins until they create a custom one.
 - **Round Builder is inline, not a per-round sub-screen:** each round is
   an expandable card in one scrollable list (add/reorder/remove/edit
   in place) — matches the "low chrome, progressive disclosure" rule

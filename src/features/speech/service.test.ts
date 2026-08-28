@@ -1,6 +1,7 @@
 import * as Speech from "expo-speech";
 import { AudioBufferSourceNode, AudioContext } from "react-native-audio-api";
 
+import { createDefaultPunches } from "../settings/service";
 import { createSpeechEngine, normalizeToKey, rateForSpeechRate, resolveBundledClip } from "./service";
 
 describe("normalizeToKey", () => {
@@ -40,6 +41,12 @@ describe("resolveBundledClip", () => {
       "roll", "slip", "duck", "pivot", "check", "clinch",
     ];
     words.forEach((word) => expect(resolveBundledClip(word)).not.toBeNull());
+  });
+
+  test("every seeded default punch has a bundled clip -- a typo would fall to the OS voice mid-combo", () => {
+    createDefaultPunches().forEach((punch) => {
+      expect([punch.name, resolveBundledClip(punch.name)]).not.toEqual([punch.name, null]);
+    });
   });
 
   test("returns null for a word with no bundled clip, e.g. a custom punch name", () => {

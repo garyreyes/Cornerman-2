@@ -6,68 +6,28 @@ import type { Combo, RandomFn } from "../comboEngine/types";
 import { getItem, setItem } from "../../lib/storage";
 import type { Preset, Punch, Settings } from "../settings/types";
 import type { RoundOverride, TimerConfig } from "../timer/types";
-import type { AssaultBikeConfig, BoxingConfig, ComboSource, RoundConfig, WorkoutTemplate } from "./types";
+import { BUILT_IN_BOXING_TEMPLATES } from "./builtIns";
+import type { AssaultBikeConfig, BoxingConfig, ComboSource, WorkoutTemplate } from "./types";
 
 const WORKOUT_TEMPLATES_KEY = "workoutTemplates";
 
-function uniformRoundPlan(rounds: number): RoundConfig[] {
-  return Array.from({ length: rounds }, () => ({ comboSource: { type: "random" } as const }));
-}
-
 /**
- * The three boxing templates' pace/round-count defaults are chosen for a
- * plausible training feel, not sourced from any spec (PRD/ARCHITECTURE
- * name the four templates but not their numbers) -- easy to retune once
- * felt on a real device, same spirit as 4a's placeholder-then-sourced
- * audio. The fourth (Assault Bike Cognitive) is real, per-figure sourced
- * from docs/user-flows.md Flow 7 -- see createBuiltInAssaultBikeConfig.
+ * The boxing templates carry bagwork.md's real round-by-round programming
+ * (see ./builtIns.ts); the bike protocols are per-figure sourced from the
+ * reference protocol table -- see createBuiltInBikeTemplates.
  */
 export function createBuiltInWorkoutTemplates(): WorkoutTemplate[] {
-  return [
-    {
-      id: Crypto.randomUUID(),
-      name: "Relax / Zone-2",
-      isBuiltIn: true,
-      workoutType: "boxing",
-      config: {
-        baseWorkDurationSec: 180,
-        baseRestDurationSec: 90,
-        warmupDurationSec: 60,
-        baseComboGapMinSec: 3,
-        baseComboGapMaxSec: 5,
-        roundPlan: uniformRoundPlan(6),
-      },
-    },
-    {
-      id: Crypto.randomUUID(),
-      name: "Moderate",
-      isBuiltIn: true,
-      workoutType: "boxing",
-      config: {
-        baseWorkDurationSec: 180,
-        baseRestDurationSec: 60,
-        warmupDurationSec: 60,
-        baseComboGapMinSec: 2,
-        baseComboGapMaxSec: 3.5,
-        roundPlan: uniformRoundPlan(8),
-      },
-    },
-    {
-      id: Crypto.randomUUID(),
-      name: "Intense",
-      isBuiltIn: true,
-      workoutType: "boxing",
-      config: {
-        baseWorkDurationSec: 180,
-        baseRestDurationSec: 45,
-        warmupDurationSec: 60,
-        baseComboGapMinSec: 1,
-        baseComboGapMaxSec: 2,
-        roundPlan: uniformRoundPlan(12),
-      },
-    },
-    ...createBuiltInBikeTemplates(),
-  ];
+  return [...createBuiltInBoxingTemplates(), ...createBuiltInBikeTemplates()];
+}
+
+function createBuiltInBoxingTemplates(): WorkoutTemplate[] {
+  return BUILT_IN_BOXING_TEMPLATES.map(({ name, config }) => ({
+    id: Crypto.randomUUID(),
+    name,
+    isBuiltIn: true,
+    workoutType: "boxing" as const,
+    config,
+  }));
 }
 
 /**
@@ -151,6 +111,10 @@ function createBuiltInBikeTemplates(): WorkoutTemplate[] {
  * Exported for its own tests; callers should use getWorkoutTemplates.
  */
 export function migrateStoredTemplates(stored: WorkoutTemplate[]): WorkoutTemplate[] {
+  return migrateBoxingBuiltIns(migrateBikeTemplates(stored));
+}
+
+function migrateBikeTemplates(stored: WorkoutTemplate[]): WorkoutTemplate[] {
   const kept = stored.filter(
     (t) => t.workoutType !== "assault-bike-cognitive" || (t.config as AssaultBikeConfig).rest !== undefined,
   );
@@ -158,6 +122,32 @@ export function migrateStoredTemplates(stored: WorkoutTemplate[]): WorkoutTempla
     return kept;
   }
   return [...kept, ...createBuiltInBikeTemplates()];
+}
+
+/**
+ * The original three boxing built-ins (Relax / Zone-2, Moderate, Intense)
+ * gave every round a bare `{type: "random"}` source, so a "Moderate"
+ * session called unstructured random punches -- nothing like the
+ * programming it was named after. They are replaced by the six bagwork
+ * templates.
+ *
+ * Detected by shape rather than by name, on the same principle as the bike
+ * migration above: a *built-in* boxing template whose rounds carry no
+ * label is one of the originals, because every replacement labels every
+ * round. That makes this idempotent by construction -- the six can never
+ * be mistaken for stale on a later read. Custom templates are never
+ * touched regardless of what their rounds look like, and a built-in the
+ * user has since deleted is not resurrected: the re-seed only fires when
+ * a stale one was actually found.
+ */
+function migrateBoxingBuiltIns(stored: WorkoutTemplate[]): WorkoutTemplate[] {
+  const isStale = (t: WorkoutTemplate): boolean =>
+    t.workoutType === "boxing" && t.isBuiltIn && t.config.roundPlan.every((r) => r.label === undefined);
+
+  if (!stored.some(isStale)) {
+    return stored;
+  }
+  return [...stored.filter((t) => !isStale(t)), ...createBuiltInBoxingTemplates()];
 }
 
 /** Seeds the built-ins into storage on first read -- same pattern as
@@ -246,6 +236,15 @@ export function resolveRoundCombo(
         source.punchPool ? { ...settings, randomPunchPool: source.punchPool } : settings,
         random,
       );
+    case "combo-pool": {
+      if (source.combos.length === 0) {
+        // Same graceful degradation as a preset whose id matches nothing --
+        // a silent round is worse than an unplanned combo.
+        return generateRandomCombo(punches, settings, random);
+      }
+      const chosen = source.combos[Math.floor(random() * source.combos.length)]!;
+      return chosen.map((num) => resolvePunchName(punches, num));
+    }
   }
 }
 

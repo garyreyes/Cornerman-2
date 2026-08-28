@@ -26,6 +26,14 @@ export function summarizeComboSource(source: ComboSource, punches: Punch[], pres
       const preset = presets.find((p) => p.id === source.presetId);
       return `Preset: ${preset ? preset.name : "(none selected)"}`;
     }
+    case "combo-pool": {
+      const count = source.combos.length;
+      if (count === 0) {
+        return "Combos: (none yet)";
+      }
+      const first = source.combos[0]!.map((num) => resolvePunchName(punches, num).name).join(" → ");
+      return count === 1 ? `Combo: ${first}` : `${count} combos: ${first} …`;
+    }
   }
 }
 

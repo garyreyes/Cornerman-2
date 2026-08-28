@@ -1004,6 +1004,115 @@ Dated log of shipped changes, appended to as features complete.
     Smoke-tested on the emulator -- audio focus granted and released
     cleanly, no AudioAPI errors. **The audible result is not verified**;
     that needs a real ear on a real device.
+- 2026-08-27: Google Play compliance audit, from a direct ask rather than
+  a phase. Checked the actual generated Android project, not just
+  `app.json` — regenerated it fresh via `expo prebuild` and read the real
+  merged release manifest. Found and fixed one real issue: the release
+  build was shipping three permissions with zero use in this app —
+  `SYSTEM_ALERT_WINDOW` (a "special app access" permission Play requires
+  justification for) and `READ_EXTERNAL_STORAGE`/`WRITE_EXTERNAL_STORAGE`
+  — all three inherited untouched from Expo's own base manifest template,
+  which literally comments "OPTIONAL PERMISSIONS, REMOVE WHATEVER YOU DO
+  NOT NEED." New `app.json` `android.blockedPermissions` strips them via
+  `tools:node="remove"`, verified against the actual merged release
+  manifest (`android/app/build/intermediates/merged_manifests/...`), not
+  just the source file. Everything else checked out already compliant on
+  inspection: `targetSdkVersion` 36 (Play's Aug 2026 requirement is 35+
+  existing / 36 new), AGP 8.12.0 + NDK 27 auto-page-align native libraries
+  to 16KB, production EAS profile defaults to `.aab`, and the notification
+  permission request already explains itself before the OS dialog fires.
+  Drafted and published a real Privacy Policy (Play requires one for every
+  listing, code fix or not) matching the app's own dark/orange design
+  tokens rather than a generic template — one placeholder left blank on
+  purpose (a real contact email), since publishing the one on file wasn't
+  something explicitly asked for. Also surfaced, not fixed: `expo
+  prebuild` itself warned that `userInterfaceStyle: "automatic"` needs
+  `expo-system-ui` to actually take effect at the native level, which
+  isn't installed — a real gap in the Phase 6 native-audit fix, outside
+  this audit's actual scope. See `PROJECT_FACTS.md` for the full trace.
+- 2026-08-27: Onboarding gained an orientation tour — three swipeable
+  cards covering workout templates, the assault-bike drills, and your own
+  punches, each with a small SVG sketch drawn from the app's own motifs
+  (the round list, the Odd One Out grid, numbered punch chips) rather than
+  screenshots, which go stale the moment a screen changes and would have
+  to be captured twice for the light palette.
+  - **It runs last, after the permission steps.** The existing intro card
+    exists to justify the system dialog it triggers, so putting three
+    feature cards between the two would separate the reason from the ask;
+    ending on the tour also means the last thing seen before landing is
+    what the app does.
+  - **Replayable from Settings → Help → "How Cornerman works"**
+    (`/settings/tour`, under the Settings stack so it inherits the themed
+    header and back arrow). Onboarding runs exactly once ever, so without
+    this everything the tour says would be unreachable after the first
+    thirty seconds of use — which is precisely when it stops being
+    memorable. Skippable from any card in onboarding; no skip on the
+    replay, where the back arrow already leaves.
+  - Deliberately an orientation, not a manual — the standing UX rule is
+    that the app should be usable without one. It covers the three things
+    a user would otherwise have to go hunting for and leaves voice, speed,
+    gap and announce style to be found when wanted.
+  - Two fixes from seeing it on a device: the punch chips laid out from a
+    single left-anchored cursor, leaving short rows hanging off one side
+    of an otherwise centred card (they now wrap into rows that are each
+    centred), and two of the three titles wrapped onto a second line
+    carrying one orphaned word at 28px.
+  - Presentation work, but the Settings→tour route got a test anyway: it
+    is the only path back to the tour, so nothing else in the app would
+    reveal it breaking. Its own file, per the documented `renderRouter`
+    cross-test interference. 277/277 tests, lint/typecheck clean.
+- 2026-08-27: The combo gap became throwing time, and the boxing templates
+  got real programming. Three findings from one report -- "I couldn't keep
+  up on the sheer quantity of combos even in easy".
+  - **The call-out was eating the gap.** `sessionTick` armed the next combo
+    from the instant the current one *started* being spoken. Measured from
+    the committed voice bank (0.73s mean per word, plus the engine's own
+    0.12s inter-word gap), a four-punch combo takes ~3.3s to say -- so a
+    3-5s gap left barely a second to actually throw it, and the old
+    "Intense" 1-2s gap was shorter than the combo itself, the same overlap
+    behind the Phase 12 echo. It now arms from when the call-out ends. The
+    estimate (`lib/speechTiming.ts`) is deliberate over feeding back the
+    engine's real completion time: that is unknowable ahead of time for a
+    custom name falling through to on-device TTS, and would move timing
+    into the untested consumer where a combo that never reports completion
+    would stall the round. Test-first, 10 red first.
+  - **The built-ins called random punches.** All three boxing templates
+    gave every round a bare `{type: "random"}` source, so a "Moderate"
+    session was unstructured random punches rather than the programming it
+    was named after. Replaced by six templates carrying `bagwork.md`'s
+    real round-by-round plans -- Easy/Moderate/Intense, each as
+    punches-only and punches + kicks, the kick rounds being the only
+    difference within a pair. Rounds are 2 min / 60s rest per bagwork's
+    own header; the previous 180s came from nowhere. Gaps are 8-12 / 6-9 /
+    4-6s, above bagwork's own rest-between-bursts figures on purpose --
+    that density proved unthrowable in practice, and tightening one is a
+    slider on the template.
+  - **Expressing those rounds needed a new `ComboSource`.** bagwork rounds
+    name several combos each (Moderate R3 is both `1-2b-3` and `2-3b-2`),
+    which nothing existing could hold: `fixed-sequence` is one combo
+    forever, `preset` is the same thing behind an id, `random` discards the
+    structure. New `combo-pool` draws one whole combo per call-out; a pool
+    of one is the rep-to-reflex case Easy's rounds ask for. Editable in the
+    Round Builder, and switching a fixed-sequence round to it carries the
+    existing sequence over rather than discarding it.
+  - **The kicks existed in the voice bank but not in the punch list**, so
+    those templates would have announced "punch fourteen". Seeded as
+    punches 8-21 (Body Jab/Body Cross plus the 12 kicks), with the random
+    pool now defaulting to the punches only -- a boxing quick-start
+    shouldn't start calling head kicks just because they exist. Existing
+    installs get a one-time backfill that pins a still-`null` pool to what
+    they already had, tracked by its own storage key rather than by
+    comparing against the defaults, which would resurrect a deleted punch
+    on every read forever. A punch created later still joins a restricted
+    pool, so only the seeded kicks start out excluded.
+  - **The round's focus now shows on screen** (`RoundFocus`). Round-by-round
+    focus is the whole point of a workout template, but the label and
+    coaching note only ever existed in the Round Builder -- a running
+    session never said which round you were in. Nothing renders for a
+    Settings-driven quick-start, which has no round plan.
+  - `bagwork.md`'s "lead-leg flick" has no clip of its own, so those rounds
+    call a Lead Low Kick and carry the flick mechanic in the round note.
+  - 276/276 tests, lint/typecheck clean.
 - 2026-08-26: Assault-Bike drill picker gained a third choice, **None** --
   alongside Odd One Out and Color Call, for a straight rest with no
   cognitive drill on any protocol that has one. `withoutDrill()`

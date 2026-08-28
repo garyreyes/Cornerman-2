@@ -45,6 +45,7 @@ import { ControlRow } from "../features/session/components/ControlRow";
 import { CountdownRing } from "../features/session/components/CountdownRing";
 import { PhaseBadge } from "../features/session/components/PhaseBadge";
 import { RoundCounter } from "../features/session/components/RoundCounter";
+import { RoundFocus } from "../features/session/components/RoundFocus";
 import { SettingsGear } from "../features/session/components/SettingsGear";
 import { TemplatesButton } from "../features/session/components/TemplatesButton";
 import { useSession } from "../features/session/useSession";
@@ -72,8 +73,18 @@ function MainTimerScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { timerState, session, settings, audioError, totalRounds, phaseDurationMs, start, togglePause, reset } =
-    useSession();
+  const {
+    timerState,
+    session,
+    settings,
+    audioError,
+    totalRounds,
+    phaseDurationMs,
+    currentRoundConfig,
+    start,
+    togglePause,
+    reset,
+  } = useSession();
 
   const phase = timerState?.phase ?? "ready";
   const isPaused = timerState?.isPaused ?? false;
@@ -101,6 +112,8 @@ function MainTimerScreen() {
 
       <View style={styles.center}>
         <PhaseBadge phase={phase} isPaused={isPaused} />
+
+        <RoundFocus round={currentRoundConfig} />
 
         <CountdownRing
           phaseEndAt={timerState?.phaseEndAt ?? null}

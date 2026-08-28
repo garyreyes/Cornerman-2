@@ -1422,6 +1422,158 @@ made during feature work.
   which is why both survived every phase gate until the app was used for
   real. When touching audio, reason about what accumulates over a *full*
   session, not what happens on the first cue.
+- **The combo gap is throwing time, and it starts when the call-out ends
+  — not when it begins.** For the whole life of the app it was armed from
+  the instant a combo *started* being spoken, so the announcement ate the
+  gap. Measured from the committed voice bank: 0.73s mean per word (n=27,
+  0.40s "jab" to 1.07s "lead inside kick") plus the engine's own 0.12s
+  `WORD_GAP_SEC`, so a four-punch combo takes ~3.3s to say. A 3-5s gap
+  therefore left ~1s to actually throw it, and the old "Intense" 1-2s gap
+  was *shorter than the combo itself* — the same overlap that caused the
+  Phase 12 echo, which was fixed at the speech layer without anyone
+  noticing the scheduling side. `lib/speechTiming.ts` now estimates the
+  call-out and `sessionTick` arms after it. **The estimate is deliberate,
+  not laziness**: the real duration is only knowable inside
+  `SpeechEngine`, and genuinely unknowable ahead of time for a custom
+  punch name falling through to on-device TTS. Feeding a real completion
+  time back would move timing decisions into the untested native consumer
+  and introduce a failure mode where a combo that never reports
+  completion stops the round's scheduling entirely. Being off by a few
+  hundred ms cannot do that. If the voice bank is ever regenerated with a
+  different voice or model, re-measure `AVG_SPOKEN_WORD_MS`.
+- **Any gap number in this project predating 2026-08-27 was measured from
+  the wrong end.** The old built-in pace figures, `Settings`' own 1.5-3s
+  default, and `bagwork.md`'s own rest-between-bursts table all describe
+  post-combo rest, which is not what the app was doing. Read any such
+  number as "rest after the call-out" and check whether the code agrees
+  before treating it as a spec.
+- **The boxing built-ins carry `bagwork.md`'s real programming now
+  (2026-08-27), replacing three templates that called random punches.**
+  The originals gave every round a bare `{type: "random"}` source, so a
+  "Moderate" session bore no relation to the template it was named after —
+  the user noticed this directly ("it is using random instead of
+  presets"). Six now: Easy/Moderate/Intense × punches-only /
+  punches + kicks, the kick rounds being the *only* difference within a
+  pair so the two read as one session with kicks turned on. Rounds are
+  2 min / 60s rest per bagwork's own header; the previous 180s came from
+  nowhere. The plans live in `workoutTemplates/builtIns.ts`, apart from
+  `service.ts`, because they are data.
+- **Template gaps deliberately sit above `bagwork.md`'s own figures**
+  (8-12 / 6-9 / 4-6s vs. bagwork's 6-9 / 4-5 / 2-3). The user wrote that
+  table and then found the density unthrowable in practice even on Easy.
+  Tightening a gap is a slider on the template, so the forgiving end is
+  the better default — a user who wants bagwork's literal numbers can
+  reach them, a user drowning in call-outs just stops using the app.
+- **`combo-pool` is the ComboSource that holds a *set* of combos**, one
+  drawn per call-out. Added because bagwork's rounds name several each
+  (Moderate R3 is `1-2b-3` and `2-3b-2`) and nothing existing could
+  express that: `fixed-sequence` is one combo forever, `preset` is the
+  same thing behind an id, `random` throws the combo structure away. A
+  pool of one is the rep-to-reflex case Easy's rounds ask for.
+  **`fixed-sequence` is now strictly redundant with it** (a pool of one)
+  and is kept only because stored custom templates may use it — a
+  candidate for the same consolidation that killed the flat `restSec` and
+  the `DrillMode`/`DrillType` pair, if it is ever confirmed unused.
+- **The default punch list is 21 entries now, not 7 (2026-08-27): 1-9
+  punches, 10-21 kicks.** The kicks and body variants had been in the
+  bundled voice bank since Phase 5a but deliberately *not* seeded, which
+  was correct until a workout template needed to name them — an unseeded
+  kick resolves to "Punch 14" and gets announced as such. **The random
+  pool now defaults to the punches only** (`PUNCH_ONLY_POOL`, 1-9): a
+  boxing quick-start must not start calling head kicks just because they
+  exist. Two consequences worth knowing: the pool is effectively never
+  `null` any more (so Settings' "Restrict punch pool" switch reads ON by
+  default, truthfully), and `createPunch` now adds the new punch to a
+  restricted pool so only the *seeded kicks* start out excluded, never
+  the user's own additions.
+  A test in `speech/service.test.ts` pins every default punch name to a
+  real bundled clip — a typo there would silently drop that punch to the
+  on-device TTS voice mid-combo rather than failing.
+- **The punch backfill is tracked by its own storage key, not by
+  comparing against the defaults.** `getPunches` returns stored rows
+  as-is, so an install predating the kicks needed a migration — but a
+  "append anything missing from the defaults" check would resurrect a
+  punch the user deliberately deleted, on every read, forever. It also
+  pins a still-`null` random pool to the punches that already existed,
+  because `null` means "draw from everything I have" and would otherwise
+  silently start calling kicks. Same lesson as the template migration:
+  **tests start from empty storage and a real device does not.**
+- **`bagwork.md`'s "lead-leg flick" has no clip of its own**, so those
+  rounds call a Lead Low Kick and carry the flick mechanic (pendulum
+  step, snap and retract, low commitment) in the round's coaching note
+  instead. Generating a real `flick` clip is a `generate_voice_bank.py`
+  run with a filename filter if it ever matters.
+- **A round's `label`/`note` finally render during a session
+  (`RoundFocus`, 2026-08-27).** They existed on `RoundConfig` since Phase
+  10a and were editable in the Round Builder the whole time, but nothing
+  ever showed them mid-session — so round-by-round focus, the entire
+  point of a workout template, was invisible exactly when it was needed.
+  Worth remembering as a shape: a field being *editable* is not the same
+  as it being *used*, and this one sat half-wired across three phases.
+- **Google Play compliance audit, 2026-08-27 — one real fix shipped, two
+  Play Console actions still needed.** Triggered by a direct ask, not part
+  of a phase. Checked against the actual generated Android project (`expo
+  prebuild`), not just `app.json`.
+  - **Fixed: three unused, unjustified permissions were shipping to
+    production.** `android/app/src/main/AndroidManifest.xml` is
+    regenerated fresh by `expo prebuild` from Expo's own base template
+    (`@expo/config-plugins`'s `getAndroidManifestTemplate`, literally
+    commented `"OPTIONAL PERMISSIONS, REMOVE WHATEVER YOU DO NOT NEED"`),
+    which this project never pruned. `SYSTEM_ALERT_WINDOW` (a "special app
+    access" permission Play Console requires justification for, with zero
+    use here — this app has no overlay UI) and
+    `READ_EXTERNAL_STORAGE`/`WRITE_EXTERNAL_STORAGE` (legacy storage
+    access, subject to Play's storage-permissions policy, also unused —
+    every entity this app stores lives in MMKV, not the filesystem) were
+    all declaring into the release manifest for no reason. Fixed via
+    `app.json`'s `android.blockedPermissions`, which emits
+    `tools:node="remove"` in the manifest — guaranteed removal even if a
+    future dependency's own manifest tries to re-add one, not just an
+    omission that a library could silently reintroduce. **Verified against
+    the actual merged release manifest**, not just the source file:
+    `android/app/build/intermediates/merged_manifests/release/
+    processReleaseManifest/AndroidManifest.xml` shows none of the three
+    present after the fix; the remaining permission list is
+    `FOREGROUND_SERVICE`/`FOREGROUND_SERVICE_MEDIA_PLAYBACK` (real, for
+    background audio), `INTERNET` (Expo's non-optional base permission —
+    needed by the dev-client/Metro connection during development even
+    though the shipped app makes no network calls; removing it would break
+    the dev workflow for no Play-compliance benefit), and `VIBRATE`
+    (harmless, normal-protection-level, doesn't trigger Play's sensitive-
+    permission review — left alone).
+  - **Already compliant, verified rather than assumed:** `targetSdkVersion`
+    resolves to 36 (`./gradlew :app:properties`), clearing Play's Aug 31
+    2026 requirement (existing apps need 35+, new apps/updates need 36) —
+    this is Expo SDK 57's own default, nothing this project set explicitly.
+    AGP is 8.12.0 with NDK 27.1.12297006, which auto-page-aligns native
+    `.so` libraries to 16KB (Play's other 2025/2026 native-library
+    requirement) with no manual config — confirmed via `gradlew
+    buildEnvironment`, not a raw byte-alignment check on a built artifact.
+    `eas.json`'s production profile has no `android.buildType` override, so
+    it defaults to `.aab` (only `development`/`preview` override to `apk`
+    for direct-install testing) — Play requires App Bundle format for a
+    real submission. The notification-permission request already follows
+    Play's own recommended pattern: onboarding's intro card explains why
+    *before* the OS dialog fires, not after.
+  - **Still needed, Play Console side, not fixable from here:** a Data
+    Safety form declaring "no data collected" (true — no accounts, no
+    backend, no analytics/crash-reporting SDK exists in `package.json` at
+    all) and a **Privacy Policy URL, which Play requires for every
+    listing now regardless of data collected.** A real one was drafted and
+    published as an artifact matching the app's own dark/orange design
+    tokens (`src/shared/theme/tokens.ts`) rather than a generic legal
+    template — one placeholder remains: a real contact email, deliberately
+    left blank rather than guessed (the user's own email in this session's
+    context is for identifying them to me, not for publishing on a public
+    page without being asked).
+  - **A pre-existing, unrelated bug surfaced by `expo prebuild`'s own
+    warning, not this audit's actual subject**: `userInterfaceStyle:
+    Install expo-system-ui in your project to enable this feature.`
+    `app.json`'s `userInterfaceStyle: "automatic"` (the Phase 6 native-audit
+    fix, PROJECT_FACTS.md) may not actually be taking effect at the native
+    container level — `expo-system-ui` isn't a listed dependency. Not a
+    Play compliance blocker, but worth its own look; flagged, not fixed,
+    since it's outside what was asked.
 - **"This protocol has no drill" and "this session has no drill" are two
   different facts, encoded two different ways.** The first is a property
   of a protocol, fixed in its template (`RestPlan.kind === "plain"`,

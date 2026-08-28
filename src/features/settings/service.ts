@@ -7,6 +7,8 @@ import type { Preset, Punch, Settings } from "./types";
 const SETTINGS_KEY = "settings";
 const PUNCHES_KEY = "punches";
 const PRESETS_KEY = "presets";
+/** One-time marker for the body-shot/kick backfill -- see seedExtendedPunchesOnce. */
+const EXTENDED_PUNCHES_SEEDED_KEY = "extendedPunchesSeeded";
 
 export class LastPunchError extends Error {}
 
@@ -22,7 +24,7 @@ export function createDefaultSettings(): Settings {
     comboGapMaxSec: 3,
     comboLengthMin: 2,
     comboLengthMax: 4,
-    randomPunchPool: null,
+    randomPunchPool: PUNCH_ONLY_POOL,
     speechRate: 1.0,
     appVolume: 1.0,
     announceStyle: "name",
@@ -41,17 +43,48 @@ export function createDefaultSettings(): Settings {
  * physical punch in orthodox vs southpaw, "Rear Hook" never does.
  * Body Hook is num 7, not interleaved into 1-6, so the traditional
  * boxing 1-6 numbering (used by the number announce-style) stays intact.
+ *
+ * Every name here resolves to a clip in the bundled voice bank -- pinned
+ * by a test in speech/service.test.ts, since a typo would silently fall
+ * through to the on-device TTS voice mid-combo instead of failing.
  */
+const DEFAULT_PUNCH_NAMES: readonly (readonly [number, string])[] = [
+  [1, "Jab"],
+  [2, "Cross"],
+  [3, "Lead Hook"],
+  [4, "Rear Hook"],
+  [5, "Lead Uppercut"],
+  [6, "Rear Uppercut"],
+  [7, "Body Hook"],
+  [8, "Body Jab"],
+  [9, "Body Cross"],
+  [10, "Lead Low Kick"],
+  [11, "Rear Low Kick"],
+  [12, "Lead Calf Kick"],
+  [13, "Rear Calf Kick"],
+  [14, "Lead Body Kick"],
+  [15, "Rear Body Kick"],
+  [16, "Lead High Kick"],
+  [17, "Rear High Kick"],
+  [18, "Lead Push Kick"],
+  [19, "Rear Push Kick"],
+  [20, "Lead Inside Kick"],
+  [21, "Rear Inside Kick"],
+];
+
+/**
+ * What Random mode draws from by default: the punches, not the kicks.
+ *
+ * The kicks are seeded as real punches so the "+ kicks" workout templates
+ * can name them and get the bundled voice instead of "punch fourteen" --
+ * but a boxing quick-start shouldn't start calling head kicks just
+ * because they now exist. Opting one in is the per-row switch already on
+ * the Punches screen.
+ */
+export const PUNCH_ONLY_POOL: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
 export function createDefaultPunches(): Punch[] {
-  return [
-    { id: Crypto.randomUUID(), num: 1, name: "Jab" },
-    { id: Crypto.randomUUID(), num: 2, name: "Cross" },
-    { id: Crypto.randomUUID(), num: 3, name: "Lead Hook" },
-    { id: Crypto.randomUUID(), num: 4, name: "Rear Hook" },
-    { id: Crypto.randomUUID(), num: 5, name: "Lead Uppercut" },
-    { id: Crypto.randomUUID(), num: 6, name: "Rear Uppercut" },
-    { id: Crypto.randomUUID(), num: 7, name: "Body Hook" },
-  ];
+  return DEFAULT_PUNCH_NAMES.map(([num, name]) => ({ id: Crypto.randomUUID(), num, name }));
 }
 
 export function getSettings(): Settings {
@@ -67,14 +100,57 @@ export function markOnboardingComplete(): void {
   saveSettings({ ...getSettings(), hasCompletedOnboarding: true });
 }
 
+/**
+ * Body shots and kicks were added to the default punch list after this app
+ * had already shipped, so an existing install holds only the original 1-7
+ * and would announce "punch fourteen" for any kick a workout template names.
+ *
+ * `get*` returns stored rows as-is, so this is the migration that gap needs
+ * -- but it runs exactly once, tracked by its own key rather than by
+ * comparing against the defaults. Comparing would silently resurrect a punch
+ * the user had deliberately deleted, every read, forever. It also pins a
+ * still-`null` random pool to whatever they already had: `null` means "draw
+ * from every punch I have", so without this their boxing quick-start would
+ * suddenly start calling head kicks.
+ */
+function seedExtendedPunchesOnce(stored: Punch[]): Punch[] {
+  if (getItem<boolean>(EXTENDED_PUNCHES_SEEDED_KEY) === true) {
+    return stored;
+  }
+  setItem(EXTENDED_PUNCHES_SEEDED_KEY, true);
+
+  const existingNums = stored.map((p) => p.num);
+  const missing = DEFAULT_PUNCH_NAMES.filter(([num]) => !existingNums.includes(num)).map(([num, name]) => ({
+    id: Crypto.randomUUID(),
+    num,
+    name,
+  }));
+  if (missing.length === 0) {
+    return stored;
+  }
+
+  const settings = getSettings();
+  if (settings.randomPunchPool === null) {
+    // Deduped on write: Punch.num is explicitly allowed to be non-unique
+    // (extraction doc 1.6), and a pool carrying the same number twice
+    // defeats ChipMultiSelect's last-chip guard, which counts entries.
+    saveSettings({ ...settings, randomPunchPool: Array.from(new Set(existingNums)) });
+  }
+
+  const merged = [...stored, ...missing];
+  setItem(PUNCHES_KEY, merged);
+  return merged;
+}
+
 export function getPunches(): Punch[] {
   const stored = getItem<Punch[]>(PUNCHES_KEY);
   if (stored === undefined) {
     const defaults = createDefaultPunches();
     setItem(PUNCHES_KEY, defaults);
+    setItem(EXTENDED_PUNCHES_SEEDED_KEY, true);
     return defaults;
   }
-  return stored;
+  return seedExtendedPunchesOnce(stored);
 }
 
 function savePunches(punches: Punch[]): void {
@@ -99,9 +175,21 @@ function normalizePunchName(name: string): string {
     .join(" ");
 }
 
+/**
+ * A punch you just created joins the random pool even when the pool is
+ * restricted. Without this, the kicks now seeded by default would make
+ * every install's pool non-null, so a custom punch would silently never
+ * be drawn until the user found the per-row switch -- the seeded kicks
+ * are the only thing meant to start out excluded, not the user's own
+ * additions. Toggling it back off afterwards still works as before.
+ */
 export function createPunch(name: string, num: number): Punch {
   const punch: Punch = { id: Crypto.randomUUID(), num, name: normalizePunchName(name) };
   savePunches([...getPunches(), punch]);
+  const settings = getSettings();
+  if (settings.randomPunchPool !== null && !settings.randomPunchPool.includes(num)) {
+    saveSettings({ ...settings, randomPunchPool: [...settings.randomPunchPool, num] });
+  }
   return punch;
 }
 
