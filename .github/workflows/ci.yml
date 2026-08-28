@@ -17,6 +17,15 @@ jobs:
           node-version: 24
           cache: npm
 
+      # Pinned explicitly: the npm bundled with actions/setup-node's Node 24
+      # has, at points, disagreed with a locally-generated lockfile over
+      # `overrides`-injected packages (npm error EUSAGE "Missing: X from
+      # lock file") even when `npm ci` succeeds locally against the exact
+      # same lockfile -- a known class of npm version-to-version drift in
+      # how lockfileVersion 3 records override resolutions, not a real
+      # package.json/package-lock.json mismatch.
+      - run: npm install -g npm@11.6.2
+
       - run: npm ci
 
       - name: Lint
