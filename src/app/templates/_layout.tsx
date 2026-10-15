@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 
-import { useTheme } from "../../shared/theme/ThemeContext";
+import { useThemedHeaderOptions } from "../../shared/theme/headerOptions";
 
 /**
  * Nested stack for the Templates Picker (Phase 10b) and, once Phase 10c
@@ -9,17 +9,9 @@ import { useTheme } from "../../shared/theme/ThemeContext";
  * (docs/user-flows.md's navigation convention).
  */
 export default function TemplatesLayout() {
-  const { colors, fonts } = useTheme();
+  const headerOptions = useThemedHeaderOptions();
   return (
-    <Stack
-      screenOptions={{
-        headerShown: true,
-        headerStyle: { backgroundColor: colors.panel },
-        headerTintColor: colors.accent,
-        headerTitleStyle: { fontFamily: fonts.bodySemiBold, fontSize: 16 },
-        headerShadowVisible: false,
-      }}
-    >
+    <Stack screenOptions={headerOptions}>
       <Stack.Screen name="index" options={{ title: "TEMPLATES" }} />
       {/* Title is set dynamically from within the screen itself (NEW
           TEMPLATE vs EDIT TEMPLATE, depending on the `id` param) -- see

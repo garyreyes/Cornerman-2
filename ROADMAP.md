@@ -747,13 +747,24 @@ wrong end. What was Phase 13 (the Templates phase close) is now Phase 14
 *Was Phase 12 until 2026-08-26, then Phase 13; renumbered twice as the
 bike protocol rework and then the bagwork templates landed in front of it.*
 
-- [ ] **Phase close: `/impeccable critique` + `/impeccable polish`** —
-  `not started` — Templates Picker, Round Builder, and Assault-Bike
-  Session judged together for visual consistency with each other and
-  with the rest of the app. The Assault-Bike screen has grown
-  materially since it was last looked at (drill grids, timer bar, score
-  readout, summary card, drill picker), so it carries the most unjudged
-  surface area of the three.
+- [x] **Phase close: `/impeccable critique` + `/impeccable polish`** —
+  `done`, 2026-09-13 — Templates Picker, Round Builder, and Assault-Bike
+  Session judged together for the first time; dual-agent critique
+  scored 28/40 against real screenshots from a freshly-built dev client,
+  not just source. All 7 findings fixed the same pass: Round Builder's
+  5-way combo-source `SegmentedControl` (confirmed visibly cramped)
+  replaced with a wrapping chip row and full-word labels; a fully
+  disabled Edit icon on Bike templates now renders nothing instead of a
+  too-subtle dimmed version; Assault-Bike's hand-duplicated header
+  theming centralized into a new `useThemedHeaderOptions()`; an
+  in-progress bike session can no longer be discarded by one stray
+  back-tap (new themed leave-confirm, not a native `Alert.alert`); the
+  Drill grid no longer vanishes into an empty rectangle between trials;
+  Round Builder's save error gets the same announced-alert treatment as
+  `AudioErrorBanner` via a new shared `InlineErrorBanner`; and three
+  drifted "section title" sizes on one screen collapsed to two
+  deliberate hierarchy levels. Full trace in `CHANGES.md`. 284/284 tests,
+  lint/typecheck clean, each fix re-verified live on the emulator.
 
 ---
 

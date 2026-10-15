@@ -1124,3 +1124,69 @@ Dated log of shipped changes, appended to as features complete.
   `DrillChoice = DrillMode | "none"` type, distinct from a protocol
   structurally having no drill at all. Engine change written test-first
   (5 red). 242/242 tests, lint/typecheck clean.
+- 2026-09-13: Phase 14 close — `/impeccable critique` + polish across
+  Templates Picker, Round Builder, and the Assault-Bike Session screen,
+  judged together for the first time since the bike protocols/scoring
+  rework grew that last screen considerably. Dual-agent critique (28/40,
+  real screenshots from a freshly-built dev client), all seven findings
+  fixed the same pass.
+  - **Round Builder's combo-source picker broke the app's own
+    cognitive-load rule.** `SegmentedControl` is built (and documented)
+    for a 2-value toggle; pushed to five options for RANDOM/FIXED/SEQ/
+    COMBOS/PRESET, a real screenshot showed it visibly cramped -- uneven
+    gaps, the two longest labels crowding the right edge. Replaced with a
+    wrapping chip row (`RoundCard.tsx`, reusing the file's own existing
+    `PresetSourceEditor` chip styles) and full words instead of
+    abbreviations -- "Combo Pool" reads as English, "COMBOS" read as
+    shorthand for it.
+  - **A fully disabled Edit icon rendered identically enough to a working
+    one to fool a first glance.** Every Bike protocol's Edit pencil in
+    Templates Picker carried the same `disabled` treatment (opacity 0.4
+    over an already-muted icon) as every boxing template's *working* Edit
+    icon -- a 4x pixel crop showed the difference is real but too subtle
+    to register in the actual list. Fixed by not rendering the icon at
+    all for rows with no editor (`TemplateRow.tsx`) -- no control reads
+    unambiguously as "nothing to press here," where a dim one invites a
+    wasted tap.
+  - **Assault-Bike hand-duplicated header theming** that
+    `settings/_layout.tsx` and `templates/_layout.tsx` each already
+    centralize once. New `useThemedHeaderOptions()`
+    (`shared/theme/headerOptions.ts`) is now the one place that defines
+    the themed-header shape; all three consumers call it.
+  - **An in-progress Assault-Bike session could be discarded with one
+    stray tap.** The header back arrow (and the hardware back button)
+    stayed active mid-drill with no confirmation, silently dropping a
+    live, in-memory-only score. `assault-bike.tsx` now intercepts
+    `beforeRemove` while a session is running (never while Ready or
+    Finished) and shows an inline "Leave session? Your score will be
+    lost." choice in place of the control row -- no native `Alert.alert`,
+    matching this app's own themed-banner convention for destructive
+    moments instead of introducing a second one.
+  - **The Drill grid vanished into an empty rectangle during MISS/HIT
+    feedback.** `useDrillRun`'s `finishTrial` nulled the puzzle
+    immediately so `trial === null` hid the whole grid for the
+    ~500ms pause between trials -- confirmed live, it read as a rendering
+    gap, not a deliberate pause. New `displayTrial` holds the same puzzle
+    on screen through the pause (cleared only when the drill itself goes
+    inactive); `trial` still gates scoring/interactivity exactly as
+    before, so a tap during the pause remains a safe no-op.
+  - **Round Builder's save error was a plain, unannounced `<Text>`**,
+    unlike `AudioErrorBanner`'s equivalent alert treatment elsewhere.
+    `AudioErrorBanner`'s pattern (themed banner, `accessibilityRole="alert"`,
+    announces itself on mount) is now a generic
+    `shared/components/InlineErrorBanner.tsx` with a `message` prop --
+    `AudioErrorBanner` is a two-line wrapper over it now, callers
+    unchanged, and Round Builder's save failure gets the same
+    screen-reader announcement for free.
+  - **Three sizes for one "section title" role on Round Builder alone**
+    (15px/13px/12px, same font, same conceptual level) -- "ROUNDS"
+    (`[id].tsx`) is a top-level section sibling to "BASE PACE"
+    (`SectionCard`), so it now matches that size exactly (15/2);
+    "COMBO SOURCE" stays smaller deliberately, one real nesting level
+    down inside an expanded round.
+  - Verified on a real Android emulator after each fix: the chip picker
+    wraps cleanly, the Bike rows show no Edit control at all, the themed
+    header renders unchanged, the leave-confirm blocks and resumes a live
+    Combat Effort session correctly, and the Drill grid stays visible
+    through a resolved trial instead of flashing empty. 284/284 tests,
+    lint/typecheck clean throughout.

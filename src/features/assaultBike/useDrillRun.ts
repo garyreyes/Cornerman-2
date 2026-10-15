@@ -20,9 +20,18 @@ const NEXT_TRIAL_DELAY_MS = 500;
 export type DrillTrial = { mode: "odd-one-out"; puzzle: Trial } | { mode: "color-call"; puzzle: ColorTrial };
 
 export interface UseDrillRunResult {
-  /** The puzzle currently on screen; null during the brief result-shown
-   * pause between trials, and whenever the drill isn't active. */
+  /** The puzzle currently interactive; null during the brief result-shown
+   * pause between trials, and whenever the drill isn't active. Gates
+   * scoring (`handleTap` is already a no-op once this goes null) -- use
+   * `displayTrial` for what to render. */
   trial: DrillTrial | null;
+  /** What the grid should show: the same puzzle as `trial`, but held over
+   * through the between-trial pause instead of disappearing the instant a
+   * tap or timeout resolves it -- an empty grid for that ~500ms read as a
+   * rendering gap, not a deliberate pause (found 2026-09-12 via
+   * /impeccable critique). Cleared only when the drill itself goes
+   * inactive, so no stale puzzle lingers into Reset/PHONE DOWN. */
+  displayTrial: DrillTrial | null;
   lastResult: TrialOutcome | null;
   /** Absolute timestamp this trial times out at; null between trials. */
   deadlineAt: number | null;
@@ -53,6 +62,7 @@ export interface UseDrillRunResult {
  */
 export function useDrillRun(active: boolean, drillMode: DrillMode, difficulty: Difficulty): UseDrillRunResult {
   const [trial, setTrial] = useState<DrillTrial | null>(null);
+  const [displayTrial, setDisplayTrial] = useState<DrillTrial | null>(null);
   const [lastResult, setLastResult] = useState<TrialOutcome | null>(null);
   const [deadlineAt, setDeadlineAt] = useState<number | null>(null);
   const [windowMs, setWindowMs] = useState(() => trialWindowMs(difficulty, 0));
@@ -115,6 +125,8 @@ export function useDrillRun(active: boolean, drillMode: DrillMode, difficulty: D
     setStats(next);
     setLastResult(result);
     setTrial(null);
+    // displayTrial deliberately left standing -- the grid stays on screen
+    // through the pause; only trial (the interactive/scoring puzzle) clears.
     trialRef.current = null;
     setDeadlineAt(null);
     nextTrialRef.current = setTimeout(() => beginTrialRef.current(), NEXT_TRIAL_DELAY_MS);
@@ -140,6 +152,7 @@ export function useDrillRun(active: boolean, drillMode: DrillMode, difficulty: D
     trialRef.current = nextTrial;
     windowRef.current = nextWindowMs;
     setTrial(nextTrial);
+    setDisplayTrial(nextTrial);
     setWindowMs(nextWindowMs);
     setDeadlineAt(now + nextWindowMs);
     setLastResult(null);
@@ -168,6 +181,7 @@ export function useDrillRun(active: boolean, drillMode: DrillMode, difficulty: D
         speechEngineRef.current?.stop();
         trialRef.current = null;
         setTrial(null);
+        setDisplayTrial(null);
         setDeadlineAt(null);
         setLastResult(null);
         return;
@@ -207,6 +221,7 @@ export function useDrillRun(active: boolean, drillMode: DrillMode, difficulty: D
 
   return {
     trial,
+    displayTrial,
     lastResult,
     deadlineAt,
     windowMs,

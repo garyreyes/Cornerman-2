@@ -1,6 +1,6 @@
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { DrillFeedback } from "../features/assaultBike/components/DrillFeedback";
@@ -21,8 +21,9 @@ import { PhaseBadge } from "../features/session/components/PhaseBadge";
 import { RoundCounter } from "../features/session/components/RoundCounter";
 import { getWorkoutTemplates, toBikeConfig } from "../features/workoutTemplates/service";
 import type { AssaultBikeConfig } from "../features/workoutTemplates/types";
+import { useThemedHeaderOptions } from "../shared/theme/headerOptions";
 import { useTheme } from "../shared/theme/ThemeContext";
-import type { ColorTokens } from "../shared/theme/tokens";
+import type { ColorTokens, Fonts } from "../shared/theme/tokens";
 
 /**
  * Assault-Bike Session (docs/user-flows.md Flow 7, Phase 11b/11c).
@@ -71,7 +72,9 @@ export default function AssaultBikeSessionRoute() {
 
 function AssaultBikeSessionScreen({ name, config }: { name: string; config: AssaultBikeConfig }) {
   const { colors, fonts } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, fonts), [colors, fonts]);
+  const headerOptions = useThemedHeaderOptions();
+  const navigation = useNavigation();
   const [baseBikeConfig] = useState(() => toBikeConfig(config));
 
   // A plain-rest protocol (Lactic Capacity) has no drill at all -- there
@@ -119,11 +122,30 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
   // since `active` can't be true in that case either. Stats live here,
   // above the per-round activation, so score and the shrinking trial
   // window carry across all of the session's rounds.
-  const { trial, lastResult, deadlineAt, windowMs, stats, summary, handleTap, resetStats } = useDrillRun(
+  const { trial, displayTrial, lastResult, deadlineAt, windowMs, stats, summary, handleTap, resetStats } = useDrillRun(
     isDrilling,
     drillChoice === "none" ? "odd-one-out" : drillChoice,
     templateDrill?.difficulty ?? "medium",
   );
+
+  // A live session's score/stats are in-memory only (PROJECT_FACTS.md) --
+  // leaving mid-drill via the header back arrow or the hardware back
+  // button silently discards them with no recovery, unlike every other
+  // destructive action in this app (Undo banners, explicit confirms).
+  // Intercepted only while a session is actually running: Ready (not
+  // started) and Finished (nothing left to lose) both leave freely.
+  const sessionActive = bikeState !== null && phase !== "finished";
+  const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!sessionActive) {
+      return undefined;
+    }
+    return navigation.addListener("beforeRemove", (e) => {
+      e.preventDefault();
+      setPendingLeave(() => () => navigation.dispatch(e.data.action));
+    });
+  }, [navigation, sessionActive]);
 
   function handleStart() {
     resetStats();
@@ -149,16 +171,7 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
           opts into the same themed header + back arrow Settings/Templates
           already use, per docs/user-flows.md's navigation convention,
           rather than inheriting the root Stack's headerShown:false. */}
-      <Stack.Screen
-        options={{
-          title: name.toUpperCase(),
-          headerShown: true,
-          headerStyle: { backgroundColor: colors.panel },
-          headerTintColor: colors.accent,
-          headerTitleStyle: { fontFamily: fonts.bodySemiBold, fontSize: 16 },
-          headerShadowVisible: false,
-        }}
-      />
+      <Stack.Screen options={{ ...headerOptions, title: name.toUpperCase() }} />
       <View style={styles.topRow}>
         <RoundCounter round={round} totalRounds={totalRounds} />
       </View>
@@ -175,15 +188,19 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
             <TrialTimerBar deadlineAt={deadlineAt} windowMs={windowMs} />
             <ScoreReadout score={stats.score} windowMs={windowMs} />
             <DrillFeedback result={lastResult} />
-            {trial === null ? null : trial.mode === "odd-one-out" ? (
+            {displayTrial === null ? null : displayTrial.mode === "odd-one-out" ? (
               <OddOneOutGrid
-                gridSize={trial.puzzle.gridSize}
-                oddIndex={trial.puzzle.oddIndex}
+                gridSize={displayTrial.puzzle.gridSize}
+                oddIndex={displayTrial.puzzle.oddIndex}
                 onTapTile={handleTap}
-                disabled={isPaused}
+                disabled={isPaused || trial === null}
               />
             ) : (
-              <ColorCallGrid choices={trial.puzzle.choices} onTapTile={handleTap} disabled={isPaused} />
+              <ColorCallGrid
+                choices={displayTrial.puzzle.choices}
+                onTapTile={handleTap}
+                disabled={isPaused || trial === null}
+              />
             )}
           </View>
         ) : (
@@ -201,21 +218,53 @@ function AssaultBikeSessionScreen({ name, config }: { name: string; config: Assa
       ) : null}
 
       <View style={styles.bottom}>
-        <ControlRow
-          showStart={showStart}
-          showPauseToggle={showPauseToggle}
-          showReset={showReset}
-          isPaused={isPaused}
-          onStart={handleStart}
-          onTogglePause={togglePause}
-          onReset={handleReset}
-        />
+        {pendingLeave !== null ? (
+          <View style={styles.leaveConfirm}>
+            <Text style={styles.leaveConfirmText}>Leave session? Your score will be lost.</Text>
+            <View style={styles.leaveConfirmActions}>
+              <Pressable
+                onPress={() => setPendingLeave(null)}
+                style={({ pressed }) => [styles.leaveConfirmButton, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Stay in session"
+              >
+                <Text style={styles.leaveConfirmButtonLabel}>STAY</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  const leave = pendingLeave;
+                  setPendingLeave(null);
+                  leave();
+                }}
+                style={({ pressed }) => [
+                  styles.leaveConfirmButton,
+                  styles.leaveConfirmButtonDanger,
+                  pressed && styles.pressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Leave session"
+              >
+                <Text style={[styles.leaveConfirmButtonLabel, styles.leaveConfirmButtonLabelDanger]}>LEAVE</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <ControlRow
+            showStart={showStart}
+            showPauseToggle={showPauseToggle}
+            showReset={showReset}
+            isPaused={isPaused}
+            onStart={handleStart}
+            onTogglePause={togglePause}
+            onReset={handleReset}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
 }
 
-function createStyles(colors: ColorTokens) {
+function createStyles(colors: ColorTokens, fonts: Fonts) {
   return StyleSheet.create({
     safeArea: {
       flex: 1,
@@ -251,6 +300,44 @@ function createStyles(colors: ColorTokens) {
     bottom: {
       paddingHorizontal: 24,
       paddingBottom: 24,
+    },
+    leaveConfirm: {
+      gap: 12,
+      alignItems: "center",
+    },
+    leaveConfirmText: {
+      fontFamily: fonts.body,
+      fontSize: 14,
+      color: colors.textPrimary,
+      textAlign: "center",
+    },
+    leaveConfirmActions: {
+      flexDirection: "row",
+      gap: 16,
+    },
+    leaveConfirmButton: {
+      minWidth: 120,
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.panelLine,
+      alignItems: "center",
+    },
+    leaveConfirmButtonDanger: {
+      borderColor: colors.danger,
+    },
+    leaveConfirmButtonLabel: {
+      fontFamily: fonts.bodySemiBold,
+      fontSize: 14,
+      letterSpacing: 2,
+      color: colors.textMuted,
+    },
+    leaveConfirmButtonLabelDanger: {
+      color: colors.danger,
+    },
+    pressed: {
+      opacity: 0.8,
     },
   });
 }

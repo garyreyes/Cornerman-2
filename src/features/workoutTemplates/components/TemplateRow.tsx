@@ -11,7 +11,13 @@ interface TemplateRowProps {
   /** True when no editor exists for this template's workoutType yet
    * (assault-bike-cognitive -- there's no Round-Builder equivalent for
    * it, and none is a planned Phase 11 deliverable). Starting the
-   * template is unaffected; only the Edit icon renders disabled. */
+   * template is unaffected; the Edit icon doesn't render at all here --
+   * a dimmed-but-still-`disabled`-Pressable version shipped first, but
+   * looked close enough to the enabled icon at a glance (both already
+   * render in `textMuted`) that a user had no reliable way to tell which
+   * rows could be edited without tapping to find out (found 2026-09-12
+   * via /impeccable critique). No control at all reads unambiguously as
+   * "nothing to press here." */
   editDisabled?: boolean;
   onPress: () => void;
   onEdit: () => void;
@@ -43,17 +49,17 @@ export function TemplateRow({ name, summary, isBuiltIn, editDisabled = false, on
         </Text>
       </Pressable>
 
-      <Pressable
-        onPress={onEdit}
-        disabled={editDisabled}
-        hitSlop={8}
-        style={({ pressed }) => [styles.iconButton, pressed && styles.pressed, editDisabled && styles.disabled]}
-        accessibilityRole="button"
-        accessibilityLabel={`Edit ${name}`}
-        accessibilityState={{ disabled: editDisabled }}
-      >
-        <Text style={styles.editGlyph}>✎</Text>
-      </Pressable>
+      {editDisabled ? null : (
+        <Pressable
+          onPress={onEdit}
+          hitSlop={8}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel={`Edit ${name}`}
+        >
+          <Text style={styles.editGlyph}>✎</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -108,9 +114,6 @@ function createStyles(colors: ColorTokens, fonts: Fonts) {
     },
     pressed: {
       opacity: 0.6,
-    },
-    disabled: {
-      opacity: 0.4,
     },
   });
 }
