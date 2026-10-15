@@ -127,6 +127,40 @@ expected — a scenario passing because it was assumed to pass isn't a test.
 Any failure found here is a follow-up bug, not something to fix inline
 during a test pass — log it and file it separately.
 
+## Driving and observing the phone from the PC (adb)
+
+Used for the 2026-09-19 spike and both 2026-10-15 runs. `adb` lives in
+`%LOCALAPPDATA%\Android\Sdk\platform-tools` and isn't on PATH by default:
+
+```powershell
+$env:Path += ";$env:LOCALAPPDATA\Android\Sdk\platform-tools"
+adb devices                       # must say "device", not "unauthorized"
+adb reverse tcp:8081 tcp:8081     # phone reaches Metro over the cable
+npx expo start --dev-client --port 8081
+adb shell am start -a android.intent.action.VIEW -d "cornerman://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081" com.gary.cornerman
+adb exec-out screencap -p > screen.png
+adb logcat -c                     # clear before a test run...
+adb logcat -d -s ReactNativeJS:*  # ...and read JS logs/errors after
+```
+
+Gotchas found the hard way:
+
+- **No phone in `adb devices`, no USB-mode prompt on the phone:** the
+  cable is likely charge-only. Windows lists the phone as `VID_2717`
+  (Xiaomi) once a data cable is used.
+- Android often doesn't ask about USB mode; it defaults to charging. Pick
+  **File transfer** from the USB notification, or set Developer options →
+  Default USB configuration.
+- The installed dev client doesn't register `exp+cornerman://`; use the
+  `cornerman://` link above.
+- Once the bundle has loaded, the cable can come out -- the app runs on
+  its own. Test screen-off scenarios unplugged: charging relaxes
+  Android's background limits (Doze never starts while plugged in).
+- `adb logcat -d` waits forever if no device is connected -- check
+  `adb devices` first.
+- Only one of you drives the phone at a time: remote `adb input` taps and
+  real presses at once produced a confusing false signal once.
+
 ## Out of scope
 
 - iOS testing — needs a Mac + Xcode; no `ios/` folder exists yet in this repo.
