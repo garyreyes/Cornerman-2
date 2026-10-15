@@ -418,3 +418,131 @@ describe("createSpeechEngine -- replace, don't layer (the echo fix)", () => {
     stopSpy.mockRestore();
   });
 });
+
+/**
+ * Background playback (2026-10): call-outs are queued ahead on the audio
+ * clock, because JS timers stop once the app is backgrounded but the audio
+ * clock keeps running -- see PROJECT_FACTS.md's 2026-09-19 spike. The mock
+ * decodes every clip to a 1.0s buffer.
+ */
+describe("createSpeechEngine -- scheduleUtterance", () => {
+  async function flushMicrotasks(times = 8): Promise<void> {
+    for (let i = 0; i < times; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  let nowSpy: jest.SpyInstance;
+  beforeEach(() => {
+    nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000);
+  });
+  afterEach(() => {
+    nowSpy.mockRestore();
+    jest.restoreAllMocks();
+  });
+
+  test("queues each word back to back from the matching audio-clock time", async () => {
+    const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
+
+    const engine = createSpeechEngine();
+    engine.scheduleUtterance(["Jab", "Cross"], 3_000, () => {});
+    await flushMicrotasks();
+
+    const whens = startSpy.mock.calls.map((call) => call[0]!);
+    expect(whens[0]).toBe(2);
+    expect(whens[1]).toBeCloseTo(3.12);
+  });
+
+  test("word spacing follows the current speech rate", async () => {
+    const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
+
+    const engine = createSpeechEngine();
+    engine.setRate(2);
+    engine.scheduleUtterance(["Jab", "Cross"], 3_000, () => {});
+    await flushMicrotasks();
+
+    expect(startSpy.mock.calls[1]![0]).toBeCloseTo(2.62);
+  });
+
+  test("a later utterance cuts off an earlier one still speaking at its start, rather than layering", async () => {
+    const stopSpy = jest.spyOn(AudioBufferSourceNode.prototype, "stop");
+
+    const engine = createSpeechEngine();
+    // "Jab" plays 2.0-3.0s, "Cross" 3.12-4.12s on the audio clock.
+    engine.scheduleUtterance(["Jab", "Cross"], 3_000, () => {});
+    await flushMicrotasks();
+    engine.scheduleUtterance(["Slip"], 4_000, () => {});
+    await flushMicrotasks();
+
+    // Only "Cross" is still due at 3.0s -- "Jab" has already finished by then.
+    expect(stopSpy.mock.calls).toEqual([[3]]);
+  });
+
+  test("an earlier utterance that has finished by the next one's start is left alone", async () => {
+    const stopSpy = jest.spyOn(AudioBufferSourceNode.prototype, "stop");
+
+    const engine = createSpeechEngine();
+    engine.scheduleUtterance(["Jab"], 3_000, () => {});
+    await flushMicrotasks();
+    engine.scheduleUtterance(["Slip"], 6_000, () => {});
+    await flushMicrotasks();
+
+    expect(stopSpy).not.toHaveBeenCalled();
+  });
+
+  test("reports onEnded once, when the utterance's last word finishes", async () => {
+    const connectSpy = jest.spyOn(AudioBufferSourceNode.prototype, "connect");
+    const onEnded = jest.fn();
+
+    const engine = createSpeechEngine();
+    engine.scheduleUtterance(["Jab", "Cross"], 3_000, onEnded);
+    await flushMicrotasks();
+
+    const sources = connectSpy.mock.instances as unknown as AudioBufferSourceNode[];
+    sources[0]!.onEnded?.({} as never);
+    expect(onEnded).not.toHaveBeenCalled();
+    sources[1]!.onEnded?.({} as never);
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
+  test("cancelling stops every word it queued", async () => {
+    const stopSpy = jest.spyOn(AudioBufferSourceNode.prototype, "stop");
+
+    const engine = createSpeechEngine();
+    const cancel = engine.scheduleUtterance(["Jab", "Cross"], 3_000, () => {});
+    await flushMicrotasks();
+    cancel();
+
+    expect(stopSpy).toHaveBeenCalledTimes(2);
+  });
+
+  test("a word with no bundled clip falls back to on-device TTS at its time, while the app is awake", () => {
+    nowSpy.mockRestore();
+    jest.useFakeTimers({ now: 1_000 });
+    const speakSpy = jest.spyOn(Speech, "speak").mockImplementation(() => {});
+
+    const engine = createSpeechEngine();
+    engine.scheduleUtterance(["Crescent Kick"], 3_000, () => {});
+
+    jest.advanceTimersByTime(1_999);
+    expect(speakSpy).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    expect(speakSpy).toHaveBeenCalledWith("Crescent Kick", expect.any(Object));
+
+    jest.useRealTimers();
+  });
+
+  test("cancelling a pending TTS fallback means it never speaks", () => {
+    nowSpy.mockRestore();
+    jest.useFakeTimers({ now: 1_000 });
+    const speakSpy = jest.spyOn(Speech, "speak").mockImplementation(() => {});
+
+    const engine = createSpeechEngine();
+    const cancel = engine.scheduleUtterance(["Crescent Kick"], 3_000, () => {});
+    cancel();
+    jest.advanceTimersByTime(5_000);
+
+    expect(speakSpy).not.toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+});

@@ -1190,3 +1190,37 @@ Dated log of shipped changes, appended to as features complete.
     Combat Effort session correctly, and the Drill grid stays visible
     through a resolved trial instead of flashing empty. 284/284 tests,
     lint/typecheck clean throughout.
+- 2026-10-15: Phase 15b — the boxing session's audio now survives the
+  screen locking and the app being backgrounded. Real-device testing
+  (2026-09-19) found home/power froze the timer and combos: every sound
+  fired from a 200ms JS `setInterval`, which Android stops once the app
+  isn't visible.
+  - **Audio is queued ahead on the audio clock instead of fired from a JS
+    timer.** `schedule.ts` walks `tick()`/`sessionTick()` event to event
+    (`startSchedule`/`advanceSchedule`); `playbackQueue.ts` keeps up to
+    30s, and at least 4 steps, queued via new `scheduleCue`/
+    `scheduleUtterance` engine methods. Each sound's `onEnded` -- proven
+    to wake JS while locked -- tops the queue up.
+  - **Each item plays exactly once.** Tested across a whole session,
+    topped up both every 200ms and only from `onEnded` wake-ups (all a
+    locked phone allows). Items missed while JS was asleep are dropped,
+    not burst on return (extraction doc §1.1).
+  - **Pause/resume keeps exact remaining time** (§1.3): pause cancels
+    what's queued and rewinds; resume shifts the walk by the paused
+    duration with the timer engine's own pause/resume math.
+  - **Settings changes still reach a running session**: returning from
+    Settings regenerates everything queued after that moment from the
+    new settings; a voice switch re-queues onto the new engine.
+  - **Replace, don't layer, still holds**: a later utterance stops one
+    still speaking at its start via `stop(when)`.
+  - The 200ms loop now only drives the display; the combo card reads
+    what playback reports as actually spoken. `AppState` changes top the
+    queue up.
+  - The review-flagged "0s work/rest hangs the schedule" bug does not
+    reproduce -- `tick()` cascades zero-length phases in one call -- and
+    is now covered by tests; the misleading comment is fixed.
+  - Verified on a POCO F6 Pro on battery: power button, home button,
+    Cornerman ↔ Spotify both ways, and recording camera video all keep
+    the combos and timer going. 336/336 tests, lint/typecheck clean.
+  - Not yet: Assault Bike (15c), custom punch names in the background
+    (15d), and the longer device scenarios listed in ROADMAP.md 15b.

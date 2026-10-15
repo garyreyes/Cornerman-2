@@ -1,4 +1,4 @@
-import { effectiveRestDurationMs, effectiveWorkDurationMs, startTimer, tick } from "./service";
+import { effectiveRestDurationMs, effectiveWorkDurationMs, nextEventTime, startTimer, tick } from "./service";
 import type { TimerConfig, TimerEvent, TimerState } from "./types";
 
 const baseConfig: TimerConfig = {
@@ -285,6 +285,129 @@ describe("per-round duration overrides (Phase 10d: WorkoutTemplate roundPlan)", 
     expect(state.round).toBe(2);
     // Round 2 begins at now+4000, using round 2's own 7000ms override.
     expect(state.phaseEndAt).toBe(now + 4_000 + 7_000);
+  });
+});
+
+describe("nextEventTime -- earliest time tick() would next produce a change", () => {
+  // Lets a scheduler (session/schedule.ts) precompute a whole session's
+  // event timeline by jumping straight from event to event, instead of
+  // reimplementing tick()'s internal thresholds or polling it at fake
+  // intermediate `now` values just to discover them.
+
+  test("warmup phase: only the phase boundary itself is a candidate", () => {
+    const now = 1_000_000;
+    const config: TimerConfig = { ...baseConfig, warmupDurationMs: 3_000 };
+    const state = startTimer(config, now);
+    expect(nextEventTime(state, config)).toBe(now + 3_000);
+  });
+
+  test("work phase, long enough to warn: the 10s-warning boundary comes before phase end", () => {
+    const now = 1_000_000;
+    const state = startTimer(baseConfig, now); // workDurationMs=15_000
+    expect(nextEventTime(state, baseConfig)).toBe(state.phaseEndAt - 10_000);
+  });
+
+  test("work phase, already warned: falls back to the phase boundary", () => {
+    const now = 1_000_000;
+    const state: TimerState = { ...startTimer(baseConfig, now), tenWarned: true };
+    expect(nextEventTime(state, baseConfig)).toBe(state.phaseEndAt);
+  });
+
+  test("work phase too short to ever warn: falls back to the phase boundary", () => {
+    const now = 1_000_000;
+    const shortConfig: TimerConfig = { ...baseConfig, workDurationMs: 8_000 };
+    const state = startTimer(shortConfig, now);
+    expect(nextEventTime(state, shortConfig)).toBe(state.phaseEndAt);
+  });
+
+  test("rest phase, no countdown announced yet: the 3-second boundary is next", () => {
+    const now = 1_000_000;
+    const state: TimerState = {
+      phase: "rest",
+      round: 1,
+      phaseEndAt: now + 5_000,
+      tenWarned: false,
+      lastRestCountdown: null,
+      firstComboAt: null,
+      isPaused: false,
+      pausedAt: null,
+    };
+    expect(nextEventTime(state, baseConfig)).toBe(state.phaseEndAt - 3_000);
+  });
+
+  test("rest phase, 3 already announced: the 2-second boundary is next, not 3 again", () => {
+    const now = 1_000_000;
+    const state: TimerState = {
+      phase: "rest",
+      round: 1,
+      phaseEndAt: now + 5_000,
+      tenWarned: false,
+      lastRestCountdown: 3,
+      firstComboAt: null,
+      isPaused: false,
+      pausedAt: null,
+    };
+    expect(nextEventTime(state, baseConfig)).toBe(state.phaseEndAt - 2_000);
+  });
+
+  test("rest phase, 1 already announced: no countdown candidates left, falls back to phase end", () => {
+    const now = 1_000_000;
+    const state: TimerState = {
+      phase: "rest",
+      round: 1,
+      phaseEndAt: now + 5_000,
+      tenWarned: false,
+      lastRestCountdown: 1,
+      firstComboAt: null,
+      isPaused: false,
+      pausedAt: null,
+    };
+    expect(nextEventTime(state, baseConfig)).toBe(state.phaseEndAt);
+  });
+
+  test("finished phase: no more events", () => {
+    const state: TimerState = {
+      phase: "finished",
+      round: 2,
+      phaseEndAt: 1_000_000,
+      tenWarned: false,
+      lastRestCountdown: null,
+      firstComboAt: null,
+      isPaused: false,
+      pausedAt: null,
+    };
+    expect(nextEventTime(state, baseConfig)).toBeNull();
+  });
+
+  test("paused: no forward event to compute -- caller must resume first", () => {
+    const now = 1_000_000;
+    const state: TimerState = { ...startTimer(baseConfig, now), isPaused: true, pausedAt: now };
+    expect(nextEventTime(state, baseConfig)).toBeNull();
+  });
+
+  test("agrees with tick() at the boundary it names -- work-warning case", () => {
+    const now = 1_000_000;
+    const state = startTimer(baseConfig, now);
+    const boundary = nextEventTime(state, baseConfig)!;
+    const { events } = tick(state, baseConfig, boundary);
+    expect(events).toEqual([{ type: "work-warning" }]);
+  });
+
+  test("agrees with tick() at the boundary it names -- rest-countdown case", () => {
+    const now = 1_000_000;
+    const state: TimerState = {
+      phase: "rest",
+      round: 1,
+      phaseEndAt: now + 5_000,
+      tenWarned: false,
+      lastRestCountdown: null,
+      firstComboAt: null,
+      isPaused: false,
+      pausedAt: null,
+    };
+    const boundary = nextEventTime(state, baseConfig)!;
+    const { events } = tick(state, baseConfig, boundary);
+    expect(events).toEqual([{ type: "rest-countdown", secondsRemaining: 3 }]);
   });
 });
 

@@ -44,6 +44,15 @@ export interface SpeechEngine {
    */
   playCombo(texts: string[]): void;
   /**
+   * Queues `texts` on the audio clock for wall-clock time `atWallMs`, so it
+   * speaks even while JS is asleep, cutting off any earlier utterance still
+   * speaking at that moment. `onEnded` fires once the last word finishes;
+   * the returned function cancels it. A word with no bundled clip makes the
+   * whole utterance fall back to on-device TTS on a JS timer, which only
+   * fires while the app is awake.
+   */
+  scheduleUtterance(texts: string[], atWallMs: number, onEnded: () => void): () => void;
+  /**
    * Silences anything currently sounding or still scheduled, and
    * supersedes any in-flight playCombo so its remaining words are never
    * scheduled at all.

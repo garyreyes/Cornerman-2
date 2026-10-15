@@ -86,10 +86,80 @@ expected — a scenario passing because it was assumed to pass isn't a test.
 
 | Date | Build/version | Device | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| | | POCO F6 Pro | | | | | | | | | | | |
+| 2026-09-19 | dev client, local build | POCO F6 Pro | PASS | not tested | **FAIL** | not tested | not tested | not tested | not tested | not tested | not tested | not tested | See below. |
+| 2026-10-15 | same 2026-09-19 native build, current working-tree JS (schedule.ts not yet wired) | POCO F6 Pro, unplugged | PASS | not tested | **FAIL** | not tested | not tested | not tested | not tested | not tested | not tested | not tested | Baseline re-run before the background-audio fix. See below. |
+| 2026-10-15 | same native build, JS at `8318d7c` (audio queued on the audio clock) | POCO F6 Pro, unplugged | PASS | PASS | PASS | not tested | not tested | not tested | not tested | not tested | not tested | not tested | Boxing only -- Assault Bike not yet converted. See below. |
+
+### 2026-09-19 findings
+
+- **Scenario 1 (Spotify + drill):** PASS — both audible at once, cues cut through music as expected.
+- **Scenario 3 (lock screen) — FAIL, critical:** Pressing the **home button** pauses both the round timer and combo call-outs immediately. Pressing the **power button** (screen lock) does the same. This is not "audio ducks" or "cues get quiet" — the drill itself stops advancing. This directly fails the hard requirement in `docs/PRD.md` ("switch to camera or Spotify, or lock the phone" must not interrupt combos) and contradicts `ARCHITECTURE.md`'s statement that `src/lib/backgroundAudio.ts` handles this via EAS dev client + foreground service. Since this reproduces on **home button alone**, before MIUI's autostart killer is even a factor, the root cause is upstream of the MIUI-specific mitigation — likely the foreground service isn't actually starting, isn't held correctly, or the audio session/timer logic is tied to component lifecycle instead of the service.
+- Scenarios 2, 5, 6, 10 all depend on background survival and are expected to fail the same way until scenario 3 is fixed — not yet tested individually since the root cause is shared.
+
+### 2026-10-15 findings
+
+- Baseline re-run on battery (cable unplugged after the JS bundle
+  loaded), to confirm the failure before wiring in the precomputed
+  schedule. Spotify opened first, then Cornerman, then START.
+- **Scenario 1:** PASS -- combos, timer, and Spotify all run together in
+  the foreground.
+- **Scenario 3:** FAIL, unchanged from 2026-09-19 -- both the home button
+  and the power button (screen off, app not closed) stop the combos and
+  the round timer immediately. Spotify keeps playing. Consistent with
+  the measured root cause in `PROJECT_FACTS.md` ("Backgrounded JS timers
+  vs the audio clock").
+- Not yet tested plugged into a charger/power bank, which relaxes
+  Android's background restrictions -- once the fix lands, test both
+  unplugged (hardest) and charging.
+
+### 2026-10-15 findings, after the fix (`8318d7c`)
+
+- Boxing session, on battery. User-observed: combos and the timer keep
+  going with the **power button** (screen off), the **home button**, and
+  switching **Cornerman ↔ Spotify** in both directions -- Spotify keeps
+  playing alongside. **Recording video in the camera** mid-drill also
+  keeps the combos going (scenario 2, previously the highest-risk case).
+- Scenarios 1, 2, 3: PASS. The lock-screen-controls half of scenario 3
+  doesn't apply -- the app has no lock-screen play/pause controls.
+- Not yet checked: the JS log for errors during the run (the phone was
+  unplugged), and the remaining scenarios.
 
 Any failure found here is a follow-up bug, not something to fix inline
 during a test pass — log it and file it separately.
+
+## Driving and observing the phone from the PC (adb)
+
+Used for the 2026-09-19 spike and both 2026-10-15 runs. `adb` lives in
+`%LOCALAPPDATA%\Android\Sdk\platform-tools` and isn't on PATH by default:
+
+```powershell
+$env:Path += ";$env:LOCALAPPDATA\Android\Sdk\platform-tools"
+adb devices                       # must say "device", not "unauthorized"
+adb reverse tcp:8081 tcp:8081     # phone reaches Metro over the cable
+npx expo start --dev-client --port 8081
+adb shell am start -a android.intent.action.VIEW -d "cornerman://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081" com.gary.cornerman
+adb exec-out screencap -p > screen.png
+adb logcat -c                     # clear before a test run...
+adb logcat -d -s ReactNativeJS:*  # ...and read JS logs/errors after
+```
+
+Gotchas found the hard way:
+
+- **No phone in `adb devices`, no USB-mode prompt on the phone:** the
+  cable is likely charge-only. Windows lists the phone as `VID_2717`
+  (Xiaomi) once a data cable is used.
+- Android often doesn't ask about USB mode; it defaults to charging. Pick
+  **File transfer** from the USB notification, or set Developer options →
+  Default USB configuration.
+- The installed dev client doesn't register `exp+cornerman://`; use the
+  `cornerman://` link above.
+- Once the bundle has loaded, the cable can come out -- the app runs on
+  its own. Test screen-off scenarios unplugged: charging relaxes
+  Android's background limits (Doze never starts while plugged in).
+- `adb logcat -d` waits forever if no device is connected -- check
+  `adb devices` first.
+- Only one of you drives the phone at a time: remote `adb input` taps and
+  real presses at once produced a confusing false signal once.
 
 ## Out of scope
 

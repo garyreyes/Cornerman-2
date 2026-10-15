@@ -229,3 +229,86 @@ describe("createAudioEngine -- graph cleanup (the bell-latency fix)", () => {
     await expect(engine.close()).resolves.toBeUndefined();
   });
 });
+
+/**
+ * Background playback (2026-10): cues are queued ahead on the audio clock,
+ * because JS timers stop once the app is backgrounded but the audio clock
+ * keeps running -- see PROJECT_FACTS.md's 2026-09-19 spike.
+ */
+describe("createAudioEngine -- scheduleCue", () => {
+  async function flushMicrotasks(times = 8): Promise<void> {
+    for (let i = 0; i < times; i++) {
+      await Promise.resolve();
+    }
+  }
+
+  let nowSpy: jest.SpyInstance;
+  beforeEach(() => {
+    nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000);
+  });
+  afterEach(() => {
+    nowSpy.mockRestore();
+    jest.restoreAllMocks();
+  });
+
+  test("starts the cue at the matching audio-clock time, not immediately", async () => {
+    const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
+
+    const engine = createAudioEngine();
+    engine.scheduleCue("bell", 3_500, () => {});
+    await flushMicrotasks();
+
+    expect(startSpy.mock.calls).toEqual([[2.5]]);
+  });
+
+  test("a scheduled clapper keeps its three claps 0.15s apart from the scheduled time", async () => {
+    const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
+
+    const engine = createAudioEngine();
+    engine.scheduleCue("clapper", 3_000, () => {});
+    await flushMicrotasks();
+
+    const whens = startSpy.mock.calls.map((call) => call[0]!);
+    expect(whens[0]).toBe(2);
+    expect(whens[1]).toBeCloseTo(2.15);
+    expect(whens[2]).toBeCloseTo(2.3);
+  });
+
+  test("reports onEnded once, when the cue's last sound finishes", async () => {
+    const connectSpy = jest.spyOn(AudioBufferSourceNode.prototype, "connect");
+    const onEnded = jest.fn();
+
+    const engine = createAudioEngine();
+    engine.scheduleCue("clapper", 3_000, onEnded);
+    await flushMicrotasks();
+
+    const sources = connectSpy.mock.instances as unknown as AudioBufferSourceNode[];
+    sources[0]!.onEnded?.({} as never);
+    sources[1]!.onEnded?.({} as never);
+    expect(onEnded).not.toHaveBeenCalled();
+    sources[2]!.onEnded?.({} as never);
+    expect(onEnded).toHaveBeenCalledTimes(1);
+  });
+
+  test("cancelling stops every source it queued", async () => {
+    const stopSpy = jest.spyOn(AudioBufferSourceNode.prototype, "stop");
+
+    const engine = createAudioEngine();
+    const cancel = engine.scheduleCue("clapper", 3_000, () => {});
+    await flushMicrotasks();
+    cancel();
+
+    expect(stopSpy).toHaveBeenCalledTimes(3);
+  });
+
+  test("cancelling before the buffer has decoded means nothing is ever started", async () => {
+    const startSpy = jest.spyOn(AudioBufferSourceNode.prototype, "start");
+
+    const engine = createAudioEngine();
+    const cancel = engine.scheduleCue("bell", 3_000, () => {});
+    cancel();
+    await flushMicrotasks();
+
+    expect(startSpy).not.toHaveBeenCalled();
+  });
+});

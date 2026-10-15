@@ -75,7 +75,8 @@ function MainTimerScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const {
     timerState,
-    session,
+    currentCombo,
+    comboCount,
     settings,
     audioError,
     totalRounds,
@@ -123,7 +124,7 @@ function MainTimerScreen() {
 
         {audioError ? <AudioErrorBanner /> : null}
 
-        <ComboCard combo={session.currentCombo} comboCount={session.comboCount} />
+        <ComboCard combo={currentCombo} comboCount={comboCount} />
       </View>
 
       <View style={styles.bottom}>

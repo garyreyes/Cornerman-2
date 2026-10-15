@@ -129,6 +129,41 @@ export function tick(
 }
 
 /**
+ * Earliest time at/after the current state that `tick()` would need to be
+ * called again to produce a state or event change -- the next phase
+ * boundary, work-warning threshold, or next unfired rest-countdown second,
+ * whichever comes first. Exists so a scheduler (session/schedule.ts) can
+ * precompute a whole session's event timeline by jumping straight from
+ * event to event, rather than reimplementing tick()'s internal thresholds
+ * or polling it at fake intermediate `now` values just to discover them.
+ * Mirrors tick()'s own if/else-if phase branching exactly, so the two can
+ * never quietly disagree about when the next event actually is.
+ *
+ * `null` means there is nothing further to schedule: the session is
+ * already finished, or paused (a caller must resume before there's a
+ * meaningful "next" time to compute).
+ */
+export function nextEventTime(state: TimerState, config: TimerConfig): number | null {
+  if (state.isPaused || state.phase === "finished") {
+    return null;
+  }
+
+  const candidates: number[] = [state.phaseEndAt];
+
+  if (state.phase === "work" && !state.tenWarned && effectiveWorkDurationMs(config, state.round) > WORK_WARNING_THRESHOLD_MS) {
+    candidates.push(state.phaseEndAt - WORK_WARNING_THRESHOLD_MS);
+  } else if (state.phase === "rest") {
+    for (const secondsRemaining of [3, 2, 1] as const) {
+      if (state.lastRestCountdown === null || secondsRemaining < state.lastRestCountdown) {
+        candidates.push(state.phaseEndAt - secondsRemaining * 1000);
+      }
+    }
+  }
+
+  return Math.min(...candidates);
+}
+
+/**
  * Freezes a running session exactly where it is. Detecting *why* to pause
  * (a phone call, losing audio focus) is native/platform wiring built
  * later (Phase 7) -- this is just the mechanism itself.
