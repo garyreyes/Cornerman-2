@@ -1224,3 +1224,13 @@ Dated log of shipped changes, appended to as features complete.
     the combos and timer going. 336/336 tests, lint/typecheck clean.
   - Not yet: Assault Bike (15c), custom punch names in the background
     (15d), and the longer device scenarios listed in ROADMAP.md 15b.
+- 2026-10-15: App icon and store artwork — the main screen's countdown
+  ring, opened at 3 o'clock so it also reads as a C, in white on the Dark
+  theme's #121212 (stroke 16% of the ring's width, round caps, the app's
+  own ring cap style). Replaces Expo's placeholder icon, adaptive icon
+  layers, monochrome themed icon and favicon; the adaptive background
+  colour goes from Expo's #E6F4FE to #121212. Adds the Play Console icon
+  (512) and feature graphic (1024×500) under `assets/store/`, vector
+  masters under `assets/brand/`, and `scripts/generate_brand_assets.py`,
+  which renders all of them from one set of constants. The launcher icon
+  only changes on the phone after a native rebuild.
