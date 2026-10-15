@@ -8,6 +8,7 @@ import { createWorkoutTemplate, getWorkoutTemplates, updateWorkoutTemplate } fro
 import type { BoxingConfig, RoundConfig } from "../../features/workoutTemplates/types";
 import { getPresets, getPunches } from "../../features/settings/service";
 import { formatSeconds, range } from "../../features/settings/format";
+import { InlineErrorBanner } from "../../shared/components/InlineErrorBanner";
 import { RangeSliderPair } from "../../shared/components/RangeSliderPair";
 import { SectionCard } from "../../shared/components/SectionCard";
 import { WheelPicker } from "../../shared/components/WheelPicker";
@@ -221,7 +222,7 @@ export function TemplateEditorScreen() {
           </Pressable>
         </View>
 
-        {saveError ? <Text style={styles.error}>Couldn&apos;t save, try again</Text> : null}
+        {saveError ? <InlineErrorBanner message="Couldn't save, try again" /> : null}
 
         <Pressable
           onPress={handleSave}
@@ -267,9 +268,15 @@ function createStyles(colors: ColorTokens, fonts: Fonts) {
     section: {
       gap: 10,
     },
+    // Matches SectionCard's own title exactly (15/2) -- "ROUNDS" is a
+    // top-level section sibling to "BASE PACE" above it, not a nested
+    // sub-header, and previously drifted to an arbitrary smaller size
+    // (found 2026-09-12 via /impeccable critique, alongside RoundCard's
+    // own "COMBO SOURCE" -- that one stays smaller deliberately, since
+    // it's one nesting level deeper, inside an expanded round).
     sectionTitle: {
       fontFamily: fonts.displaySemiBold,
-      fontSize: 13,
+      fontSize: 15,
       letterSpacing: 2,
       color: colors.accent,
     },
@@ -293,12 +300,6 @@ function createStyles(colors: ColorTokens, fonts: Fonts) {
       fontSize: 13,
       letterSpacing: 1,
       color: colors.accent,
-    },
-    error: {
-      fontFamily: fonts.bodyMedium,
-      fontSize: 13,
-      color: colors.danger,
-      textAlign: "center",
     },
     saveButton: {
       paddingVertical: 14,

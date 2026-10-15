@@ -7,7 +7,6 @@ import { formatSeconds, range } from "../../settings/format";
 import type { Preset, Punch } from "../../settings/types";
 import { ChipMultiSelect } from "../../../shared/components/ChipMultiSelect";
 import { RangeSliderPair } from "../../../shared/components/RangeSliderPair";
-import { SegmentedControl } from "../../../shared/components/SegmentedControl";
 import { WheelPicker } from "../../../shared/components/WheelPicker";
 import { useTheme } from "../../../shared/theme/ThemeContext";
 import type { ColorTokens, Fonts } from "../../../shared/theme/tokens";
@@ -32,14 +31,18 @@ interface RoundCardProps {
 const WORK_VALUES = range(0, 600, 5);
 const REST_VALUES = range(0, 300, 5);
 
-// Abbreviated to keep five segments legible on a narrow phone -- the
-// editor that opens underneath each one says what it is at full length.
+// Full words, not the five-way SegmentedControl this used to be -- that
+// component is built (and documented) for a 2-value toggle, and pushed to
+// five it rendered visibly cramped with uneven spacing (found 2026-09-12
+// via /impeccable critique, confirmed on a real device screenshot). Chips
+// wrap instead of fighting for a fixed-width slice of the screen, and full
+// words read as plain language rather than jargon shorthand.
 const SOURCE_OPTIONS: { value: ComboSource["type"]; label: string }[] = [
-  { value: "random", label: "RANDOM" },
-  { value: "fixed-punch", label: "FIXED" },
-  { value: "fixed-sequence", label: "SEQ" },
-  { value: "combo-pool", label: "COMBOS" },
-  { value: "preset", label: "PRESET" },
+  { value: "random", label: "Random" },
+  { value: "fixed-punch", label: "Fixed Punch" },
+  { value: "fixed-sequence", label: "Sequence" },
+  { value: "combo-pool", label: "Combo Pool" },
+  { value: "preset", label: "Preset" },
 ];
 
 /**
@@ -231,7 +234,23 @@ export function RoundCard({
           ) : null}
 
           <Text style={styles.sectionTitle}>COMBO SOURCE</Text>
-          <SegmentedControl options={SOURCE_OPTIONS} value={source.type} onChange={handleSourceTypeChange} />
+          <View style={styles.chipWrap}>
+            {SOURCE_OPTIONS.map((option) => {
+              const active = option.value === source.type;
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() => handleSourceTypeChange(option.value)}
+                  style={[styles.chip, active && styles.chipActive]}
+                  hitSlop={4}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{option.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
           {source.type === "random" ? (
             <RandomSourceEditor source={source} punches={punches} onChange={updateSource} />

@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 
-import { useTheme } from "../../shared/theme/ThemeContext";
+import { useThemedHeaderOptions } from "../../shared/theme/headerOptions";
 
 /**
  * Nested stack for Settings and (Phase 8b/8c) its children -- Punches,
@@ -11,17 +11,9 @@ import { useTheme } from "../../shared/theme/ThemeContext";
  * rather than at the root layout.
  */
 export default function SettingsLayout() {
-  const { colors, fonts } = useTheme();
+  const headerOptions = useThemedHeaderOptions();
   return (
-    <Stack
-      screenOptions={{
-        headerShown: true,
-        headerStyle: { backgroundColor: colors.panel },
-        headerTintColor: colors.accent,
-        headerTitleStyle: { fontFamily: fonts.bodySemiBold, fontSize: 16 },
-        headerShadowVisible: false,
-      }}
-    >
+    <Stack screenOptions={headerOptions}>
       <Stack.Screen name="index" options={{ title: "SETTINGS" }} />
       <Stack.Screen name="punches" options={{ title: "PUNCHES" }} />
       <Stack.Screen name="presets/index" options={{ title: "PRESETS" }} />

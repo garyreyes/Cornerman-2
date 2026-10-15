@@ -27,7 +27,7 @@ function summarize(template: WorkoutTemplate): string {
  * push is the right call there, unlike boxing's pop-back. The Edit icon
  * only opens the Round Builder (Phase 10c) for boxing templates --
  * there's no assault-bike editor (not a planned Phase 11 deliverable),
- * so TemplateRow renders that icon disabled for those rows instead of
+ * so TemplateRow omits that icon entirely for those rows instead of
  * routing somewhere that would crash.
  */
 export function TemplatesPickerScreen() {
