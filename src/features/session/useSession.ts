@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { createAudioEngine } from "../audio/service";
 import type { AudioEngine } from "../audio/types";
-import { resolveAnnounceText } from "../comboEngine/service";
+import type { Combo } from "../comboEngine/types";
 import {
   hideSessionNotification,
   initBackgroundAudioSession,
@@ -26,8 +26,10 @@ import type { TimerConfig, TimerState } from "../timer/types";
 import { consumePendingTemplateStart } from "../workoutTemplates/pendingStart";
 import { getWorkoutTemplates, toTimerConfig as templateToTimerConfig } from "../workoutTemplates/service";
 import type { RoundConfig, WorkoutTemplate } from "../workoutTemplates/types";
-import { createSession, decideInterruptionAction, sessionTick, shiftSessionForResume } from "./service";
-import type { ActiveTemplateSession, SessionState } from "./types";
+import type { ScheduleInputs } from "./schedule";
+import { decideInterruptionAction } from "./service";
+import type { ActiveTemplateSession } from "./types";
+import { usePlayback } from "./usePlayback";
 
 const TICK_INTERVAL_MS = 200;
 
@@ -59,7 +61,9 @@ function computePhaseDurationMs(config: TimerConfig, state: TimerState): number 
 
 export interface UseSessionResult {
   timerState: TimerState | null;
-  session: SessionState;
+  /** The most recently spoken combo; stays visible through Rest. */
+  currentCombo: Combo | null;
+  comboCount: number;
   settings: Settings;
   audioError: boolean;
   /** The active session's actual round total -- configRef's snapshot once
@@ -86,29 +90,26 @@ export interface UseSessionResult {
 }
 
 /**
- * The untested effect-loop consumer of session/service.ts's pure
- * sessionTick decisions -- native audio/speech calls and the poll-interval
- * live here, matching how audio/speech's own native wiring was never unit
- * tested (see PROJECT_FACTS.md); sessionTick and tick() carry the real
- * test coverage.
+ * Wires the session's pure engines to native audio. Every bell, clap,
+ * tick and call-out is queued ahead on the audio clock by usePlayback,
+ * from the precomputed schedule in schedule.ts -- not fired from the 200ms
+ * loop below, which only drives the display. A JS timer stops once the app
+ * is backgrounded or the screen locks; the audio clock doesn't (see
+ * PROJECT_FACTS.md's 2026-09-19 spike). The pure engines carry the real
+ * test coverage; this native wiring is untested, as before.
  *
  * settings/punches/presets are re-synced from storage whenever this
  * screen regains focus -- e.g. returning from Settings/Punches after a
- * change -- so that change reaches an already-running session instead of
- * only the next one (fixed 2026-08-25 after the user found a disabled
- * punch still getting called out; see PROJECT_FACTS.md). This is
- * sufficient, not a compromise: settings can only change via navigating
- * to Settings/Punches and back, which is exactly a focus transition, so
- * there's no real case this misses. An earlier version of this fix
- * polled storage every 200ms tick instead -- that forced a background
- * re-render of this hook's whole subtree 5x/sec for the app's entire
- * lifetime (even idle, even while a totally different screen had focus,
- * since Main Timer stays mounted underneath), which starved the JS
- * thread enough to make the Settings screen's pure-JS scroll wheels
- * unresponsive. Reverted for that reason -- see PROJECT_FACTS.md. The
- * tick loop itself reads punches/presets from refs (updated only on
- * focus), not state, so it never needs `[punches, presets]` in its
- * effect deps and never re-subscribes its interval.
+ * change -- and anything already queued after that moment is regenerated,
+ * so the change reaches an already-running session instead of only the
+ * next one (fixed 2026-08-25 after the user found a disabled punch still
+ * getting called out; see PROJECT_FACTS.md). This is sufficient, not a
+ * compromise: settings can only change via navigating to Settings/Punches
+ * and back, which is exactly a focus transition. An earlier version of
+ * that fix polled storage every 200ms tick instead -- that starved the JS
+ * thread enough to make the Settings screen's scroll wheels unresponsive,
+ * and was reverted (see PROJECT_FACTS.md). Playback reads these from refs,
+ * not state, so nothing re-subscribes when they change.
  *
  * Round *structure* (rounds/work/rest/warmup duration) is the one
  * exception to "live": snapshotted into `configRef` once, when `start()`
@@ -130,7 +131,6 @@ export function useSession(): UseSessionResult {
   const activeTemplateRef = useRef<ActiveTemplateSession | null>(null);
 
   const [timerState, setTimerState] = useState<TimerState | null>(null);
-  const [session, setSession] = useState<SessionState>(() => createSession());
   const [audioError, setAudioError] = useState(false);
   // Mirrors of configRef's derived values, kept as real state rather than
   // read from the ref during render (ESLint's react-hooks/refs rule --
@@ -148,10 +148,25 @@ export function useSession(): UseSessionResult {
   const audioEngineRef = useRef<AudioEngine | null>(null);
   const speechEngineRef = useRef<SpeechEngine | null>(null);
   const pausedByInterruptionRef = useRef(false);
+  /** When the running session was paused; null while running or idle. */
+  const pausedAtRef = useRef<number | null>(null);
+
+  const getScheduleInputs = useCallback(
+    (): ScheduleInputs => ({
+      config: configRef.current,
+      settings: settingsRef.current,
+      punches: punchesRef.current,
+      presets: presetsRef.current,
+      activeTemplate: activeTemplateRef.current,
+      random: Math.random,
+    }),
+    [],
+  );
+  const playback = usePlayback(getScheduleInputs, audioEngineRef, speechEngineRef);
+  const { begin, topUp, pause: pausePlayback, resume: resumePlayback, reschedule, end } = playback;
 
   // Cue/bell playback (bell, clapper, countdown tick) never depends on
-  // voice -- built once and left alone for the hook's lifetime, same as
-  // before this change.
+  // voice -- built once and left alone for the hook's lifetime.
   useEffect(() => {
     const initAudioEngine = () => {
       try {
@@ -165,16 +180,16 @@ export function useSession(): UseSessionResult {
     initAudioEngine();
   }, []);
 
-  // Rebuilds the speech engine only when the *voice itself* changes, not
-  // on every settings tick -- `settings.ttsVoice` is a primitive dep, so
-  // this only re-fires on a real value change even though `settings` gets
-  // a new object identity every tick. appVolume/speechRate don't need a
-  // rebuild; they're applied live in the tick loop below via
-  // setVolume/setRate. Builds the replacement before touching the ref, and
-  // only closes the previous engine once the new one is confirmed working
-  // -- a failed voice *switch* keeps the old (working) engine rather than
-  // leaving playback broken or surfacing the "sound unavailable" banner
-  // for a problem that isn't "sound is unavailable".
+  // Rebuilds the speech engine only when the *voice itself* changes --
+  // `settings.ttsVoice` is a primitive dep, so this only re-fires on a real
+  // value change. appVolume/speechRate don't need a rebuild; they're
+  // applied live via setVolume/setRate. Builds the replacement before
+  // touching the ref, and only closes the previous engine once the new one
+  // is confirmed working -- a failed voice *switch* keeps the old (working)
+  // engine rather than surfacing the "sound unavailable" banner for a
+  // problem that isn't "sound is unavailable". Closing the old engine
+  // silences whatever it had queued, so a running session re-queues onto
+  // the new one.
   useEffect(() => {
     const rebuildSpeechEngine = () => {
       let nextEngine: SpeechEngine;
@@ -182,9 +197,6 @@ export function useSession(): UseSessionResult {
         nextEngine = createSpeechEngine(settings.ttsVoice);
       } catch {
         if (speechEngineRef.current === null) {
-          // Initial construction genuinely failed -- sound really is
-          // unavailable, unlike a failed later voice *switch* (which just
-          // keeps whatever engine was already working).
           setAudioError(true);
         }
         return;
@@ -193,18 +205,16 @@ export function useSession(): UseSessionResult {
       speechEngineRef.current = nextEngine;
       if (previous !== null) {
         void previous.close();
+        reschedule(Date.now());
       }
     };
     rebuildSpeechEngine();
-  }, [settings.ttsVoice]);
+  }, [settings.ttsVoice, reschedule]);
 
   // Fires on mount (this screen is already focused then) and again every
-  // time it regains focus -- e.g. returning from Settings/Punches. Updates
-  // both the ref (what the tick loop below actually reads) and the state
-  // (what triggers the ttsVoice-rebuild effect above and what's returned
-  // to the UI) together. Declared after the engine-construction effects
-  // above so on mount, by the time volume/rate get applied, the engines
-  // those calls target already exist.
+  // time it regains focus -- e.g. returning from Settings/Punches. Declared
+  // after the engine-construction effects above so on mount, by the time
+  // volume/rate get applied, the engines those calls target already exist.
   useFocusEffect(
     useCallback(() => {
       const freshSettings = getSettings();
@@ -215,172 +225,138 @@ export function useSession(): UseSessionResult {
       audioEngineRef.current?.setVolume(freshSettings.appVolume);
       speechEngineRef.current?.setVolume(freshSettings.appVolume);
       speechEngineRef.current?.setRate(freshSettings.speechRate);
-    }, []),
+      reschedule(Date.now());
+    }, [reschedule]),
+  );
+
+  const pauseSession = useCallback(
+    (now: number) => {
+      if (pausedAtRef.current !== null || !pausePlayback(now)) {
+        return;
+      }
+      pausedAtRef.current = now;
+      setTimerState((prev) => (prev === null ? prev : pauseTimer(prev, now)));
+      showSessionNotification("paused");
+    },
+    [pausePlayback],
+  );
+
+  const resumeSession = useCallback(
+    (now: number) => {
+      const pausedAt = pausedAtRef.current;
+      if (pausedAt === null) {
+        return;
+      }
+      pausedAtRef.current = null;
+      resumePlayback(pausedAt, now);
+      setTimerState((prev) => (prev === null ? prev : resumeTimer(prev, now)));
+      showSessionNotification("playing");
+    },
+    [resumePlayback],
   );
 
   useEffect(() => {
     initBackgroundAudioSession();
 
     const unsubscribe = subscribeToInterruptions((event) => {
-      setTimerState((prev) => {
-        if (prev === null) {
-          return prev;
-        }
-        const decision = decideInterruptionAction(event, prev.isPaused, pausedByInterruptionRef.current);
-        pausedByInterruptionRef.current = decision.pausedByInterruption;
-        const now = Date.now();
-        if (decision.shouldPause) {
-          showSessionNotification("paused");
-          return pauseTimer(prev, now);
-        }
-        if (decision.shouldResume) {
-          showSessionNotification("playing");
-          if (prev.pausedAt !== null) {
-            const pausedDurationMs = now - prev.pausedAt;
-            setSession((prevSession) => shiftSessionForResume(prevSession, pausedDurationMs));
-          }
-          return resumeTimer(prev, now);
-        }
-        return prev;
-      });
+      const decision = decideInterruptionAction(event, pausedAtRef.current !== null, pausedByInterruptionRef.current);
+      pausedByInterruptionRef.current = decision.pausedByInterruption;
+      if (decision.shouldPause) {
+        pauseSession(Date.now());
+      } else if (decision.shouldResume) {
+        resumeSession(Date.now());
+      }
     });
 
     return unsubscribe;
-  }, []);
+  }, [pauseSession, resumeSession]);
 
+  // Display only -- no audio fires from here. Also tops up playback while
+  // the app is awake, as a backstop to each sound's own onEnded.
   useEffect(() => {
     const intervalId = setInterval(() => {
       const now = Date.now();
+      topUp(now);
 
       setTimerState((prevTimerState) => {
         if (prevTimerState === null) {
           return prevTimerState;
         }
-
         const { state: nextTimerState, events } = tick(prevTimerState, configRef.current, now);
-        events.forEach((event) => {
-          audioEngineRef.current?.handleTimerEvent(event);
-          if (event.type === "session-finished") {
-            hideSessionNotification();
-          }
-        });
-        // Piggybacks on this same 200ms cadence rather than adding a new
-        // one -- React bails out of re-rendering when the value is
-        // unchanged (the common case, most ticks don't cross a phase/
-        // round boundary), so this doesn't add extra renders beyond what
-        // setTimerState below already causes every tick.
+        if (events.some((event) => event.type === "session-finished")) {
+          hideSessionNotification();
+        }
+        // React bails out of re-rendering when the value is unchanged (most
+        // ticks don't cross a phase/round boundary).
         setPhaseDurationMs(computePhaseDurationMs(configRef.current, nextTimerState));
-
-        setSession((prevSession) => {
-          const { session: nextSession, actions } = sessionTick(
-            prevSession,
-            nextTimerState,
-            settingsRef.current,
-            punchesRef.current,
-            presetsRef.current,
-            now,
-            Math.random,
-            activeTemplateRef.current,
-          );
-          actions.forEach((action) => {
-            if (action.type === "speak-combo") {
-              const words = action.combo.map((punch) =>
-                resolveAnnounceText(punch, settingsRef.current.announceStyle),
-              );
-              speechEngineRef.current?.playCombo(words);
-            } else {
-              speechEngineRef.current?.playWord(action.cue);
-            }
-          });
-          return nextSession;
-        });
-
         return nextTimerState;
       });
     }, TICK_INTERVAL_MS);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [topUp]);
 
-  const start = useCallback((template?: Extract<WorkoutTemplate, { workoutType: "boxing" }>) => {
-    pausedByInterruptionRef.current = false;
-    // Snapshot round *structure* fresh, at the moment Start is pressed --
-    // not whatever was true when this hook first mounted (previously
-    // frozen forever via configRef's initial value, since Main Timer is
-    // the app's one long-lived screen and this ref was never
-    // re-derived). Held fixed for the rest of this session once started --
-    // see this hook's own doc comment for why. A template, when passed,
-    // drives this instead of Settings -- Phase 10d.
-    if (template) {
-      configRef.current = templateToTimerConfig(template.config);
-      activeTemplateRef.current = {
-        roundPlan: template.config.roundPlan,
-        baseComboGapMinSec: template.config.baseComboGapMinSec,
-        baseComboGapMaxSec: template.config.baseComboGapMaxSec,
-      };
-      setActiveRoundPlan(template.config.roundPlan);
-    } else {
-      configRef.current = toTimerConfig(getSettings());
-      activeTemplateRef.current = null;
-      setActiveRoundPlan(null);
-    }
-    const initial = startTimer(configRef.current, Date.now());
-    // startTimer computes the first TimerState directly rather than going
-    // through tick() (there's no prior state to transition from), so it
-    // never emits a TimerEvent -- every later phase change fires one via
-    // the tick loop below, but this very first one otherwise wouldn't,
-    // meaning the bell would silently skip Round 1's start whenever
-    // warmup is off (the default) and Start goes straight to Work. Fire
-    // the same "phase-changed" event here that tick() would have, so
-    // audioEngineRef's handleTimerEvent/mapEventToCue (bell on work/rest,
-    // nothing on warmup/ready/finished) applies uniformly.
-    audioEngineRef.current?.handleTimerEvent({ type: "phase-changed", phase: initial.phase, round: initial.round });
-    setTimerState(initial);
-    setSession(createSession());
-    setLastStartedTotalRounds(configRef.current.totalRounds);
-    setPhaseDurationMs(computePhaseDurationMs(configRef.current, initial));
-    showSessionNotification("playing");
-  }, []);
+  const start = useCallback(
+    (template?: Extract<WorkoutTemplate, { workoutType: "boxing" }>) => {
+      pausedByInterruptionRef.current = false;
+      pausedAtRef.current = null;
+      // Snapshot round *structure* fresh, at the moment Start is pressed,
+      // and hold it fixed for the rest of this session -- see this hook's
+      // own doc comment for why. A template, when passed, drives this
+      // instead of Settings -- Phase 10d.
+      if (template) {
+        configRef.current = templateToTimerConfig(template.config);
+        activeTemplateRef.current = {
+          roundPlan: template.config.roundPlan,
+          baseComboGapMinSec: template.config.baseComboGapMinSec,
+          baseComboGapMaxSec: template.config.baseComboGapMaxSec,
+        };
+        setActiveRoundPlan(template.config.roundPlan);
+      } else {
+        configRef.current = toTimerConfig(getSettings());
+        activeTemplateRef.current = null;
+        setActiveRoundPlan(null);
+      }
+      const now = Date.now();
+      const initial = startTimer(configRef.current, now);
+      // Queues the opening bell (schedule.ts fires it for the first phase,
+      // which startTimer itself never emits an event for) and everything
+      // after it.
+      begin(now);
+      setTimerState(initial);
+      setLastStartedTotalRounds(configRef.current.totalRounds);
+      setPhaseDurationMs(computePhaseDurationMs(configRef.current, initial));
+      showSessionNotification("playing");
+    },
+    [begin],
+  );
 
   const togglePause = useCallback(() => {
     pausedByInterruptionRef.current = false;
-    setTimerState((prev) => {
-      if (prev === null) {
-        return prev;
-      }
-      const now = Date.now();
-      if (prev.isPaused) {
-        showSessionNotification("playing");
-        if (prev.pausedAt !== null) {
-          const pausedDurationMs = now - prev.pausedAt;
-          setSession((prevSession) => shiftSessionForResume(prevSession, pausedDurationMs));
-        }
-        return resumeTimer(prev, now);
-      }
-      showSessionNotification("paused");
-      return pauseTimer(prev, now);
-    });
-  }, []);
+    if (pausedAtRef.current === null) {
+      pauseSession(Date.now());
+    } else {
+      resumeSession(Date.now());
+    }
+  }, [pauseSession, resumeSession]);
 
   const reset = useCallback(() => {
     pausedByInterruptionRef.current = false;
+    pausedAtRef.current = null;
     activeTemplateRef.current = null;
+    end();
     setTimerState(null);
-    setSession(createSession());
     setPhaseDurationMs(null);
     setLastStartedTotalRounds(null);
     setActiveRoundPlan(null);
     hideSessionNotification();
-  }, []);
+  }, [end]);
 
   // Consumes a "start this template" signal left by the Templates Picker
   // (docs/user-flows.md Flow 6: tapping a template starts it directly, no
   // separate confirmation) -- Main Timer stays mounted underneath
   // Templates the whole time, so router.back() alone carries no params to
-  // signal this; see workoutTemplates/pendingStart.ts. Same
-  // useFocusEffect timing as the settings/punches/presets resync above,
-  // just a separate effect since it depends on `start` (declared after
-  // that one).
+  // signal this; see workoutTemplates/pendingStart.ts.
   useFocusEffect(
     useCallback(() => {
       const pendingId = consumePendingTemplateStart();
@@ -397,22 +373,21 @@ export function useSession(): UseSessionResult {
     }, [start]),
   );
 
-  // While Ready (no session started yet), tracks settings.rounds live --
-  // same preview behavior as before Phase 10d. Once a session has
-  // started (quick-start or template), freezes to whatever was actually
-  // snapshotted at start(), even after settings.rounds later changes.
+  // While Ready (no session started yet), tracks settings.rounds live.
+  // Once a session has started, freezes to whatever was snapshotted at
+  // start(), even after settings.rounds later changes.
   const totalRounds = timerState === null ? settings.rounds : (lastStartedTotalRounds ?? settings.rounds);
 
   // Warmup runs before round 1 and Finished after the last, so neither has
-  // a round whose focus to show -- `round` is 0 in the first case and the
-  // session is over in the second.
+  // a round whose focus to show.
   const isRunningARound = timerState !== null && (timerState.phase === "work" || timerState.phase === "rest");
   const currentRoundConfig =
     isRunningARound && activeRoundPlan !== null ? (activeRoundPlan[timerState.round - 1] ?? null) : null;
 
   return {
     timerState,
-    session,
+    currentCombo: playback.currentCombo,
+    comboCount: playback.comboCount,
     settings,
     audioError,
     totalRounds,

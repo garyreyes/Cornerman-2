@@ -1,6 +1,7 @@
 import { AudioContext } from "react-native-audio-api";
 import type { AudioBuffer, AudioBufferSourceNode } from "react-native-audio-api";
 
+import { audioClockTime } from "../../lib/audioClock";
 import type { TimerEvent } from "../timer/types";
 import type { AudioEngine, CueName } from "./types";
 
@@ -125,17 +126,53 @@ export function createAudioEngine(): AudioEngine {
    * limiter above exists precisely so overlapping percussive cues don't
    * clip. Only the graph bookkeeping changed here, not the mixing.
    */
-  async function playCue(cue: CueName): Promise<void> {
-    const buffer = await buffers[cue];
+  function startCue(cue: CueName, buffer: AudioBuffer, when: number, onLastEnded?: () => void): AudioBufferSourceNode[] {
     const repeatCount = cue === "clapper" ? CLAPPER_REPEAT_COUNT : 1;
+    const sources: AudioBufferSourceNode[] = [];
     for (let i = 0; i < repeatCount; i++) {
       const source = context.createBufferSource();
       source.buffer = buffer;
       source.connect(volumeGain);
-      source.onEnded = () => releaseSource(source);
+      const isLast = i === repeatCount - 1;
+      source.onEnded = () => {
+        releaseSource(source);
+        if (isLast) {
+          onLastEnded?.();
+        }
+      };
       activeSources.add(source);
-      source.start(context.currentTime + i * CLAPPER_GAP_SEC);
+      source.start(when + i * CLAPPER_GAP_SEC);
+      sources.push(source);
     }
+    return sources;
+  }
+
+  async function playCue(cue: CueName): Promise<void> {
+    const buffer = await buffers[cue];
+    startCue(cue, buffer, context.currentTime);
+  }
+
+  function scheduleCue(cue: CueName, atWallMs: number, onEnded: () => void): () => void {
+    let cancelled = false;
+    let sources: AudioBufferSourceNode[] = [];
+    buffers[cue]
+      .then((buffer) => {
+        if (!cancelled) {
+          sources = startCue(cue, buffer, audioClockTime(atWallMs, Date.now(), context.currentTime), onEnded);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      for (const source of sources) {
+        try {
+          source.stop();
+        } catch {
+          // Already ended; releasing it below is all that's left.
+        }
+        releaseSource(source);
+      }
+    };
   }
 
   function handleTimerEvent(event: TimerEvent): void {
@@ -157,5 +194,5 @@ export function createAudioEngine(): AudioEngine {
     return context.close();
   }
 
-  return { setVolume, playCue, handleTimerEvent, close };
+  return { setVolume, playCue, scheduleCue, handleTimerEvent, close };
 }

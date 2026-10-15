@@ -2,6 +2,7 @@ import * as Speech from "expo-speech";
 import { AudioContext } from "react-native-audio-api";
 import type { AudioBuffer, AudioBufferSourceNode } from "react-native-audio-api";
 
+import { audioClockTime } from "../../lib/audioClock";
 import { rateForSpeechRate } from "./rate";
 import { DEFAULT_VOICE, type SpeechEngine, type TtsVoice } from "./types";
 
@@ -200,6 +201,7 @@ export function createSpeechEngine(voice: TtsVoice = DEFAULT_VOICE): SpeechEngin
 
   function stop(): void {
     playGeneration += 1;
+    queuedWords.clear();
     for (const source of [...activeSources]) {
       try {
         source.stop();
@@ -294,6 +296,83 @@ export function createSpeechEngine(voice: TtsVoice = DEFAULT_VOICE): SpeechEngin
     }
   }
 
+  /** Words queued ahead by scheduleUtterance, with when each stops
+   * sounding on the audio clock -- so a later utterance can cut off one
+   * still speaking at its start (replace, don't layer). */
+  const queuedWords = new Set<{ source: AudioBufferSourceNode; endsAt: number }>();
+
+  function cutOffQueuedWordsAt(when: number): void {
+    for (const queued of queuedWords) {
+      if (queued.endsAt > when) {
+        try {
+          queued.source.stop(when);
+        } catch {
+          // Already ended.
+        }
+        queued.endsAt = when;
+      }
+    }
+  }
+
+  function scheduleUtterance(texts: string[], atWallMs: number, onEnded: () => void): () => void {
+    const words = texts.map((text) => text.trim()).filter((text) => text !== "");
+    const keys = words.map(normalizeToKey);
+
+    if (!keys.every((key) => key in clips)) {
+      // On-device TTS can't be placed on the audio clock, so an off-bank
+      // word only plays if JS is awake to fire this timer.
+      const timeoutId = setTimeout(() => {
+        playSequence(words, playGeneration).catch(() => {});
+      }, Math.max(0, atWallMs - Date.now()));
+      return () => clearTimeout(timeoutId);
+    }
+
+    let cancelled = false;
+    const scheduled: { source: AudioBufferSourceNode; endsAt: number }[] = [];
+    Promise.all(keys.map((key) => buffers[key]!))
+      .then((decoded) => {
+        if (cancelled) {
+          return;
+        }
+        let when = audioClockTime(atWallMs, Date.now(), context.currentTime);
+        cutOffQueuedWordsAt(when);
+        decoded.forEach((buffer, i) => {
+          const source = context.createBufferSource({ pitchCorrection: true });
+          source.buffer = buffer;
+          source.playbackRate.value = currentRate;
+          source.connect(volumeGain);
+          const queued = { source, endsAt: when + buffer.duration / currentRate };
+          const isLast = i === decoded.length - 1;
+          source.onEnded = () => {
+            queuedWords.delete(queued);
+            releaseSource(source);
+            if (isLast) {
+              onEnded();
+            }
+          };
+          activeSources.add(source);
+          queuedWords.add(queued);
+          scheduled.push(queued);
+          source.start(when);
+          when = queued.endsAt + WORD_GAP_SEC;
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      for (const queued of scheduled) {
+        queuedWords.delete(queued);
+        try {
+          queued.source.stop();
+        } catch {
+          // Already ended; releasing it below is all that's left.
+        }
+        releaseSource(queued.source);
+      }
+    };
+  }
+
   function playWord(text: string): boolean {
     if (text.trim() === "") {
       return false;
@@ -337,5 +416,5 @@ export function createSpeechEngine(voice: TtsVoice = DEFAULT_VOICE): SpeechEngin
     return context.close();
   }
 
-  return { setVolume, setRate, playWord, playCombo, stop, close };
+  return { setVolume, setRate, playWord, playCombo, scheduleUtterance, stop, close };
 }
