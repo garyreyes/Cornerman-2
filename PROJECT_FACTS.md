@@ -1627,3 +1627,13 @@ made during feature work.
   - The "session playing" notification is hidden by the display loop, so
     a session that finishes while locked leaves it up until the app is
     reopened.
+- **`npx expo prebuild` recreates `android/` from scratch, even without
+  `--clean` (observed 2026-10-15, Expo SDK 57, `CI=1`).** It printed
+  "Clearing android" and rebuilt the folder. `android/` is gitignored, so
+  anything hand-edited there is unrecoverable afterwards -- copy the
+  folder somewhere outside the repo before any prebuild, then diff
+  sources (excluding `build/`, `.gradle/`, `.cxx/`) against the copy.
+  That 2026-10-15 diff showed only icon files and `colors.xml` changed,
+  confirming `android/` had no hand edits at that point. Related:
+  `npx expo run:android --device` takes the device *name*, not its adb
+  serial -- with one phone attached, omit the flag.
