@@ -89,6 +89,7 @@ expected — a scenario passing because it was assumed to pass isn't a test.
 | 2026-09-19 | dev client, local build | POCO F6 Pro | PASS | not tested | **FAIL** | not tested | not tested | not tested | not tested | not tested | not tested | not tested | See below. |
 | 2026-10-15 | same 2026-09-19 native build, current working-tree JS (schedule.ts not yet wired) | POCO F6 Pro, unplugged | PASS | not tested | **FAIL** | not tested | not tested | not tested | not tested | not tested | not tested | not tested | Baseline re-run before the background-audio fix. See below. |
 | 2026-10-15 | same native build, JS at `8318d7c` (audio queued on the audio clock) | POCO F6 Pro, unplugged | PASS | PASS | PASS | not tested | not tested | not tested | not tested | not tested | not tested | not tested | Boxing only -- Assault Bike not yet converted. See below. |
+| 2026-10-15 | brand-mark native build, JS at `c4742d5` | POCO F6 Pro, unplugged, 16% battery | -- | -- | -- | not tested | **PASS (survived)** | not tested | PASS | not tested | not tested | not tested | Scenario 5 expected a kill and didn't get one. See below. |
 
 ### 2026-09-19 findings
 
@@ -123,6 +124,30 @@ expected — a scenario passing because it was assumed to pass isn't a test.
   doesn't apply -- the app has no lock-screen play/pause controls.
 - Not yet checked: the JS log for errors during the run (the phone was
   unplugged), and the remaining scenarios.
+
+### 2026-10-15 findings, MIUI autostart off (`c4742d5`)
+
+- **Scenario 7:** PASS -- `adb shell am start -n
+  com.miui.securitycenter/com.miui.permcenter.autostart.AutoStartManagementActivity`
+  (the target in `src/features/onboarding/service.ts`) opens HyperOS's
+  real "Background autostart" list, not generic Settings. Cornerman was
+  ON there before this test.
+- Switching Cornerman's autostart OFF killed the running app at once
+  (PID changed) -- MIUI doesn't wait for the app to go to the background.
+  Relaunched from Metro afterwards.
+- **Scenario 5:** boxing session started 19:19:42, screen locked, cable
+  unplugged, phone pocketed at 16% battery. User-observed: combos and
+  bells kept going for the full 10+ minutes. **Survived, so the
+  "app gets killed" expectation is wrong for this build** -- the audio
+  queue alone keeps the process alive without autostart. The JS log and
+  PID weren't checked afterwards (phone stayed unplugged until the
+  session had long finished).
+- Implication, not acted on: the onboarding battery step that pushes
+  users to enable autostart may be unnecessary on HyperOS. Scenario 6
+  (autostart ON) is now low-risk, since OFF already survives.
+- Run at 16% is a harsher test than intended. Future runs: charge to
+  50-80%, then unplug -- low battery invites battery saver, which
+  confounds the result (scenario 8 covers battery saver deliberately).
 
 Any failure found here is a follow-up bug, not something to fix inline
 during a test pass — log it and file it separately.
