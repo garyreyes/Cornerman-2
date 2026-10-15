@@ -88,6 +88,7 @@ expected — a scenario passing because it was assumed to pass isn't a test.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 2026-09-19 | dev client, local build | POCO F6 Pro | PASS | not tested | **FAIL** | not tested | not tested | not tested | not tested | not tested | not tested | not tested | See below. |
 | 2026-10-15 | same 2026-09-19 native build, current working-tree JS (schedule.ts not yet wired) | POCO F6 Pro, unplugged | PASS | not tested | **FAIL** | not tested | not tested | not tested | not tested | not tested | not tested | not tested | Baseline re-run before the background-audio fix. See below. |
+| 2026-10-15 | same native build, JS at `8318d7c` (audio queued on the audio clock) | POCO F6 Pro, unplugged | PASS | PASS | PASS | not tested | not tested | not tested | not tested | not tested | not tested | not tested | Boxing only -- Assault Bike not yet converted. See below. |
 
 ### 2026-09-19 findings
 
@@ -110,6 +111,18 @@ expected — a scenario passing because it was assumed to pass isn't a test.
 - Not yet tested plugged into a charger/power bank, which relaxes
   Android's background restrictions -- once the fix lands, test both
   unplugged (hardest) and charging.
+
+### 2026-10-15 findings, after the fix (`8318d7c`)
+
+- Boxing session, on battery. User-observed: combos and the timer keep
+  going with the **power button** (screen off), the **home button**, and
+  switching **Cornerman ↔ Spotify** in both directions -- Spotify keeps
+  playing alongside. **Recording video in the camera** mid-drill also
+  keeps the combos going (scenario 2, previously the highest-risk case).
+- Scenarios 1, 2, 3: PASS. The lock-screen-controls half of scenario 3
+  doesn't apply -- the app has no lock-screen play/pause controls.
+- Not yet checked: the JS log for errors during the run (the phone was
+  unplugged), and the remaining scenarios.
 
 Any failure found here is a follow-up bug, not something to fix inline
 during a test pass — log it and file it separately.

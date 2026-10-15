@@ -1615,3 +1615,15 @@ made during feature work.
     `onEnded` wall-clock times. Cannot distinguish true audio-clock drift
     from JS callback-delivery latency with this method; treat as an upper
     bound, and resync against wall clock on foreground either way.
+- **Session audio must never fire from a JS timer (2026-10-15).** Follows
+  from the measurement above. The boxing session queues every bell, clap,
+  tick and call-out ahead on the AudioContext clock
+  (`session/playbackQueue.ts` + `usePlayback.ts`); the 200ms interval in
+  `useSession.ts` only drives the display. Anything new that makes a
+  sound during a session goes through the schedule, not the tick loop.
+  Two known consequences:
+  - A punch name with no recorded clip falls back to on-device TTS on a
+    `setTimeout`, so it only speaks while the app is awake (ROADMAP 15d).
+  - The "session playing" notification is hidden by the display loop, so
+    a session that finishes while locked leaves it up until the app is
+    reopened.

@@ -198,11 +198,9 @@ from the real, shipped result)*
   `pause`/`resume` timer functions. Also added a minimal "session
   running" notification (`PlaybackNotificationManager`), confirmed
   scope. 105/105 tests passing, all gates green.
-  - [ ] Real-device verification — **not run**. This environment has no
-    device/simulator at all (same gap as 6a's visual audit) — whether
-    audio genuinely survives a locked screen or a real phone call has
-    never been observed, only reasoned through against the library's
-    source. Verify once you can run this on a real device.
+  - [x] Real-device verification — **run 2026-09-19, and it failed**: the
+    foreground service started correctly, but the timer and combos froze
+    on home/lock because they ran on a JS timer. Fixed in Phase 15.
 - [x] **7b. Onboarding/permission screen** — `done` —
   `src/app/OnboardingScreen.tsx`, first-launch only per
   `docs/user-flows.md` Flow 1: intro explainer → Android 13+
@@ -765,6 +763,44 @@ bike protocol rework and then the bagwork templates landed in front of it.*
   drifted "section title" sizes on one screen collapsed to two
   deliberate hierarchy levels. Full trace in `CHANGES.md`. 284/284 tests,
   lint/typecheck clean, each fix re-verified live on the emulator.
+
+## Phase 15 — Background Audio Survival
+
+Added 2026-10-15. Real-device testing on the POCO F6 Pro (2026-09-19)
+found that pressing home or the power button froze the round timer and
+combo call-outs -- failing `docs/PRD.md`'s hard requirement that a drill
+keeps calling out while the phone is locked or another app is in front.
+Root cause: every sound fired from a 200ms JS `setInterval`, and Android
+stops JS timers once the app isn't visible. Measurements in
+`PROJECT_FACTS.md` ("Backgrounded JS timers vs the audio clock").
+
+- [x] **15a. Verification spike** — `done`, 2026-09-19 — proved on the
+  real phone that `AudioBufferSourceNode.start(when)` fires while locked
+  and that each source's `onEnded` still wakes JS, so a short rolling
+  queue topped up from `onEnded` is viable.
+- [x] **15b. Boxing session plays from a precomputed schedule** — `done`,
+  2026-10-15 — `schedule.ts` walks the timer/session engines event to
+  event; `playbackQueue.ts` queues up to 30s (and at least 4 steps) ahead
+  on the audio clock, hands each item over exactly once, drops missed
+  items instead of bursting them, rewinds on pause or a settings change,
+  and shifts by the paused duration on resume. The JS loop now only
+  drives the display; `AppState` changes top the queue up. 336/336
+  tests. On the real phone: power button, home button, switching to and
+  from Spotify, and recording camera video all keep the combos and timer
+  going (`docs/DEVICE_TESTING.md`, 2026-10-15).
+  - [ ] Remaining device scenarios — **not run yet**: 10+ min pocketed
+    session (MIUI autostart off, then on), phone call mid-drill, pause/
+    resume then lock, settings change mid-session, a session finishing
+    with the screen off, charging, battery saver, Bluetooth.
+- [ ] **15c. Assault Bike gets the same treatment** — `not started` —
+  phase cues only (no speech). Reverses `PROJECT_FACTS.md`'s "no
+  background audio for the Assault-Bike Session screen" decision, which
+  needs recording there. Reaction-drill trials stay foreground-only.
+- [ ] **15d. Punch vocabulary** — `not started` — custom punch names fall
+  through to on-device TTS, which can't be queued on the audio clock, so
+  they go silent with the screen off. Restrict new punches to the
+  recorded vocabulary; keep existing custom punches, flagged as silent in
+  the background.
 
 ---
 
