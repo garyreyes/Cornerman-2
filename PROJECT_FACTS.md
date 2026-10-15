@@ -1583,3 +1583,35 @@ made during feature work.
   `withoutDrill()` before it reaches the engine. Once collapsed, the
   engine genuinely can't tell the two apart -- which is the point: the
   state machine only needs one "no drill" cycle, not two.
+- **Backgrounded JS timers vs the audio clock -- measured on a real POCO
+  F6 Pro (HyperOS), 2026-09-19.** This closes Phase 7a's standing
+  "real-device verification not run" gap, and it closes it *negatively*:
+  background audio as originally built does not survive. Measured with a
+  throwaway `src/app/spike.tsx` route (since deleted) that activated the
+  real audio session and showed the playback notification, so the Android
+  foreground service was running exactly as during a real drill.
+  - **`setInterval` cannot be relied on when the app is not visible.**
+    Screen locked: the 1s interval fired 10 times and then stopped dead
+    at 13.7s elapsed, silent for the remaining ~124s. Merely backgrounded
+    (home button, screen still on): erratic and bursty -- 13 ticks in
+    135s, in clumps separated by 12-22s gaps, fully stopped after 45s.
+    This is the root cause of the timer and combos freezing, and it means
+    **no design may depend on a JS timer continuing in the background.**
+  - **`AudioBufferSourceNode.start(when)` fires reliably with no JS
+    awake.** Four bells scheduled at +10s/+30s/+60s/+120s on the
+    AudioContext clock *all* played, both backgrounded and with the
+    screen locked -- including the 120s one, ~106s after the JS interval
+    had already died. Scheduling ahead on the audio clock is therefore
+    the viable mechanism for background cues.
+  - **Audio-thread callbacks wake JS even when timers are dead.** Each
+    source's `onEnded` executed at its own correct wall-clock time
+    (00:54:28 / 00:54:48 / 00:55:18 / 00:56:18) while the screen was
+    locked and long after the last `setInterval` tick -- and they were
+    spread across real time, not flushed in a batch on unlock. So a
+    rolling schedule horizon can be topped up from `onEnded` rather than
+    from a timer, which avoids having to queue an entire session's worth
+    of source nodes up front.
+  - **Observed ~0.3% late drift** at the 120s mark (~380ms) measured via
+    `onEnded` wall-clock times. Cannot distinguish true audio-clock drift
+    from JS callback-delivery latency with this method; treat as an upper
+    bound, and resync against wall clock on foreground either way.

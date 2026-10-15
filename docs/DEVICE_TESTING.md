@@ -86,7 +86,30 @@ expected — a scenario passing because it was assumed to pass isn't a test.
 
 | Date | Build/version | Device | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| | | POCO F6 Pro | | | | | | | | | | | |
+| 2026-09-19 | dev client, local build | POCO F6 Pro | PASS | not tested | **FAIL** | not tested | not tested | not tested | not tested | not tested | not tested | not tested | See below. |
+| 2026-10-15 | same 2026-09-19 native build, current working-tree JS (schedule.ts not yet wired) | POCO F6 Pro, unplugged | PASS | not tested | **FAIL** | not tested | not tested | not tested | not tested | not tested | not tested | not tested | Baseline re-run before the background-audio fix. See below. |
+
+### 2026-09-19 findings
+
+- **Scenario 1 (Spotify + drill):** PASS — both audible at once, cues cut through music as expected.
+- **Scenario 3 (lock screen) — FAIL, critical:** Pressing the **home button** pauses both the round timer and combo call-outs immediately. Pressing the **power button** (screen lock) does the same. This is not "audio ducks" or "cues get quiet" — the drill itself stops advancing. This directly fails the hard requirement in `docs/PRD.md` ("switch to camera or Spotify, or lock the phone" must not interrupt combos) and contradicts `ARCHITECTURE.md`'s statement that `src/lib/backgroundAudio.ts` handles this via EAS dev client + foreground service. Since this reproduces on **home button alone**, before MIUI's autostart killer is even a factor, the root cause is upstream of the MIUI-specific mitigation — likely the foreground service isn't actually starting, isn't held correctly, or the audio session/timer logic is tied to component lifecycle instead of the service.
+- Scenarios 2, 5, 6, 10 all depend on background survival and are expected to fail the same way until scenario 3 is fixed — not yet tested individually since the root cause is shared.
+
+### 2026-10-15 findings
+
+- Baseline re-run on battery (cable unplugged after the JS bundle
+  loaded), to confirm the failure before wiring in the precomputed
+  schedule. Spotify opened first, then Cornerman, then START.
+- **Scenario 1:** PASS -- combos, timer, and Spotify all run together in
+  the foreground.
+- **Scenario 3:** FAIL, unchanged from 2026-09-19 -- both the home button
+  and the power button (screen off, app not closed) stop the combos and
+  the round timer immediately. Spotify keeps playing. Consistent with
+  the measured root cause in `PROJECT_FACTS.md` ("Backgrounded JS timers
+  vs the audio clock").
+- Not yet tested plugged into a charger/power bank, which relaxes
+  Android's background restrictions -- once the fix lands, test both
+  unplugged (hardest) and charging.
 
 Any failure found here is a follow-up bug, not something to fix inline
 during a test pass — log it and file it separately.
